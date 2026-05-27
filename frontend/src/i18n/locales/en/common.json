@@ -1,0 +1,43 @@
+{
+  "loading": "Loading...",
+  "actions": {
+    "save": "Save",
+    "saving": "Saving...",
+    "backToHome": "Back to home"
+  },
+  "states": {
+    "notUpdated": "Not updated yet"
+  },
+  "errors": {
+    "notFound": "Page not found"
+  },
+  "debate": {
+    "phases": {
+      "motion": "Motion announcement",
+      "prep7": "Preparation (7 minutes)",
+      "speech": "Speech",
+      "crossExam": "Cross examination",
+      "judgeFeedback": "Judge feedback",
+      "prep1": "Break (1 minute)",
+      "closing": "Closing",
+      "finalJudging": "Final judging",
+      "completed": "Completed"
+    },
+    "speakers": {
+      "pro1": "Pro - Speaker 1",
+      "opp1": "Opposition - Speaker 1",
+      "pro2": "Pro - Speaker 2",
+      "opp2": "Opposition - Speaker 2",
+      "pro3": "Pro - Speaker 3",
+      "opp3": "Opposition - Speaker 3"
+    },
+    "criteria": {
+      "logic": "Logic & Reasoning",
+      "rebuttal": "Rebuttal Quality",
+      "evidence": "Evidence & Examples",
+      "crossExam": "Cross Examination",
+      "strategy": "Strategy & Consistency",
+      "communication": "Communication & Clarity"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "loading": "Đang tải...",
+  "actions": {
+    "save": "Lưu",
+    "saving": "Đang lưu...",
+    "backToHome": "Về trang chủ"
+  },
+  "states": {
+    "notUpdated": "Chưa cập nhật"
+  },
+  "errors": {
+    "notFound": "Trang không tồn tại"
+  },
+  "debate": {
+    "phases": {
+      "motion": "Công bố chủ đề",
+      "prep7": "Chuẩn bị (7 phút)",
+      "speech": "Phát biểu",
+      "crossExam": "Chất vấn",
+      "judgeFeedback": "BGK nhận xét",
+      "prep1": "Nghỉ (1 phút)",
+      "closing": "Tổng kết",
+      "finalJudging": "Chấm điểm cuối",
+      "completed": "Kết thúc"
+    },
+    "speakers": {
+      "pro1": "Ủng hộ - Speaker 1",
+      "opp1": "Phản đối - Speaker 1",
+      "pro2": "Ủng hộ - Speaker 2",
+      "opp2": "Phản đối - Speaker 2",
+      "pro3": "Ủng hộ - Speaker 3",
+      "opp3": "Phản đối - Speaker 3"
+    },
+    "criteria": {
+      "logic": "Lập luận & Logic",
+      "rebuttal": "Chất lượng phản biện",
+      "evidence": "Dẫn chứng & Ví dụ",
+      "crossExam": "Chất vấn chéo",
+      "strategy": "Chiến lược & Nhất quán",
+      "communication": "Trình bày & Rõ ràng"
+    }
+  }
+}

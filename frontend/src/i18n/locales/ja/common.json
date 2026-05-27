@@ -1,0 +1,43 @@
+{
+  "loading": "読み込み中...",
+  "actions": {
+    "save": "保存",
+    "saving": "保存中...",
+    "backToHome": "ホームに戻る"
+  },
+  "states": {
+    "notUpdated": "未設定"
+  },
+  "errors": {
+    "notFound": "ページが見つかりません"
+  },
+  "debate": {
+    "phases": {
+      "motion": "論題発表",
+      "prep7": "準備（7分）",
+      "speech": "スピーチ",
+      "crossExam": "クロス試問",
+      "judgeFeedback": "審判フィードバック",
+      "prep1": "休憩（1分）",
+      "closing": "総括",
+      "finalJudging": "最終判定",
+      "completed": "終了"
+    },
+    "speakers": {
+      "pro1": "賛成 - Speaker 1",
+      "opp1": "反対 - Speaker 1",
+      "pro2": "賛成 - Speaker 2",
+      "opp2": "反対 - Speaker 2",
+      "pro3": "賛成 - Speaker 3",
+      "opp3": "反対 - Speaker 3"
+    },
+    "criteria": {
+      "logic": "論理性・推論",
+      "rebuttal": "反駁の質",
+      "evidence": "証拠・具体例",
+      "crossExam": "クロス試問",
+      "strategy": "戦略・一貫性",
+      "communication": "伝達力・明瞭さ"
+    }
+  }
+}

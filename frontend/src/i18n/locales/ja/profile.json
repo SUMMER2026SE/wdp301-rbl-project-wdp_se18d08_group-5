@@ -1,0 +1,42 @@
+{
+  "title": "プロフィール",
+  "fields": {
+    "displayName": "表示名",
+    "avatar": "アバターURL",
+    "bio": "Bio",
+    "school": "学校",
+    "club": "クラブ"
+  },
+  "stats": {
+    "elo": "ELO",
+    "tier": "Tier",
+    "winLoss": "勝ち / 負け",
+    "totalDebates": "総ディベート数"
+  },
+  "status": {
+    "emailVerified": "メール認証済み",
+    "emailUnverified": "メール未認証"
+  },
+  "messages": {
+    "loadFailed": "プロフィールを読み込めませんでした",
+    "updateSuccess": "プロフィールを更新しました。",
+    "updateFailed": "プロフィールを更新できませんでした",
+    "notFound": "プロフィールが見つかりません"
+  },
+  "validation": {
+    "displayNameRequired": "表示名を入力してください",
+    "displayNameMax": "50文字以内で入力してください",
+    "avatarInvalid": "画像URLが正しくありません",
+    "bioMax": "500文字以内で入力してください",
+    "schoolMax": "100文字以内で入力してください",
+    "clubMax": "100文字以内で入力してください"
+  },
+  "tiers": {
+    "novice": "初心者",
+    "debater": "Debater",
+    "advanced": "上級",
+    "expert": "エキスパート",
+    "master": "マスター",
+    "grandMaster": "グランドマスター"
+  }
+}

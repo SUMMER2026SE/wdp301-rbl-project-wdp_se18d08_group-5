@@ -1,0 +1,92 @@
+{
+  "hero": {
+    "kicker": "Tranh biện học thuật, được hỗ trợ bởi AI",
+    "title": "Nền tảng tranh biện AI cho thi đấu học thuật",
+    "subtitle": "Tranh biện xếp hạng, tạo phòng riêng và nhận phản hồi AI rõ ràng sau mỗi trận."
+  },
+  "cta": {
+    "primaryAuth": "Vào xếp hạng",
+    "primaryGuest": "Bắt đầu ngay",
+    "secondaryAuth": "Tạo phòng",
+    "secondaryGuest": "Xem trận đấu"
+  },
+  "showcase": {
+    "liveRoom": "Phòng tranh biện trực tiếp",
+    "liveTitle": "Cross Examination đang diễn ra",
+    "liveCopy": "Luồng tranh biện rõ ràng, tốc độ nhanh, tập trung vào quyết định và phản biện.",
+    "playerSnapshot": "Tóm tắt người chơi",
+    "format": "Thể thức",
+    "judge": "Giám khảo",
+    "queue": "Hàng chờ",
+    "elo": "ELO",
+    "winRate": "Tỉ lệ thắng",
+    "feedback": "Phản hồi",
+    "strengths": "4 điểm mạnh"
+  },
+  "sections": {
+    "start": {
+      "title": "Vào trận theo cách bạn muốn",
+      "description": "Chọn xếp hạng để gặp đối thủ phù hợp hoặc mở phòng riêng cho bạn bè và câu lạc bộ.",
+      "bullets": ["Ghép trận xếp hạng", "Phòng riêng linh hoạt", "1v1 và 3v3"],
+      "eyebrow": "Bắt đầu nhanh",
+      "panelTitle": "Ranked hoặc custom room",
+      "panelDetail": "Ghép cặp nhanh hoặc chủ động tạo bàn tranh biện của riêng bạn.",
+      "stats": {
+        "modes": "Chế độ",
+        "access": "Truy cập",
+        "modesValue": "1v1 / 3v3",
+        "accessValue": "Công khai / riêng tư"
+      },
+      "cta": "Khám phá chế độ đấu"
+    },
+    "ai": {
+      "title": "AI giúp bạn tranh biện tốt hơn",
+      "description": "Không chỉ chấm điểm, AI còn chỉ ra lập luận yếu, ngụy biện và điểm cần cải thiện sau mỗi trận.",
+      "bullets": ["Phân tích lập luận", "Phát hiện ngụy biện", "Phản hồi sau trận"],
+      "eyebrow": "Lợi thế khác biệt",
+      "panelTitle": "Feedback rõ ràng, công bằng",
+      "panelDetail": "Biến mỗi trận đấu thành một vòng học tập có thể đo được.",
+      "stats": {
+        "analysis": "Phân tích",
+        "detection": "Nhận diện",
+        "analysisValue": "Lập luận",
+        "detectionValue": "Ngụy biện"
+      },
+      "cta": "Xem trải nghiệm AI"
+    },
+    "progress": {
+      "title": "Theo dõi tiến bộ thật qua từng trận",
+      "description": "Điểm ELO, lịch sử thắng thua và hồ sơ cá nhân giúp bạn biết mình đang tiến lên ở đâu.",
+      "bullets": ["Xếp hạng ELO", "Lịch sử trận đấu", "Hồ sơ tiến bộ"],
+      "eyebrow": "Tiến bộ đo được",
+      "panelTitle": "Stats không chỉ để trưng bày",
+      "panelDetail": "Biết bạn đang mạnh ở đâu và cần luyện thêm điều gì.",
+      "stats": {
+        "tracking": "Theo dõi",
+        "improvement": "Cải thiện",
+        "trackingValue": "Win / Loss",
+        "improvementValue": "Theo thời gian"
+      },
+      "cta": "Xem bảng xếp hạng"
+    },
+    "community": {
+      "title": "Xem cộng đồng tranh biện đang diễn ra",
+      "description": "Theo dõi trận đang live, bảng xếp hạng và hoạt động nổi bật để học nhanh hơn từ người khác.",
+      "bullets": ["Trận trực tiếp", "Bảng xếp hạng", "Quan sát chiến thuật"],
+      "eyebrow": "Khám phá cộng đồng",
+      "panelTitle": "Học qua quan sát",
+      "panelDetail": "Không cần vào trận ngay, bạn vẫn có thể xem, phân tích và học hỏi.",
+      "stats": {
+        "watch": "Theo dõi",
+        "explore": "Khám phá",
+        "watchValue": "Trận trực tiếp",
+        "exploreValue": "Top người chơi"
+      },
+      "cta": "Xem trận đang diễn ra"
+    }
+  },
+  "finalCta": {
+    "title": "Sẵn sàng cho trận tranh biện tiếp theo?",
+    "copy": "Bắt đầu với một trận xếp hạng, mở phòng riêng hoặc khám phá cộng đồng đang tranh biện ngay lúc này."
+  }
+}

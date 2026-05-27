@@ -1,0 +1,19 @@
+{
+  "brand": "AI Debate",
+  "links": {
+    "liveMatches": "Trận đấu trực tiếp",
+    "leaderboard": "Bảng xếp hạng",
+    "rank": "Xếp hạng",
+    "createRoom": "Tạo phòng",
+    "profile": "Hồ sơ",
+    "logout": "Đăng xuất",
+    "login": "Đăng nhập",
+    "register": "Đăng ký"
+  },
+  "language": {
+    "label": "Ngôn ngữ",
+    "en": "EN",
+    "vi": "VI",
+    "ja": "日本語"
+  }
+}

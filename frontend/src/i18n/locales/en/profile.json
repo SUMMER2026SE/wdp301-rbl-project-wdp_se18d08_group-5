@@ -1,0 +1,42 @@
+{
+  "title": "Profile",
+  "fields": {
+    "displayName": "Display name",
+    "avatar": "Avatar URL",
+    "bio": "Bio",
+    "school": "School",
+    "club": "Club"
+  },
+  "stats": {
+    "elo": "ELO",
+    "tier": "Tier",
+    "winLoss": "Wins / Losses",
+    "totalDebates": "Total debates"
+  },
+  "status": {
+    "emailVerified": "Email verified",
+    "emailUnverified": "Email not verified"
+  },
+  "messages": {
+    "loadFailed": "Unable to load profile",
+    "updateSuccess": "Profile updated successfully.",
+    "updateFailed": "Unable to update profile",
+    "notFound": "Profile not found"
+  },
+  "validation": {
+    "displayNameRequired": "Please enter a display name",
+    "displayNameMax": "Maximum 50 characters",
+    "avatarInvalid": "Invalid image URL",
+    "bioMax": "Maximum 500 characters",
+    "schoolMax": "Maximum 100 characters",
+    "clubMax": "Maximum 100 characters"
+  },
+  "tiers": {
+    "novice": "Novice",
+    "debater": "Debater",
+    "advanced": "Advanced",
+    "expert": "Expert",
+    "master": "Master",
+    "grandMaster": "Grand Master"
+  }
+}

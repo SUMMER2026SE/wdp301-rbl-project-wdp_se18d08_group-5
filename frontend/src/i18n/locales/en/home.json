@@ -1,0 +1,92 @@
+{
+  "hero": {
+    "kicker": "Academic debate, powered by AI",
+    "title": "AI debate platform for academic competition",
+    "subtitle": "Play ranked debates, create private rooms, and receive clear AI feedback after every match."
+  },
+  "cta": {
+    "primaryAuth": "Enter ranked queue",
+    "primaryGuest": "Get started",
+    "secondaryAuth": "Create room",
+    "secondaryGuest": "Watch matches"
+  },
+  "showcase": {
+    "liveRoom": "Live Debate Room",
+    "liveTitle": "Cross Examination in progress",
+    "liveCopy": "Structured rounds, fast pacing, and better focus on decision-making and rebuttal.",
+    "playerSnapshot": "Player Snapshot",
+    "format": "Format",
+    "judge": "Judge",
+    "queue": "Queue",
+    "elo": "ELO",
+    "winRate": "Win rate",
+    "feedback": "Feedback",
+    "strengths": "4 strengths"
+  },
+  "sections": {
+    "start": {
+      "title": "Join debates your way",
+      "description": "Queue into ranked matches or open private rooms for your friends and debate club.",
+      "bullets": ["Ranked matchmaking", "Flexible private rooms", "1v1 and 3v3"],
+      "eyebrow": "Fast start",
+      "panelTitle": "Ranked or custom room",
+      "panelDetail": "Jump into matchmaking or host your own debate table.",
+      "stats": {
+        "modes": "Modes",
+        "access": "Access",
+        "modesValue": "1v1 / 3v3",
+        "accessValue": "Public / private"
+      },
+      "cta": "Explore formats"
+    },
+    "ai": {
+      "title": "AI helps you debate better",
+      "description": "AI does more than score. It highlights weak reasoning, fallacies, and what to improve after the match.",
+      "bullets": ["Argument analysis", "Fallacy detection", "Post-match feedback"],
+      "eyebrow": "Core advantage",
+      "panelTitle": "Clear, fair feedback",
+      "panelDetail": "Turn every debate into a measurable learning loop.",
+      "stats": {
+        "analysis": "Analysis",
+        "detection": "Detection",
+        "analysisValue": "Arguments",
+        "detectionValue": "Fallacies"
+      },
+      "cta": "See AI experience"
+    },
+    "progress": {
+      "title": "Track real progress after every match",
+      "description": "ELO, win/loss history, and your profile show exactly where you are improving.",
+      "bullets": ["ELO ranking", "Match history", "Progress profile"],
+      "eyebrow": "Measured growth",
+      "panelTitle": "Stats with meaning",
+      "panelDetail": "See where you are strong and what you should train next.",
+      "stats": {
+        "tracking": "Tracking",
+        "improvement": "Improvement",
+        "trackingValue": "Win / Loss",
+        "improvementValue": "Over time"
+      },
+      "cta": "View leaderboard"
+    },
+    "community": {
+      "title": "See the debate community in motion",
+      "description": "Watch live debates, explore the leaderboard, and learn faster by observing other players.",
+      "bullets": ["Live matches", "Leaderboard", "Strategy observation"],
+      "eyebrow": "Explore community",
+      "panelTitle": "Learn by watching",
+      "panelDetail": "You can still observe, analyze, and learn even before joining a match.",
+      "stats": {
+        "watch": "Watch",
+        "explore": "Explore",
+        "watchValue": "Live matches",
+        "exploreValue": "Top players"
+      },
+      "cta": "Watch live now"
+    }
+  },
+  "finalCta": {
+    "title": "Ready for your next debate?",
+    "copy": "Start a ranked match, open a private room, or explore the community debating right now."
+  }
+}

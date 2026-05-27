@@ -1,0 +1,7 @@
+{
+  "generic": "エラーが発生しました",
+  "noRefreshToken": "リフレッシュトークンがありません",
+  "system": "システム",
+  "yellowCard": "イエローカード",
+  "redCard": "レッドカード"
+}

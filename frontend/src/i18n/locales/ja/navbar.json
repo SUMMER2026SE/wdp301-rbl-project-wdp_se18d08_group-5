@@ -1,0 +1,19 @@
+{
+  "brand": "AI Debate",
+  "links": {
+    "liveMatches": "ライブ対戦",
+    "leaderboard": "ランキング",
+    "rank": "ランク対戦",
+    "createRoom": "ルーム作成",
+    "profile": "プロフィール",
+    "logout": "ログアウト",
+    "login": "ログイン",
+    "register": "登録"
+  },
+  "language": {
+    "label": "言語",
+    "en": "EN",
+    "vi": "VI",
+    "ja": "日本語"
+  }
+}

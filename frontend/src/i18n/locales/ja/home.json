@@ -1,0 +1,92 @@
+{
+  "hero": {
+    "kicker": "AIが支えるアカデミックディベート",
+    "title": "学術競技のためのAIディベートプラットフォーム",
+    "subtitle": "ランク戦に参加し、プライベートルームを作成し、試合ごとに明確なAIフィードバックを受け取れます。"
+  },
+  "cta": {
+    "primaryAuth": "ランク戦へ",
+    "primaryGuest": "今すぐ始める",
+    "secondaryAuth": "ルーム作成",
+    "secondaryGuest": "試合を見る"
+  },
+  "showcase": {
+    "liveRoom": "ライブディベートルーム",
+    "liveTitle": "Cross Examination 進行中",
+    "liveCopy": "明確な進行、速いテンポ、そして判断力と反論に集中できる設計です。",
+    "playerSnapshot": "プレイヤースナップショット",
+    "format": "形式",
+    "judge": "審査",
+    "queue": "キュー",
+    "elo": "ELO",
+    "winRate": "勝率",
+    "feedback": "フィードバック",
+    "strengths": "強み4項目"
+  },
+  "sections": {
+    "start": {
+      "title": "自分に合った方法で参加",
+      "description": "ランク戦で実力の近い相手と戦うか、友人やクラブ向けにプライベートルームを開けます。",
+      "bullets": ["ランクマッチング", "柔軟なプライベートルーム", "1v1 と 3v3"],
+      "eyebrow": "素早く開始",
+      "panelTitle": "ランク戦またはカスタムルーム",
+      "panelDetail": "すぐにマッチングへ入るか、自分専用のディベート卓を作成できます。",
+      "stats": {
+        "modes": "モード",
+        "access": "公開範囲",
+        "modesValue": "1v1 / 3v3",
+        "accessValue": "公開 / 非公開"
+      },
+      "cta": "形式を見る"
+    },
+    "ai": {
+      "title": "AIでより良い議論へ",
+      "description": "AIは採点だけでなく、弱い論理や詭弁、試合後に改善すべき点まで示します。",
+      "bullets": ["論点分析", "詭弁検出", "試合後フィードバック"],
+      "eyebrow": "中核の強み",
+      "panelTitle": "明確で公平なフィードバック",
+      "panelDetail": "すべての試合を測定可能な学習サイクルに変えます。",
+      "stats": {
+        "analysis": "分析",
+        "detection": "検出",
+        "analysisValue": "論点",
+        "detectionValue": "詭弁"
+      },
+      "cta": "AI体験を見る"
+    },
+    "progress": {
+      "title": "試合ごとの成長を可視化",
+      "description": "ELO、勝敗履歴、プロフィールにより、自分の成長を正確に把握できます。",
+      "bullets": ["ELOランキング", "対戦履歴", "成長プロフィール"],
+      "eyebrow": "測定できる成長",
+      "panelTitle": "意味のある統計",
+      "panelDetail": "自分の強みと次に鍛えるべき点が見えてきます。",
+      "stats": {
+        "tracking": "追跡",
+        "improvement": "改善",
+        "trackingValue": "勝敗",
+        "improvementValue": "時系列"
+      },
+      "cta": "ランキングを見る"
+    },
+    "community": {
+      "title": "動いているコミュニティを見る",
+      "description": "ライブ対戦を観戦し、ランキングを確認し、他のプレイヤーを観察して素早く学べます。",
+      "bullets": ["ライブ対戦", "ランキング", "戦略観察"],
+      "eyebrow": "コミュニティ探索",
+      "panelTitle": "見て学ぶ",
+      "panelDetail": "試合に入る前でも、観察・分析・学習が可能です。",
+      "stats": {
+        "watch": "観戦",
+        "explore": "探索",
+        "watchValue": "ライブ対戦",
+        "exploreValue": "上位プレイヤー"
+      },
+      "cta": "ライブを見る"
+    }
+  },
+  "finalCta": {
+    "title": "次のディベートに挑みますか？",
+    "copy": "ランク戦を始める、プライベートルームを開く、または今まさに議論しているコミュニティを見てみましょう。"
+  }
+}

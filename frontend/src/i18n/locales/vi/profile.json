@@ -1,0 +1,42 @@
+{
+  "title": "Hồ sơ",
+  "fields": {
+    "displayName": "Tên hiển thị",
+    "avatar": "Avatar URL",
+    "bio": "Bio",
+    "school": "Trường",
+    "club": "CLB"
+  },
+  "stats": {
+    "elo": "ELO",
+    "tier": "Tier",
+    "winLoss": "Thắng / Thua",
+    "totalDebates": "Tổng debate"
+  },
+  "status": {
+    "emailVerified": "Email đã xác thực",
+    "emailUnverified": "Chưa xác thực email"
+  },
+  "messages": {
+    "loadFailed": "Không thể tải hồ sơ",
+    "updateSuccess": "Cập nhật hồ sơ thành công.",
+    "updateFailed": "Không thể cập nhật hồ sơ",
+    "notFound": "Không tìm thấy hồ sơ"
+  },
+  "validation": {
+    "displayNameRequired": "Vui lòng nhập tên hiển thị",
+    "displayNameMax": "Tối đa 50 ký tự",
+    "avatarInvalid": "URL ảnh không hợp lệ",
+    "bioMax": "Tối đa 500 ký tự",
+    "schoolMax": "Tối đa 100 ký tự",
+    "clubMax": "Tối đa 100 ký tự"
+  },
+  "tiers": {
+    "novice": "Tân binh",
+    "debater": "Debater",
+    "advanced": "Nâng cao",
+    "expert": "Chuyên gia",
+    "master": "Master",
+    "grandMaster": "Grand Master"
+  }
+}
