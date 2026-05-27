@@ -9,3 +9,7 @@ export const updateProfileSchema = z.object({
   school: z.string().trim().max(100).optional(),
   club: z.string().trim().max(100).optional(),
 });
+
+export const userSearchQuerySchema = z.object({
+  q: z.string().trim().min(1, 'Query is required'),
+});

@@ -244,12 +244,27 @@ export interface ChatMessage {
 export interface LeaderboardEntry {
   _id: string;
   username: string;
+  displayName?: string;
   avatar: string;
   elo: number;
   tier: RankTier;
   wins: number;
   losses: number;
   rank: number;
+}
+
+export interface DebateHistoryItem {
+  sessionId: string;
+  roomId: string;
+  roomTitle: string;
+  motion: string;
+  format: DebateFormat;
+  status: RoomStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+  userSide: Team | null;
+  userRole: RoomRole;
+  result: 'win' | 'loss' | 'draw' | null;
 }
 
 // --- API Response ---

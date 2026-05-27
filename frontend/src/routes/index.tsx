@@ -15,6 +15,7 @@ const ForgotPasswordPage = lazy(() => import('@pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('@pages/auth/ResetPasswordPage'));
 const ChangePasswordPage = lazy(() => import('@pages/auth/ChangePasswordPage'));
 const ProfilePage = lazy(() => import('@pages/user/ProfilePage'));
+const HistoryPage = lazy(() => import('@pages/user/HistoryPage'));
 const LeaderboardPage = lazy(() => import('@pages/ranking/LeaderboardPage'));
 const LiveMatchesPage = lazy(() => import('@pages/matches/LiveMatchesPage'));
 const CreateRoomPage = lazy(() => import('@pages/room/CreateRoomPage'));
@@ -46,6 +47,10 @@ export const routes: RouteObject[] = [
       {
         path: 'profile/:userId',
         element: withSuspense(ProfilePage),
+      },
+      {
+        path: 'profile/:userId/history',
+        element: withSuspense(HistoryPage),
       },
       {
         path: 'leaderboard',

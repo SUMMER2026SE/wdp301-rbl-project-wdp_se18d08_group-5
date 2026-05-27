@@ -13,9 +13,9 @@
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A1-01 | `GET /users/:id/history` — paginated debate history | UC-11 | `user.routes.ts` | ❌ Chưa impl |
-| A1-02 | User search — `GET /users/search?q=` | — | `user.routes.ts` | ❌ Chưa impl |
-| A1-03 | Avatar URL validation (Zod schema) | UC-09 | `user.routes.ts` | ❌ Chưa impl |
+| A1-01 | `GET /users/:id/history` — paginated debate history | UC-11 | `user.routes.ts` | ✅ Đã impl |
+| A1-02 | User search — `GET /users/search?q=` | — | `user.routes.ts` | ✅ Đã impl |
+| A1-03 | Avatar URL validation (Zod schema) | UC-09 | `user.routes.ts` | ✅ Đã impl |
 
 #### Matchmaking (Dev 2)
 
@@ -82,8 +82,8 @@
 |---|------|----|------|--------|
 | F1-01 | Auth store với access/refresh token logic | UC-04 | `stores/authStore.ts` | ⚠️ partial |
 | F1-02 | Token refresh interceptor | UC-04 | `services/api.ts` | ❌ |
-| F1-03 | Profile page — edit + avatar URL | UC-07-09 | `pages/user/ProfilePage.tsx` | ❌ |
-| F1-04 | User history page (debate list) | UC-11 | `pages/user/HistoryPage.tsx` | ❌ |
+| F1-03 | Profile page — edit + avatar URL | UC-07-09 | `pages/user/ProfilePage.tsx` | ✅ Đã impl |
+| F1-04 | User history page (debate list) | UC-11 | `pages/user/HistoryPage.tsx` | ✅ Đã impl |
 
 #### Room + Matchmaking (Dev 2)
 
@@ -138,7 +138,7 @@
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| F6-01 | Leaderboard page — ELO + tier display | UC-64 | `pages/ranking/LeaderboardPage.tsx` | ❌ |
+| F6-01 | Leaderboard page — ELO + tier display | UC-64 | `pages/ranking/LeaderboardPage.tsx` | ✅ Đã impl |
 | F6-02 | Rank badge component | — | `components/ranking/RankBadge.tsx` | ❌ |
 
 ---

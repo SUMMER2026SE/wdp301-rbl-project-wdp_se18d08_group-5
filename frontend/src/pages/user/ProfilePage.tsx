@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Card, Col, Container, Form, Image, Row, Spinner } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +13,7 @@ const fallbackAvatar = 'https://via.placeholder.com/160?text=User';
 
 export default function ProfilePage() {
   const { userId } = useParams();
+  const navigate = useNavigate();
   const { user: currentUser, setUser } = useAuthStore();
   const { t } = useTranslation('profile');
   const [profile, setProfile] = useState<User | null>(null);
@@ -61,8 +62,16 @@ export default function ProfilePage() {
     setMessage('');
     try {
       const res = await userService.updateProfile(userId, data);
-      setProfile(res.data.data);
-      if (isOwner) setUser(res.data.data);
+      const updatedUser = res.data.data;
+      setProfile(updatedUser);
+      reset({
+        displayName: updatedUser.profile.displayName || updatedUser.username,
+        avatar: updatedUser.profile.avatar || '',
+        bio: updatedUser.profile.bio || '',
+        school: updatedUser.profile.school || '',
+        club: updatedUser.profile.club || '',
+      });
+      if (isOwner) setUser(updatedUser);
       setMessage(t('messages.updateSuccess'));
     } catch (err: any) {
       setError(err.response?.data?.message || t('messages.updateFailed'));
@@ -105,6 +114,13 @@ export default function ProfilePage() {
               <div className="d-flex justify-content-between"><span>{t('stats.tier')}</span><strong>{profile.ranking.tier}</strong></div>
               <div className="d-flex justify-content-between"><span>{t('stats.winLoss')}</span><strong>{profile.stats.wins} / {profile.stats.losses}</strong></div>
               <div className="d-flex justify-content-between"><span>{t('stats.totalDebates')}</span><strong>{profile.stats.totalDebates}</strong></div>
+              <Button
+                onClick={() => navigate(`/profile/${profile._id}/history`)}
+                variant="outline-primary"
+                className="mt-3 w-100"
+              >
+                Xem lịch sử tranh biện
+              </Button>
             </Card.Body>
           </Card>
         </Col>

@@ -67,9 +67,10 @@ Production:  https://<domain>/api/v1
 | 6 | GET | `/users/:id` | Xem hồ sơ công khai | Guest/User | — | ✅ |
 | 7 | PUT | `/users/:id/profile` | Cập nhật hồ sơ | User (owner) | `{ displayName?, bio?, school?, avatar?, club? }` | ✅ |
 | 8 | GET | `/users/:id/stats` | Xem thống kê (W/L, điểm TB, ELO) | Guest/User | — | ✅ |
-| 9 | GET | `/users/:id/history` | Xem lịch sử tranh biện | User | Query: `?page=&limit=` | ❌ **Chưa impl** |
+| 9 | GET | `/users/:id/history` | Xem lịch sử tranh biện | Guest/User | Query: `?page=&limit=` | ✅ |
+| 10 | GET | `/users/search?q=` | Tìm user theo username/displayName | User | Query: `?q=` | ✅ |
 
-> **Cần thêm:** `GET /users/:id/history` — phân trang debate history, trả về danh sách `DebateSession` đã completed.
+> `GET /users/:id/history` hiện query từ `DebateRoom.status = completed` + `participants`, sau đó join `DebateSession.finalScores` để shape kết quả win/loss/draw tối thiểu cho frontend.
 
 ---
 
@@ -308,7 +309,8 @@ VITE_SOCKET_URL=http://localhost:3000
 
 - [x] Auth routes (5 endpoints)
 - [x] User routes (profile, stats)
-- [ ] User history — `GET /users/:id/history`
+- [x] User history — `GET /users/:id/history`
+- [x] User search — `GET /users/search?q=`
 - [x] Room CRUD — create, list, detail, join, leave, position, lock, kick
 - [ ] Room edit — `PUT /rooms/:id`
 - [ ] Room delete — `DELETE /rooms/:id`
