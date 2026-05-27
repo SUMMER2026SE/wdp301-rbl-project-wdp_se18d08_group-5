@@ -16,6 +16,7 @@ import matchmakingRoutes from './features/matchmaking/matchmaking.routes.js';
 import debateRoutes from './features/debate/debate.routes.js';
 import aiRoutes from './features/ai/ai.routes.js';
 import rankingRoutes from './features/ranking/ranking.routes.js';
+import adminRoutes from './features/admin/admin.routes.js';
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/v1/matchmaking', matchmakingRoutes);
 app.use('/api/v1/debate', debateRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/rankings', rankingRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

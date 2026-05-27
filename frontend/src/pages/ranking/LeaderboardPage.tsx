@@ -1,28 +1,12 @@
 import { useState } from 'react';
-import { Alert, Badge, Container, Pagination, Table } from 'react-bootstrap';
+import { Alert, Container, Pagination, Table } from 'react-bootstrap';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingScreen } from '@components/common/LoadingScreen';
+import { RankBadge } from '@components/ranking/RankBadge';
 import { rankingService } from '@services/rankingService';
 import { useAuthStore } from '@stores/authStore';
 
 const PAGE_SIZE = 20;
-
-function tierVariant(tier: string) {
-  switch (tier) {
-    case 'GrandMaster':
-      return 'danger';
-    case 'Master':
-      return 'warning';
-    case 'Expert':
-      return 'info';
-    case 'Advanced':
-      return 'primary';
-    case 'Debater':
-      return 'secondary';
-    default:
-      return 'dark';
-  }
-}
 
 export default function LeaderboardPage() {
   const [page, setPage] = useState(1);
@@ -96,7 +80,7 @@ export default function LeaderboardPage() {
                     </td>
                     <td>{entry.elo}</td>
                     <td>
-                      <Badge bg={tierVariant(entry.tier)}>{entry.tier}</Badge>
+                      <RankBadge tier={entry.tier} />
                     </td>
                     <td>{entry.wins}/{entry.losses}</td>
                   </tr>

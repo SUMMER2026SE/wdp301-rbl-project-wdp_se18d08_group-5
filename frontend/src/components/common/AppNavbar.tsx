@@ -144,6 +144,16 @@ export function AppNavbar() {
                   <i className="bi bi-person me-2" />
                   {t('links.profile')}
                 </NavDropdown.Item>
+                {user.role === 'admin' && (
+                  <NavDropdown.Item as={Link} to="/admin">
+                    <i className="bi bi-speedometer2 me-2" />
+                    {t('links.admin')}
+                  </NavDropdown.Item>
+                )}
+                <NavDropdown.Item as={Link} to="/change-password">
+                  <i className="bi bi-shield-lock me-2" />
+                  {t('links.changePassword')}
+                </NavDropdown.Item>
                 <NavDropdown.Divider />
                 <NavDropdown.Item onClick={handleLogout}>
                   <i className="bi bi-box-arrow-right me-2" />

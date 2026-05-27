@@ -1,12 +1,14 @@
 import { Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/AppError.js';
+import { User } from '../models/User.js';
+import { assertNotBanned } from '../utils/ban.js';
 import type { AuthRequest } from '../types/index.js';
 
 /**
  * Verify JWT access token from Authorization header.
  */
-export function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
+export async function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -17,9 +19,20 @@ export function authenticate(req: AuthRequest, _res: Response, next: NextFunctio
 
   try {
     const payload = verifyAccessToken(token);
-    req.user = payload;
+    const user = await User.findById(payload.userId).select('role isBanned bannedUntil');
+
+    if (!user) {
+      throw new UnauthorizedError('User not found');
+    }
+
+    assertNotBanned(user);
+    req.user = { userId: payload.userId, role: user.role };
     next();
-  } catch {
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      throw error;
+    }
+
     throw new UnauthorizedError('Invalid or expired token');
   }
 }

@@ -6,7 +6,6 @@ import DebateLayout from '@layouts/DebateLayout';
 import { ProtectedRoute } from '@components/common/ProtectedRoute';
 import { LoadingScreen } from '@components/common/LoadingScreen';
 
-// Lazy-loaded pages
 const HomePage = lazy(() => import('@pages/HomePage'));
 const LoginPage = lazy(() => import('@pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@pages/auth/RegisterPage'));
@@ -17,6 +16,7 @@ const ChangePasswordPage = lazy(() => import('@pages/auth/ChangePasswordPage'));
 const ProfilePage = lazy(() => import('@pages/user/ProfilePage'));
 const HistoryPage = lazy(() => import('@pages/user/HistoryPage'));
 const LeaderboardPage = lazy(() => import('@pages/ranking/LeaderboardPage'));
+const AdminDashboardPage = lazy(() => import('@pages/admin/AdminDashboardPage'));
 const LiveMatchesPage = lazy(() => import('@pages/matches/LiveMatchesPage'));
 const CreateRoomPage = lazy(() => import('@pages/room/CreateRoomPage'));
 const LobbyPage = lazy(() => import('@pages/room/LobbyPage'));
@@ -67,6 +67,12 @@ export const routes: RouteObject[] = [
           { path: 'rooms/:roomId/lobby', element: withSuspense(LobbyPage) },
           { path: 'matchmaking', element: withSuspense(RankQueuePage) },
           { path: 'change-password', element: withSuspense(ChangePasswordPage) },
+        ],
+      },
+      {
+        element: <ProtectedRoute allowedRoles={['admin']} />,
+        children: [
+          { path: 'admin', element: withSuspense(AdminDashboardPage) },
         ],
       },
       {

@@ -6,6 +6,8 @@
     "rank": "Xếp hạng",
     "createRoom": "Tạo phòng",
     "profile": "Hồ sơ",
+    "admin": "Admin",
+    "changePassword": "Đổi mật khẩu",
     "logout": "Đăng xuất",
     "login": "Đăng nhập",
     "register": "Đăng ký"

@@ -2,10 +2,6 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@stores/authStore';
 import { authService } from '@services/authService';
 
-/**
- * Initialize auth state on app load.
- * If tokens exist in storage, fetch current user.
- */
 export function useAuthInit() {
   const { accessToken, setUser, logout, setLoading } = useAuthStore();
 
@@ -15,14 +11,25 @@ export function useAuthInit() {
       return;
     }
 
+    let isMounted = true;
+
     authService
       .getMe()
       .then((res) => {
+        if (!isMounted) return;
         setUser(res.data.data);
-        setLoading(false);
       })
       .catch(() => {
+        if (!isMounted) return;
         logout();
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessToken, logout, setLoading, setUser]);
 }

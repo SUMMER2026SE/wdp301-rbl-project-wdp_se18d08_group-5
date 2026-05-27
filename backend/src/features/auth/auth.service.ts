@@ -3,6 +3,7 @@ import { User, IUser } from '../../models/User.js';
 import { ENV } from '../../config/env.js';
 import { generateTokenPair, verifyRefreshToken } from '../../utils/jwt.js';
 import { BadRequestError, UnauthorizedError, ConflictError } from '../../utils/AppError.js';
+import { assertNotBanned } from '../../utils/ban.js';
 import { generateRawToken, hashToken } from '../../utils/token.js';
 import { emailService } from './email.service.js';
 import type {
@@ -87,6 +88,7 @@ export class AuthService {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) throw new UnauthorizedError('Invalid email or password');
+    assertNotBanned(user);
 
     const tokens = generateTokenPair({ userId: user._id.toString(), role: user.role });
 
@@ -126,6 +128,7 @@ export class AuthService {
       await user.save();
     }
 
+    assertNotBanned(user);
     const tokens = generateTokenPair({ userId: user._id.toString(), role: user.role });
     return { user: this.sanitizeUser(user), ...tokens };
   }
@@ -173,6 +176,7 @@ export class AuthService {
       const payload = verifyRefreshToken(refreshToken);
       const user = await User.findById(payload.userId);
       if (!user) throw new UnauthorizedError('User not found');
+      assertNotBanned(user);
 
       const tokens = generateTokenPair({ userId: user._id.toString(), role: user.role });
       return tokens;
@@ -184,6 +188,7 @@ export class AuthService {
   async getMe(userId: string) {
     const user = await User.findById(userId);
     if (!user) throw new BadRequestError('User not found');
+    assertNotBanned(user);
     return this.sanitizeUser(user);
   }
 

@@ -70,9 +70,9 @@
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A6-01 | ELO calculation service (K-factor, expected score) | UC-52 | `ranking.service.ts` | ❌ Chưa impl |
-| A6-02 | Tier calculation (Novice → GrandMaster) | — | `ranking.service.ts` | ❌ Chưa impl |
-| A6-03 | ELO update sau debate (trigger từ debate ended) | UC-52 | `debate.service.ts` | ❌ Chưa impl |
+| A6-01 | ELO calculation service (K-factor, expected score) | UC-52 | `ranking.service.ts` | ✅ Đã impl |
+| A6-02 | Tier calculation (Novice → GrandMaster) | — | `ranking.service.ts` | ✅ Đã impl |
+| A6-03 | ELO update sau debate (trigger từ debate ended) | UC-52 | `debate.service.ts` | ✅ Đã impl |
 
 ### A2. Frontend Features
 
@@ -80,8 +80,8 @@
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| F1-01 | Auth store với access/refresh token logic | UC-04 | `stores/authStore.ts` | ⚠️ partial |
-| F1-02 | Token refresh interceptor | UC-04 | `services/api.ts` | ❌ |
+| F1-01 | Auth store với access/refresh token logic | UC-04 | `stores/authStore.ts` | ✅ Đã impl |
+| F1-02 | Token refresh interceptor | UC-04 | `services/api.ts` | ✅ Đã impl |
 | F1-03 | Profile page — edit + avatar URL | UC-07-09 | `pages/user/ProfilePage.tsx` | ✅ Đã impl |
 | F1-04 | User history page (debate list) | UC-11 | `pages/user/HistoryPage.tsx` | ✅ Đã impl |
 
@@ -139,7 +139,7 @@
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
 | F6-01 | Leaderboard page — ELO + tier display | UC-64 | `pages/ranking/LeaderboardPage.tsx` | ✅ Đã impl |
-| F6-02 | Rank badge component | — | `components/ranking/RankBadge.tsx` | ❌ |
+| F6-02 | Rank badge component | — | `components/ranking/RankBadge.tsx` | ✅ Đã impl |
 
 ---
 

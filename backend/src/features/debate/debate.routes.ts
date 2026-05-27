@@ -5,6 +5,7 @@ import { sendSuccess } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
 import { NotFoundError, ForbiddenError } from '../../utils/AppError.js';
+import { applyDebateResult } from '../ranking/ranking.service.js';
 import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
@@ -17,15 +18,12 @@ router.post(
     const room = await DebateRoom.findById(req.params.roomId);
     if (!room) throw new NotFoundError('Room not found');
 
-    // Check host permission
     const isHost = room.hostId?.toString() === req.user!.userId;
     const isOwner = room.createdBy.toString() === req.user!.userId;
     if (!isHost && !isOwner) throw new ForbiddenError('Only host can pause');
 
     room.status = 'paused';
     await room.save();
-
-    // TODO: Emit socket event debate:paused
 
     sendSuccess(res, { status: 'paused' }, 'Debate paused');
   }),
@@ -46,8 +44,6 @@ router.post(
     room.status = 'active';
     await room.save();
 
-    // TODO: Emit socket event debate:resumed
-
     sendSuccess(res, { status: 'active' }, 'Debate resumed');
   }),
 );
@@ -65,7 +61,6 @@ router.post(
     const isOwner = room.createdBy.toString() === req.user!.userId;
     if (!isHost && !isOwner) throw new ForbiddenError('Only host can issue cards');
 
-    // Save card to session
     const session = await DebateSession.findOne({ roomId: room._id });
     if (session) {
       session.cards.push({
@@ -77,8 +72,6 @@ router.post(
       });
       await session.save();
     }
-
-    // TODO: Emit socket event debate:card-issued
 
     sendSuccess(res, { type: 'yellow', userId, reason }, 'Card issued');
   }),
@@ -102,8 +95,6 @@ router.post(
     ) as any;
     await room.save();
 
-    // TODO: Emit socket event + disconnect user
-
     sendSuccess(res, null, 'Participant kicked');
   }),
 );
@@ -114,14 +105,27 @@ router.post(
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { speaker, score } = req.body;
-    // score: { logic, rebuttal, evidence, crossExam, strategy, communication }
-
     const session = await DebateSession.findOne({ roomId: req.params.roomId });
     if (!session) throw new NotFoundError('Session not found');
 
-    // TODO: Validate judge role, save score to turn history
-
     sendSuccess(res, { speaker, score }, 'Score submitted');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/result — Apply final result to ranking for rank rooms
+router.post(
+  '/:roomId/result',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.roomId);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host can finalize result');
+
+    const rankingResult = await applyDebateResult(req.params.roomId);
+    sendSuccess(res, rankingResult, rankingResult.applied ? 'Result applied' : 'Result not applied');
   }),
 );
 

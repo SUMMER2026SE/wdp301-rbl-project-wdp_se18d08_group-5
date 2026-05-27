@@ -11,14 +11,14 @@
 | Nhóm | Số endpoint REST | Trạng thái | Ghi chú |
 |------|-----------------|------------|---------|
 | A. Auth | 5 | ✅ Đã impl | |
-| B. User/Profile | 3 / 4 impl | ⚠️ Incomplete | Thiếu history |
+| B. User/Profile | 4 / 4 impl | ✅ Complete | Search + history đã impl |
 | C. Matchmaking | 3 route impl | ⚠️ Partial | Matcher service chưa impl |
 | D. Room | 9 / 12 impl | ⚠️ Incomplete | Thiếu assign-role, edit, delete |
 | E. Host Controls | 5 / 6 impl | ⚠️ Sai vị trí | Hiện tại `/debate/:id/host/*`, thiếu `next-turn`, cần `/rooms/:id/host/*` |
 | F. Cross Exam | 0 REST / 2 socket partial | ⚠️ Partial | REST chưa impl, socket chỉ stub |
-| G. Judge/Scoring | 1 / 3 impl | ⚠️ Partial | `submit-score` mới là stub; thiếu scores + result |
+| G. Judge/Scoring | 2 / 3 impl | ⚠️ Partial | `submit-score` còn stub; đã có hook apply result, thiếu scores |
 | H. AI | 4 / 6 impl | ⚠️ Incomplete | Thiếu judge-turn + final-verdict |
-| I. Ranking | 2 | ✅ Đã impl | |
+| I. Ranking | 2 + service hook | ✅ Đã impl | Leaderboard/user rank + ELO apply flow |
 | **Tổng REST** | **~27 impl + 1 partial / ~42** | **⚠️ Incomplete** | Socket events còn nhiều mục stub/missing |
 | Socket events | ~20 | ⚠️ Cần xem 08_Socket | Bidirectional |
 
@@ -158,7 +158,7 @@ Production:  https://<domain>/api/v1
 |---|--------|----------|--------|-------|---------------|--------|
 | 35 | POST | `/rooms/:id/judge/submit-score` | Nộp điểm (6 tiêu chí / 100) (UC-48) | Judge (human) | `{ speaker, logic, rebuttal, evidence, crossExam, strategy, communication, notes? }` | ⚠️ Đã impl ở `/debate/:roomId/judge/submit-score`, còn stub |
 | 36 | GET | `/rooms/:id/scores` | Xem điểm tổng hợp (judges + AI) (UC-49–50) | Participant/Viewer | — | ❌ **Chưa impl** |
-| 37 | GET | `/rooms/:id/result` | Kết quả trận (winner, ELO change) (UC-51–52) | User | — | ❌ **Chưa impl** |
+| 37 | POST | `/debate/:roomId/result` | Apply kết quả trận rank vào ELO/tier | Owner/Host | — | ✅ |
 
 ---
 

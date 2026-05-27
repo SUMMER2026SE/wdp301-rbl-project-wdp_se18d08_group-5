@@ -4,10 +4,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { authService } from '@services/authService';
+import { useAuthStore } from '@stores/authStore';
 
 export default function ChangePasswordPage() {
   const { t } = useTranslation('auth');
+  const userId = useAuthStore((state) => state.user?._id);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,23 +47,33 @@ export default function ChangePasswordPage() {
     <Container className="py-5">
       <Card className="mx-auto shadow-sm" style={{ maxWidth: 520 }}>
         <Card.Body className="p-4">
-          <h3 className="text-center mb-4">{t('changePassword.title')}</h3>
+          <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h3 className="mb-2">{t('changePassword.title')}</h3>
+              <p className="text-muted mb-0">{t('changePassword.hint')}</p>
+            </div>
+            {userId && (
+              <Button as={Link as any} to={`/profile/${userId}`} variant="outline-secondary" size="sm">
+                {t('changePassword.backToProfile')}
+              </Button>
+            )}
+          </div>
           {message && <Alert variant="success">{message}</Alert>}
           {error && <Alert variant="danger">{error}</Alert>}
           <Form onSubmit={handleSubmit(onSubmit)}>
             <Form.Group className="mb-3">
               <Form.Label>{t('fields.currentPassword')}</Form.Label>
-              <Form.Control type="password" isInvalid={!!errors.currentPassword} {...register('currentPassword')} />
+              <Form.Control type="password" autoComplete="current-password" isInvalid={!!errors.currentPassword} {...register('currentPassword')} />
               <Form.Control.Feedback type="invalid">{errors.currentPassword?.message}</Form.Control.Feedback>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('fields.newPassword')}</Form.Label>
-              <Form.Control type="password" isInvalid={!!errors.newPassword} {...register('newPassword')} />
+              <Form.Control type="password" autoComplete="new-password" isInvalid={!!errors.newPassword} {...register('newPassword')} />
               <Form.Control.Feedback type="invalid">{errors.newPassword?.message}</Form.Control.Feedback>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>{t('fields.confirmPassword')}</Form.Label>
-              <Form.Control type="password" isInvalid={!!errors.confirmPassword} {...register('confirmPassword')} />
+              <Form.Control type="password" autoComplete="new-password" isInvalid={!!errors.confirmPassword} {...register('confirmPassword')} />
               <Form.Control.Feedback type="invalid">{errors.confirmPassword?.message}</Form.Control.Feedback>
             </Form.Group>
             <Button type="submit" className="w-100" disabled={loading}>{loading ? t('changePassword.submitting') : t('changePassword.submit')}</Button>

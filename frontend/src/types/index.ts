@@ -267,6 +267,45 @@ export interface DebateHistoryItem {
   result: 'win' | 'loss' | 'draw' | null;
 }
 
+export interface AdminUser {
+  _id: string;
+  username: string;
+  email: string;
+  role: 'admin' | 'user';
+  authProvider: 'local' | 'google';
+  isEmailVerified: boolean;
+  isBanned: boolean;
+  banReason: string;
+  bannedUntil: string | null;
+  bannedAt: string | null;
+  profile: {
+    displayName: string;
+    avatar: string;
+  };
+  createdAt: string;
+}
+
+export interface AdminUsersQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: 'admin' | 'user';
+}
+
+export interface UpdateUserRoleRequest {
+  role: 'admin' | 'user';
+}
+
+export type BanDurationPreset = '1h' | '24h' | '7d' | '30d' | 'custom';
+export type CustomBanDurationUnit = 'minutes' | 'hours' | 'days';
+
+export interface BanUserRequest {
+  durationPreset: BanDurationPreset;
+  customDurationValue?: number;
+  customDurationUnit?: CustomBanDurationUnit;
+  reason?: string;
+}
+
 // --- API Response ---
 
 export interface ApiResponse<T> {

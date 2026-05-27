@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
+import { RankBadge } from '@components/ranking/RankBadge';
 import { userService } from '@services/userService';
 import { useAuthStore } from '@stores/authStore';
 import type { User } from '@/types';
@@ -108,7 +109,10 @@ export default function ProfilePage() {
               />
               <h3>{profile.profile.displayName || profile.username}</h3>
               <p className="text-muted mb-2">@{profile.username}</p>
-              <Badge bg={profile.isEmailVerified ? 'success' : 'warning'}>{profile.isEmailVerified ? t('status.emailVerified') : t('status.emailUnverified')}</Badge>
+              <div className="d-flex justify-content-center gap-2 flex-wrap mb-2">
+                <Badge bg={profile.isEmailVerified ? 'success' : 'warning'}>{profile.isEmailVerified ? t('status.emailVerified') : t('status.emailUnverified')}</Badge>
+                <RankBadge tier={profile.ranking.tier} />
+              </div>
               <hr />
               <div className="d-flex justify-content-between"><span>{t('stats.elo')}</span><strong>{profile.ranking.elo}</strong></div>
               <div className="d-flex justify-content-between"><span>{t('stats.tier')}</span><strong>{profile.ranking.tier}</strong></div>

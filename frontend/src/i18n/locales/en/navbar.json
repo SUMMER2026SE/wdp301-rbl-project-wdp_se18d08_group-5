@@ -6,6 +6,8 @@
     "rank": "Rank",
     "createRoom": "Create Room",
     "profile": "Profile",
+    "admin": "Admin",
+    "changePassword": "Change password",
     "logout": "Logout",
     "login": "Login",
     "register": "Register"
