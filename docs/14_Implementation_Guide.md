@@ -4,6 +4,8 @@
 **Loại tài liệu:** Hướng dẫn kỹ thuật — cách implement các tính năng MVP
 **Tham chiếu:** [01_Debate_Rule.md](./01_Debate_Rule.md) · [13_Todo_List_MVP.md](./13_Todo_List_MVP.md) · [12_API_Endpoints_MVP.md](./12_API_Endpoints_MVP.md)
 
+> ⚠️ **Lưu ý quan trọng:** Tài liệu này là implementation guide / target design. Nhiều đoạn code bên dưới là mẫu tham khảo hoặc thiết kế đề xuất, **không phản ánh 1:1 code hiện tại**. Trạng thái thực tế của backend/frontend phải đối chiếu với `12_API_Endpoints_MVP.md`, `13_Todo_List_MVP.md` và source code hiện tại.
+
 ---
 
 ## 1. THỨ TỰ IMPLEMENT (CRITICAL PATH)
@@ -32,14 +34,16 @@ Live + Replay + Polish (Dev 5)
 
 ### 2.1 Access Token Flow
 
-```
-Login → server trả { accessToken } + httpOnly refreshToken cookie
+``` 
+Login → server hiện trả access token + refresh token trong response body
 Frontend → gửi accessToken trong Authorization: Bearer <token>
-Hết hạn (401) → gọi /auth/refresh-token → lưu token mới
+Hết hạn (401) → gọi /auth/refresh-token với refreshToken từ client store → lưu token mới
 Refresh thất bại → redirect /login
 ```
 
 ### 2.2 Auth Store Pattern (Zustand)
+
+> Ghi chú: đoạn dưới là **mẫu đơn giản hóa**. Code hiện tại đã có `refreshToken` và `isLoading` trong `frontend/src/stores/authStore.ts`.
 
 ```typescript
 // frontend/src/stores/authStore.ts
@@ -79,6 +83,8 @@ export const useAuthStore = create<AuthState>()(
 ```
 
 ### 2.3 Axios Interceptor with Refresh
+
+> Ghi chú: đoạn dưới là **mẫu target flow**. Code hiện tại trong `frontend/src/services/api.ts` đã có interceptor, nhưng đang refresh bằng `refreshToken` lưu trong store thay vì dựa vào httpOnly cookie.
 
 ```typescript
 // frontend/src/services/api.ts
@@ -120,6 +126,8 @@ api.interceptors.response.use(
 ---
 
 ## 3. MODELS — IMPLEMENTATION
+
+> Ghi chú: các đoạn model dưới đây mô tả **shape mong muốn / gần-spec**. Model thật trong `backend/src/models/` đã tồn tại nhưng khác một số field, enum và cấu trúc chi tiết.
 
 ### 3.1 DebateRoom Model
 
@@ -301,6 +309,8 @@ export const DebateSession = mongoose.model<ISession>('DebateSession', sessionSc
 
 ### 3.3 User Stats Update — Post-Debate Hook
 
+> Chưa có `backend/src/features/debate/debate.service.ts` trong code hiện tại; đoạn dưới là pseudocode cho service dự kiến.
+
 ```typescript
 // backend/src/features/debate/debate.service.ts
 async updateUserStats(winnerId: string, loserId: string, isDraw: boolean) {
@@ -317,6 +327,8 @@ async updateUserStats(winnerId: string, loserId: string, isDraw: boolean) {
 ---
 
 ## 4. MATCHMAKING — IMPLEMENTATION
+
+> Chưa có `backend/src/features/matchmaking/matchmaking.service.ts` trong code hiện tại; phần này mô tả service cần thêm.
 
 ### 4.1 Matchmaking Service
 
@@ -379,6 +391,8 @@ export const matchmakingService = new MatchmakingService();
 ---
 
 ## 5. DEBATE ENGINE — IMPLEMENTATION
+
+> Chưa có `backend/src/features/debate/debate.service.ts` trong code hiện tại; toàn bộ section này là thiết kế / pseudocode cho orchestration layer dự kiến.
 
 ### 5.1 Phase State Machine
 
@@ -511,6 +525,8 @@ export function calculateTier(elo: number): string {
 
 ## 6. TIMER SERVICE — IMPLEMENTATION
 
+> `backend/src/socket/timer.service.ts` đã tồn tại, nhưng implementation thực tế khác mẫu dưới đây (`start/pause/resume/stop` thay vì `startTimerAsync` + completer map).
+
 ```typescript
 // backend/src/socket/timer.service.ts
 import { getIO } from './index.js';
@@ -564,6 +580,8 @@ export const timerService = new TimerService();
 ---
 
 ## 7. SOCKET.IO — IMPLEMENTATION
+
+> Socket layer đã tồn tại trong `backend/src/socket/`, nhưng event names và flow thực tế hiện khác ví dụ bên dưới. Code hiện tại dùng các event như `room:join`, `room:leave`, `chat:send`, `cross-exam:pass-turn`, `cross-exam:finish`, `host:start-speech`, `host:next-turn`, `room:rejoin`.
 
 ### 7.1 Server Setup
 
@@ -687,6 +705,8 @@ export function useDebateSocket(roomId?: string) {
 
 ## 8. AI SERVICE — IMPLEMENTATION
 
+> Hiện tại `backend/src/features/ai/ai.service.ts` mới có `analyzeSpeech`, `scoreArgument`, `summarizeDebate`, `checkToxic`. Các hàm `judgeTurn`, `getFinalVerdict`, retry wrapper tổng quát bên dưới là thiết kế đề xuất, chưa có trong code hiện tại.
+
 ### 8.1 AI Judge Turn (per-turn feedback)
 
 ```typescript
@@ -788,6 +808,8 @@ private getFallbackAnalysis() {
 ---
 
 ## 9. VALIDATION — IMPLEMENTATION
+
+> Các file `backend/src/features/room/room.schema.ts`, `backend/src/features/debate/debate.schema.ts`, `backend/src/middleware/roomGuard.ts` hiện chưa có; các đoạn dưới đây là mẫu cần implement thêm.
 
 ### 9.1 Room Schema (Zod)
 

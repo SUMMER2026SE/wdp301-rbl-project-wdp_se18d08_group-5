@@ -13,66 +13,66 @@
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A1-01 | `GET /users/:id/history` — paginated debate history | UC-11 | `user.routes.ts` | ❌ |
-| A1-02 | User search — `GET /users/search?q=` | — | `user.routes.ts` | ❌ |
-| A1-03 | Avatar URL validation (Zod schema) | UC-09 | `user.routes.ts` | ❌ |
+| A1-01 | `GET /users/:id/history` — paginated debate history | UC-11 | `user.routes.ts` | ❌ Chưa impl |
+| A1-02 | User search — `GET /users/search?q=` | — | `user.routes.ts` | ❌ Chưa impl |
+| A1-03 | Avatar URL validation (Zod schema) | UC-09 | `user.routes.ts` | ❌ Chưa impl |
 
 #### Matchmaking (Dev 2)
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A2-01 | Matchmaking service — ELO-based pairing (1v1/3v3) | UC-13 | `matchmaking.service.ts` | ❌ |
-| A2-02 | Auto-tạo `DebateRoom` + gán Pro/Opp khi match thành | UC-13 | `matchmaking.service.ts` | ❌ |
-| A2-03 | Emit `match:found` socket event khi ghép được | UC-13 | `matchmaking.service.ts` | ❌ |
+| A2-01 | Matchmaking service — ELO-based pairing (1v1/3v3) | UC-13 | `matchmaking.service.ts` | ❌ Chưa impl |
+| A2-02 | Auto-tạo `DebateRoom` + gán Pro/Opp khi match thành | UC-13 | `matchmaking.service.ts` | ❌ Chưa impl |
+| A2-03 | Emit `match:found` socket event khi ghép được | UC-13 | `matchmaking.service.ts` | ❌ Chưa impl |
 
 #### Room (Dev 2)
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A3-01 | `PUT /rooms/:id` — chỉnh sửa cấu hình lobby | UC-15 | `room.routes.ts` | ❌ |
-| A3-02 | `DELETE /rooms/:id` — xóa phòng (Owner) | UC-16 | `room.routes.ts` | ❌ |
-| A3-03 | `POST /rooms/:id/assign-role` — gán Host/Judge human | UC-20 | `room.routes.ts` | ❌ |
-| A3-04 | Zod validation schema cho room creation | UC-14 | `room.schema.ts` | ❌ |
-| A3-05 | `POST /rooms/:id/join` — validation trùng user | UC-17 | `room.routes.ts` | ⚠️ partial |
-| A3-06 | Viewer join (spectate) khi trận đang active | UC-42 | `room.routes.ts` | ❌ |
+| A3-01 | `PUT /rooms/:id` — chỉnh sửa cấu hình lobby | UC-15 | `room.routes.ts` | ❌ Chưa impl |
+| A3-02 | `DELETE /rooms/:id` — xóa phòng (Owner) | UC-16 | `room.routes.ts` | ❌ Chưa impl |
+| A3-03 | `POST /rooms/:id/assign-role` — gán Host/Judge human | UC-20 | `room.routes.ts` | ❌ Chưa impl |
+| A3-04 | Zod validation schema cho room creation | UC-14 | `room.schema.ts` | ❌ Chưa impl |
+| A3-05 | `POST /rooms/:id/join` — validation trùng user | UC-17 | `room.routes.ts` | ✅ Đã impl |
+| A3-06 | Viewer join (spectate) khi trận đang active | UC-42 | `room.routes.ts` | ❌ Chưa impl |
 
 #### Debate Engine (Dev 2)
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A4-01 | Di chuyển host controls từ `/debate/` → `/rooms/:id/host/*` | UC-44-47 | `room.routes.ts` | ❌ |
-| A4-02 | `POST /rooms/:id/host/mute` — mute/cấm chat | UC-47 | `room.routes.ts` | ❌ |
-| A4-03 | `POST /rooms/:id/cross-exam/pass-turn` | UC-32 | `room.routes.ts` | ❌ |
-| A4-04 | `POST /rooms/:id/cross-exam/finish` | UC-32 | `room.routes.ts` | ❌ |
-| A4-05 | `GET /rooms/:id/scores` — tổng hợp điểm judges + AI | UC-50 | `debate.routes.ts` | ❌ |
-| A4-06 | `GET /rooms/:id/result` — winner + ELO delta | UC-51-52 | `debate.routes.ts` | ❌ |
-| A4-07 | ELO update trigger sau debate (rank room) | UC-52 | `debate.service.ts` | ❌ |
-| A4-08 | Debate orchestration — 25 bước phase state machine | UC-41 | `debate.service.ts` | ❌ |
-| A4-09 | Motion assignment + `motion` phase announcement | UC-26 | `debate.service.ts` | ❌ |
-| A4-10 | Prep 7 phút timer + prep 1 phút timer | UC-27, UC-35 | `debate.service.ts` | ❌ |
-| A4-11 | CE enforcement — max 2 câu/đội, penalty thiếu Q/A | UC-33 | `debate.service.ts` | ❌ |
-| A4-12 | Speaker 3 — không CE, không luận điểm mới | UC-36 | `debate.service.ts` | ❌ |
-| A4-13 | Final judging + winner announcement | UC-37-38 | `debate.service.ts` | ❌ |
-| A4-14 | Session persist `completed` + transcript | UC-39 | `debate.service.ts` | ❌ |
-| A4-15 | Reconnect state — khôi phục phase + timer | UC-56 | `debate.service.ts` | ❌ |
+| A4-01 | Di chuyển host controls từ `/debate/` → `/rooms/:id/host/*` | UC-44-47 | `room.routes.ts` | ❌ Chưa impl |
+| A4-02 | `POST /rooms/:id/host/mute` — mute/cấm chat | UC-47 | `room.routes.ts` | ❌ Chưa impl |
+| A4-03 | `POST /rooms/:id/cross-exam/pass-turn` | UC-32 | `room.routes.ts` | ❌ Chưa impl |
+| A4-04 | `POST /rooms/:id/cross-exam/finish` | UC-32 | `room.routes.ts` | ❌ Chưa impl |
+| A4-05 | `GET /rooms/:id/scores` — tổng hợp điểm judges + AI | UC-50 | `debate.routes.ts` | ❌ Chưa impl |
+| A4-06 | `GET /rooms/:id/result` — winner + ELO delta | UC-51-52 | `debate.routes.ts` | ❌ Chưa impl |
+| A4-07 | ELO update trigger sau debate (rank room) | UC-52 | `debate.service.ts` | ❌ Chưa impl |
+| A4-08 | Debate orchestration — 25 bước phase state machine | UC-41 | `debate.service.ts` | ❌ Chưa impl |
+| A4-09 | Motion assignment + `motion` phase announcement | UC-26 | `debate.service.ts` | ❌ Chưa impl |
+| A4-10 | Prep 7 phút timer + prep 1 phút timer | UC-27, UC-35 | `debate.service.ts` | ❌ Chưa impl |
+| A4-11 | CE enforcement — max 2 câu/đội, penalty thiếu Q/A | UC-33 | `debate.service.ts` | ❌ Chưa impl |
+| A4-12 | Speaker 3 — không CE, không luận điểm mới | UC-36 | `debate.service.ts` | ❌ Chưa impl |
+| A4-13 | Final judging + winner announcement | UC-37-38 | `debate.service.ts` | ❌ Chưa impl |
+| A4-14 | Session persist `completed` + transcript | UC-39 | `debate.service.ts` | ❌ Chưa impl |
+| A4-15 | Reconnect state — khôi phục phase + timer | UC-56 | `debate.service.ts` | ❌ Chưa impl |
 
 #### AI (Dev 4)
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A5-01 | `POST /ai/judge-turn` — AI BGK per-turn feedback | UC-58 | `ai.service.ts` | ❌ |
-| A5-02 | `POST /ai/final-verdict` — AI phán quyết cuối | UC-61 | `ai.service.ts` | ❌ |
-| A5-03 | AI verdict tổng hợp nhiều judge + AI | UC-50 | `ai.service.ts` | ❌ |
-| A5-04 | AI phát hiện luận điểm mới ở S3 (cảnh báo) | UC-43 | `ai.service.ts` | ❌ |
-| A5-05 | OpenAI retry logic (3 retries với backoff) | UC-63 | `ai.service.ts` | ❌ |
+| A5-01 | `POST /ai/judge-turn` — AI BGK per-turn feedback | UC-58 | `ai.service.ts` | ❌ Chưa impl |
+| A5-02 | `POST /ai/final-verdict` — AI phán quyết cuối | UC-61 | `ai.service.ts` | ❌ Chưa impl |
+| A5-03 | AI verdict tổng hợp nhiều judge + AI | UC-50 | `ai.service.ts` | ❌ Chưa impl |
+| A5-04 | AI phát hiện luận điểm mới ở S3 (cảnh báo) | UC-43 | `ai.service.ts` | ❌ Chưa impl |
+| A5-05 | OpenAI retry logic (3 retries với backoff) | UC-63 | `ai.service.ts` | ❌ Chưa impl |
 
 #### Ranking (Dev 1)
 
 | # | Task | UC | File | Status |
 |---|------|----|------|--------|
-| A6-01 | ELO calculation service (K-factor, expected score) | UC-52 | `ranking.service.ts` | ❌ |
-| A6-02 | Tier calculation (Novice → GrandMaster) | — | `ranking.service.ts` | ❌ |
-| A6-03 | ELO update sau debate (trigger từ debate ended) | UC-52 | `debate.service.ts` | ❌ |
+| A6-01 | ELO calculation service (K-factor, expected score) | UC-52 | `ranking.service.ts` | ❌ Chưa impl |
+| A6-02 | Tier calculation (Novice → GrandMaster) | — | `ranking.service.ts` | ❌ Chưa impl |
+| A6-03 | ELO update sau debate (trigger từ debate ended) | UC-52 | `debate.service.ts` | ❌ Chưa impl |
 
 ### A2. Frontend Features
 
@@ -149,21 +149,21 @@
 
 | # | Task | File | Status |
 |---|------|------|--------|
-| B1-01 | **DebateRoom schema** — đầy đủ fields theo TRD §5 (currentPhase, teamProposition, teamOpposition, judges, etc.) | `models/DebateRoom.ts` | ⚠️ partial |
-| B1-02 | **DebateSession schema** — đầy đủ fields theo TRD §5 (turnHistory, currentTurn, finalScores, cards, aiSummary) | `models/DebateSession.ts` | ⚠️ partial |
-| B1-03 | **MatchQueue schema** — đầy đủ | `models/MatchQueue.ts` | ⚠️ partial |
-| B1-04 | **Message schema** — type (chat/system/announcement), isToxic | `models/Message.ts` | ⚠️ partial |
-| B1-05 | **Room validation schema** (Zod) — create + update | `features/room/room.schema.ts` | ❌ |
-| B1-06 | **Debate validation schema** (Zod) — submit score, cross-exam | `features/debate/debate.schema.ts` | ❌ |
-| B1-07 | `roomParticipantGuard` middleware — verify user in room | `middleware/roomGuard.ts` | ❌ |
-| B1-08 | `roleGuard(roles[])` middleware — verify room role (Host/Judge/Owner) | `middleware/roleGuard.ts` | ❌ |
-| B1-09 | Socket auth middleware — JWT on handshake | `socket/index.ts` | ❌ |
-| B1-10 | Socket room cleanup on disconnect | `socket/room.socket.ts` | ❌ |
-| B1-11 | Chat toxic check — auto-hook vào `chat:send` | `socket/chat.socket.ts` | ❌ |
-| B1-12 | Matchmaking service — ELO pairing + room creation | `features/matchmaking/matchmaking.service.ts` | ❌ |
-| B1-13 | Debate orchestration service — phase state machine | `features/debate/debate.service.ts` | ❌ |
-| B1-14 | Timer service (server-side countdown, broadcast every 1s) | `socket/timer.service.ts` | ❌ |
-| B1-15 | ELO calculation service | `features/ranking/elo.service.ts` | ❌ |
+| B1-01 | **DebateRoom schema** — đầy đủ fields theo TRD §5 (currentPhase, teamProposition, teamOpposition, judges, etc.) | `models/DebateRoom.ts` | ⚠️ Partial, model exists |
+| B1-02 | **DebateSession schema** — đầy đủ fields theo TRD §5 (turnHistory, currentTurn, finalScores, cards, aiSummary) | `models/DebateSession.ts` | ⚠️ Partial, model exists |
+| B1-03 | **MatchQueue schema** — đầy đủ | `models/MatchQueue.ts` | ⚠️ Partial, model exists |
+| B1-04 | **Message schema** — type (chat/system/announcement), isToxic | `models/Message.ts` | ⚠️ Partial, model exists |
+| B1-05 | **Room validation schema** (Zod) — create + update | `features/room/room.schema.ts` | ❌ Chưa impl |
+| B1-06 | **Debate validation schema** (Zod) — submit score, cross-exam | `features/debate/debate.schema.ts` | ❌ Chưa impl |
+| B1-07 | `roomParticipantGuard` middleware — verify user in room | `middleware/roomGuard.ts` | ❌ Chưa impl |
+| B1-08 | `roleGuard(roles[])` middleware — verify room role (Host/Judge/Owner) | `middleware/roleGuard.ts` | ❌ Chưa impl |
+| B1-09 | Socket auth middleware — JWT on handshake | `socket/index.ts` | ✅ Đã impl |
+| B1-10 | Socket room cleanup on disconnect | `socket/room.socket.ts` | ❌ Chưa impl |
+| B1-11 | Chat toxic check — auto-hook vào `chat:send` | `socket/chat.socket.ts` | ⚠️ Stub only |
+| B1-12 | Matchmaking service — ELO pairing + room creation | `features/matchmaking/matchmaking.service.ts` | ❌ Chưa impl |
+| B1-13 | Debate orchestration service — phase state machine | `features/debate/debate.service.ts` | ❌ Chưa impl |
+| B1-14 | Timer service (server-side countdown, broadcast every 1s) | `socket/timer.service.ts` | ✅ Đã impl |
+| B1-15 | ELO calculation service | `features/ranking/elo.service.ts` | ❌ Chưa impl |
 | B1-16 | Redis adapter (optional) — sticky sessions for Socket.IO | `socket/index.ts` | 🔜 Phase 2 |
 
 ### B2. Frontend Infrastructure
