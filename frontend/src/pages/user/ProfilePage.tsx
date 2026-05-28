@@ -108,7 +108,7 @@ export default function ProfilePage() {
                 }}
               />
               <h3>{profile.profile.displayName || profile.username}</h3>
-              <p className="text-muted mb-2">@{profile.username}</p>
+              <p className="landing-subtitle mb-2">@{profile.username}</p>
               <div className="d-flex justify-content-center gap-2 flex-wrap mb-2">
                 <Badge bg={profile.isEmailVerified ? 'success' : 'warning'}>{profile.isEmailVerified ? t('status.emailVerified') : t('status.emailUnverified')}</Badge>
                 <RankBadge tier={profile.ranking.tier} />
