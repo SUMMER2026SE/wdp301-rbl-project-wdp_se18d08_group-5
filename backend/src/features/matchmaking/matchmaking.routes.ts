@@ -6,6 +6,7 @@ import { MatchQueue } from '../../models/MatchQueue.js';
 import { User } from '../../models/User.js';
 import { BadRequestError, NotFoundError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
+import { tryCreateRankMatch } from './matchmaking.service.js';
 
 const router = Router();
 
@@ -31,10 +32,20 @@ router.post(
       status: 'waiting',
     });
 
-    // TODO: Trigger matchmaking service to find opponent
-    // matchmakingService.tryMatch(entry);
+    const match = await tryCreateRankMatch(entry);
 
-    sendSuccess(res, { queueId: entry._id, format, elo: user.ranking.elo }, 'Joined queue', 201);
+    sendSuccess(
+      res,
+      {
+        queueId: entry._id,
+        format,
+        elo: user.ranking.elo,
+        status: match.matched ? 'matched' : 'waiting',
+        roomId: match.matched ? match.room._id : null,
+      },
+      match.matched ? 'Match found' : 'Joined queue',
+      201,
+    );
   }),
 );
 
@@ -57,9 +68,19 @@ router.get(
   '/status',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const entry = await MatchQueue.findOne({ userId: req.user!.userId, status: 'waiting' });
+    const entry = await MatchQueue.findOne({
+      userId: req.user!.userId,
+      status: { $in: ['waiting', 'matched'] },
+    }).sort({ createdAt: -1 });
     if (!entry) {
       return sendSuccess(res, { status: 'idle' });
+    }
+    if (entry.status === 'matched') {
+      return sendSuccess(res, {
+        status: 'matched',
+        format: entry.format,
+        roomId: entry.matchedRoomId,
+      });
     }
     const waitTime = Math.floor((Date.now() - entry.createdAt.getTime()) / 1000);
     sendSuccess(res, { status: 'waiting', format: entry.format, waitTime });

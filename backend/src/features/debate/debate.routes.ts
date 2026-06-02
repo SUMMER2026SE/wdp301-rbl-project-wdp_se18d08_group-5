@@ -4,7 +4,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
-import { NotFoundError, ForbiddenError } from '../../utils/AppError.js';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/AppError.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import type { AuthRequest } from '../../types/index.js';
 
@@ -99,16 +99,185 @@ router.post(
   }),
 );
 
+// POST /api/v1/debate/:roomId/host/next-turn — Advance the debate turn (UC-45)
+router.post(
+  '/:roomId/host/next-turn',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { nextSpeaker, phase, timeLimit } = req.body;
+    const room = await DebateRoom.findById(req.params.roomId);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host can advance turns');
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const currentTurn = session.currentTurn;
+    const now = new Date();
+    const duration = now.getTime() - currentTurn.startTime.getTime();
+    session.turnHistory.push({
+      speaker: currentTurn.speaker,
+      startTime: currentTurn.startTime,
+      endTime: now,
+      duration,
+      transcript: req.body.transcript || '',
+      crossExamination: null,
+      aiAnalysis: null,
+    });
+
+    session.currentTurn = {
+      speaker: nextSpeaker || currentTurn.speaker,
+      phase: phase || currentTurn.phase,
+      startTime: new Date(),
+      timeLimit: timeLimit ?? currentTurn.timeLimit,
+      timeRemaining: timeLimit ?? currentTurn.timeRemaining,
+      status: 'active',
+    };
+
+    await session.save();
+    sendSuccess(res, session.currentTurn, 'Turn advanced');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/host/mute — Mute/unmute a participant (UC-47)
+router.post(
+  '/:roomId/host/mute',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { userId, action } = req.body;
+    const room = await DebateRoom.findById(req.params.roomId);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host can mute participants');
+
+    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    if (!participant) throw new NotFoundError('Participant not found');
+
+    (participant as any).muted = action === 'mute';
+    await room.save();
+
+    sendSuccess(res, { userId, muted: action === 'mute' }, `Participant ${action === 'mute' ? 'muted' : 'unmuted'}`);
+  }),
+);
+
 // POST /api/v1/debate/:roomId/judge/submit-score — Judge submit score (UC-48)
 router.post(
   '/:roomId/judge/submit-score',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { speaker, score } = req.body;
+    const { speaker, score, notes } = req.body;
     const session = await DebateSession.findOne({ roomId: req.params.roomId });
     if (!session) throw new NotFoundError('Session not found');
 
-    sendSuccess(res, { speaker, score }, 'Score submitted');
+    if (!session.finalScores) {
+      session.finalScores = {
+        teamProposition: { total: 0, breakdown: {} },
+        teamOpposition: { total: 0, breakdown: {} },
+        winner: null,
+        aiVerdict: null,
+        judgeVerdicts: [],
+      };
+    }
+
+    const finalScores = session.finalScores as {
+      judgeVerdicts: any[];
+    };
+    finalScores.judgeVerdicts = finalScores.judgeVerdicts || [];
+    finalScores.judgeVerdicts.push({
+      judgeId: req.user!.userId as any,
+      speaker,
+      score,
+      notes: notes || '',
+      submittedAt: new Date(),
+    });
+
+    await session.save();
+    sendSuccess(res, { speaker, score, notes }, 'Score submitted');
+  }),
+);
+
+// GET /api/v1/debate/:roomId/scores — Get current scores for the room (UC-36)
+router.get(
+  '/:roomId/scores',
+  asyncHandler(async (req, res: Response) => {
+    const room = await DebateRoom.findById(req.params.roomId).select('participants judgeType');
+    if (!room) throw new NotFoundError('Room not found');
+
+    const session = await DebateSession.findOne({ roomId: req.params.roomId });
+    if (!session) {
+      throw new NotFoundError('Session not found');
+    }
+
+    const payload = {
+      finalScores: session.finalScores,
+      judgeVerdicts: session.finalScores?.judgeVerdicts || [],
+      turnHistory: session.turnHistory,
+      participants: room.participants,
+    };
+
+    sendSuccess(res, payload);
+  }),
+);
+
+// POST /api/v1/debate/:roomId/cross-exam/pass-turn — Pass the cross-exam turn (UC-32)
+router.post(
+  '/:roomId/cross-exam/pass-turn',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { nextSpeaker } = req.body;
+    const session = await DebateSession.findOne({ roomId: req.params.roomId });
+    if (!session) throw new NotFoundError('Session not found');
+    if (session.currentTurn.phase !== 'cross_exam') {
+      throw new BadRequestError('Current phase is not cross-exam');
+    }
+
+    const now = new Date();
+    const duration = now.getTime() - session.currentTurn.startTime.getTime();
+    session.turnHistory.push({
+      speaker: session.currentTurn.speaker,
+      startTime: session.currentTurn.startTime,
+      endTime: now,
+      duration,
+      transcript: req.body.transcript || '',
+      crossExamination: null,
+      aiAnalysis: null,
+    });
+
+    session.currentTurn = {
+      speaker: nextSpeaker || session.currentTurn.speaker,
+      phase: 'cross_exam',
+      startTime: new Date(),
+      timeLimit: session.currentTurn.timeLimit,
+      timeRemaining: session.currentTurn.timeRemaining,
+      status: 'active',
+    };
+
+    await session.save();
+    sendSuccess(res, session.currentTurn, 'Cross-exam turn passed');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/cross-exam/finish — Finish cross-examination (UC-33)
+router.post(
+  '/:roomId/cross-exam/finish',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const session = await DebateSession.findOne({ roomId: req.params.roomId });
+    if (!session) throw new NotFoundError('Session not found');
+    if (session.currentTurn.phase !== 'cross_exam') {
+      throw new BadRequestError('Current phase is not cross-exam');
+    }
+
+    session.currentTurn.status = 'completed';
+    session.currentTurn.phase = 'judge_feedback';
+    await session.save();
+
+    sendSuccess(res, session.currentTurn, 'Cross-exam finished');
   }),
 );
 

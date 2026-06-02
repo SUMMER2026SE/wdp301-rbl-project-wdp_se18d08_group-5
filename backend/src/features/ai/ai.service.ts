@@ -57,6 +57,48 @@ Return JSON with: { score: { logic (0-30), rebuttal (0-20), evidence (0-15), cro
     }
   }
 
+  async judgeTurn(roomId: string, speaker: string, transcript: string, context: any) {
+    try {
+      const prompt = `You are an AI judge evaluating one debate turn for room ${roomId}. The speaker is ${speaker}. Use the transcript and context to provide a JSON result with { score: { logic, rebuttal, evidence, crossExam, strategy, communication, overall }, verdict: 'proposition' | 'opposition' | 'draw', comments: string }`;
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: prompt },
+          { role: 'user', content: `${transcript}\n\nContext:\n${JSON.stringify(context || {})}` },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      return content ? JSON.parse(content) : this.getFallbackJudgeTurn();
+    } catch (error) {
+      console.error('AI judgeTurn error:', error);
+      return this.getFallbackJudgeTurn();
+    }
+  }
+
+  async finalVerdict(roomId: string, sessionData: any) {
+    try {
+      const prompt = `You are an AI head judge for room ${roomId}. Review the session data and provide a final verdict in Vietnamese. Return JSON with { winner: 'proposition' | 'opposition' | 'draw', verdict: string, summary: string }`;
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: prompt },
+          { role: 'user', content: JSON.stringify(sessionData || {}) },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.4,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      return content ? JSON.parse(content) : this.getFallbackFinalVerdict();
+    } catch (error) {
+      console.error('AI finalVerdict error:', error);
+      return this.getFallbackFinalVerdict();
+    }
+  }
+
   /**
    * Summarize entire debate.
    */
@@ -124,6 +166,22 @@ Return JSON with: { score: { logic (0-30), rebuttal (0-20), evidence (0-15), cro
 
   private getFallbackScore() {
     return { logic: 0, rebuttal: 0, evidence: 0, crossExam: 0, strategy: 0, communication: 0, overall: 0 };
+  }
+
+  private getFallbackJudgeTurn() {
+    return {
+      score: { logic: 0, rebuttal: 0, evidence: 0, crossExam: 0, strategy: 0, communication: 0, overall: 0 },
+      verdict: 'draw',
+      comments: 'AI judge unavailable. Please try again later.',
+    };
+  }
+
+  private getFallbackFinalVerdict() {
+    return {
+      winner: 'draw',
+      verdict: 'AI final verdict unavailable. Please try again later.',
+      summary: 'Không thể tạo kết luận cuối cùng do AI tạm thời không khả dụng.',
+    };
   }
 }
 

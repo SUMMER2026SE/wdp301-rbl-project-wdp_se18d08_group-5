@@ -12,14 +12,14 @@
 |------|-----------------|------------|---------|
 | A. Auth | 5 | ✅ Đã impl | |
 | B. User/Profile | 4 / 4 impl | ✅ Complete | Search + history đã impl |
-| C. Matchmaking | 3 route impl | ⚠️ Partial | Matcher service chưa impl |
-| D. Room | 9 / 12 impl | ⚠️ Incomplete | Thiếu assign-role, edit, delete |
-| E. Host Controls | 5 / 6 impl | ⚠️ Sai vị trí | Hiện tại `/debate/:id/host/*`, thiếu `next-turn`, cần `/rooms/:id/host/*` |
-| F. Cross Exam | 0 REST / 2 socket partial | ⚠️ Partial | REST chưa impl, socket chỉ stub |
-| G. Judge/Scoring | 2 / 3 impl | ⚠️ Partial | `submit-score` còn stub; đã có hook apply result, thiếu scores |
+| C. Matchmaking | 3 route impl + matcher | ✅ Complete | Queue, cancel, status, auto-create rank room + `match:found` |
+| D. Room | 12 / 12 impl | ✅ Complete | CRUD, join/leave, position, assign-role, kick, start |
+| E. Host Controls | 6 / 6 impl | ✅ Complete | Đã có `/rooms/:id/host/*`; legacy `/debate/:id/host/*` vẫn còn |
+| F. Cross Exam | 2 REST / 2 socket partial | ✅ REST complete | `pass-turn`, `finish` đã impl REST |
+| G. Judge/Scoring | 3 / 3 impl | ✅ Complete | Submit score, scores, apply result |
 | H. AI | 4 / 6 impl | ⚠️ Incomplete | Thiếu judge-turn + final-verdict |
 | I. Ranking | 2 + service hook | ✅ Đã impl | Leaderboard/user rank + ELO apply flow |
-| **Tổng REST** | **~27 impl + 1 partial / ~42** | **⚠️ Incomplete** | Socket events còn nhiều mục stub/missing |
+| **Tổng REST** | **Dev 2 scope complete** | **⚠️ Partial overall** | AI/socket polish ngoài Dev 2 còn mục stub/missing |
 | Socket events | ~20 | ⚠️ Cần xem 08_Socket | Bidirectional |
 
 ---
@@ -74,7 +74,7 @@ Production:  https://<domain>/api/v1
 
 ---
 
-### C. Matchmaking — Rank (UC-12 → UC-13) — ⚠️ Route đã impl, matcher chưa impl
+### C. Matchmaking — Rank (UC-12 → UC-13) — ✅ Complete
 
 **File:** `src/features/matchmaking/matchmaking.routes.ts`
 
@@ -84,7 +84,7 @@ Production:  https://<domain>/api/v1
 | 11 | DELETE | `/matchmaking/queue` | Hủy queue | User | — | ✅ |
 | 12 | GET | `/matchmaking/status` | Trạng thái queue hiện tại | User | — | ✅ |
 
-> **Lưu ý:** 3 REST endpoints đã có. Ghép trận (UC-13) mới dừng ở TODO trong route, chưa có matcher service và chưa emit `match:found`.
+> **Lưu ý:** 3 REST endpoints đã có. Ghép trận (UC-13) đã có matcher service: tạo rank room + DebateSession, cập nhật queue matched, emit `match:found`.
 
 ---
 
@@ -97,13 +97,13 @@ Production:  https://<domain>/api/v1
 | 13 | POST | `/rooms/create` | Tạo Custom Room | User → Owner | `{ title, format, hostType, judgeType, judgeCount, isPrivate, password? }` | ✅ |
 | 14 | GET | `/rooms` | Duyệt Live Matches | Guest/User | Query: `?status=&format=&roomType=&page=&limit=` | ✅ |
 | 15 | GET | `/rooms/:id` | Chi tiết phòng | User | — | ✅ |
-| 16 | PUT | `/rooms/:id` | Chỉnh sửa cấu hình phòng (lobby) | Owner | `{ title?, format?, hostType?, judgeType?, isPrivate?, password? }` | ❌ **Chưa impl** |
-| 17 | DELETE | `/rooms/:id` | Hủy / xóa phòng (lobby only) | Owner | — | ❌ **Chưa impl** |
+| 16 | PUT | `/rooms/:id` | Chỉnh sửa cấu hình phòng (lobby) | Owner | `{ title?, format?, hostType?, judgeType?, isPrivate?, password? }` | ✅ |
+| 17 | DELETE | `/rooms/:id` | Hủy / xóa phòng (lobby only) | Owner | — | ✅ |
 | 18 | POST | `/rooms/:id/join` | Join phòng | User | `{ password? }` | ✅ |
 | 19 | POST | `/rooms/:id/leave` | Rời phòng | Participant | — | ✅ |
 | 20 | POST | `/rooms/:id/position` | Select Position | User | `{ team: 'proposition'\|'opposition', speakerSlot: 'S1'\|'S2'\|'S3', role?: 'debater'\|'judge'\|'host' }` | ✅ |
 | 21 | POST | `/rooms/:id/position/lock` | Lock position | Owner | — | ✅ |
-| 22 | POST | `/rooms/:id/assign-role` | Gán slot Host / Judge (human) | Owner | `{ userId, role: 'host'\|'judge' }` | ❌ **Chưa impl** |
+| 22 | POST | `/rooms/:id/assign-role` | Gán slot Host / Judge (human) | Owner | `{ userId, role: 'host'\|'judge' }` | ✅ |
 | 23 | POST | `/rooms/:id/kick` | Kick / ban (lobby) | Owner | `{ userId, reason? }` | ✅ |
 | 24 | POST | `/rooms/:id/start` | Start trận | Owner/Host | — | ✅ |
 
@@ -113,18 +113,18 @@ Production:  https://<domain>/api/v1
 
 #### E1. Host Controls (UC-44 → UC-47)
 
-> ⚠️ **Cần di chuyển:** Các endpoint hiện tại nằm ở `/debate/:roomId/host/*`. Cần chuyển về `/rooms/:id/host/*` để nhất quán với spec.
+> ✅ Các endpoint host controls đã có ở `/rooms/:id/host/*`. Legacy `/debate/:roomId/host/*` vẫn còn để tương thích.
 
 **File target:** `src/features/room/room.routes.ts`
 
 | # | Method | Endpoint | Mô tả | Actor | Body / Params | Status |
 |---|--------|----------|--------|-------|---------------|--------|
-| 25 | POST | `/rooms/:id/host/pause` | Tạm dừng trận (UC-44) | Host | — | ⚠️ Đã impl ở `/debate/:roomId/host/pause` |
-| 26 | POST | `/rooms/:id/host/resume` | Tiếp tục trận | Host | — | ⚠️ Đã impl ở `/debate/:roomId/host/resume` |
-| 27 | POST | `/rooms/:id/host/next-turn` | Chuyển lượt tiếp theo (UC-45) | Host | — | ❌ **Chưa impl REST** |
-| 28 | POST | `/rooms/:id/host/issue-card` | Phát thẻ vàng | Host | `{ userId, reason }` | ⚠️ Đã impl ở `/debate/:roomId/host/issue-card` |
-| 29 | POST | `/rooms/:id/host/kick` | Kick participant (UC-46) | Host | `{ userId, reason? }` | ⚠️ Đã impl ở `/debate/:roomId/host/kick` |
-| 30 | POST | `/rooms/:id/host/mute` | Mute / cấm chat (UC-47) | Host | `{ userId, type: 'mute'\|'unmute' }` | ❌ **Chưa impl** |
+| 25 | POST | `/rooms/:id/host/pause` | Tạm dừng trận (UC-44) | Host | — | ✅ |
+| 26 | POST | `/rooms/:id/host/resume` | Tiếp tục trận | Host | — | ✅ |
+| 27 | POST | `/rooms/:id/host/next-turn` | Chuyển lượt tiếp theo (UC-45) | Host | — | ✅ |
+| 28 | POST | `/rooms/:id/host/issue-card` | Phát thẻ vàng | Host | `{ userId, reason }` | ✅ |
+| 29 | POST | `/rooms/:id/host/kick` | Kick participant (UC-46) | Host | `{ userId, reason? }` | ✅ |
+| 30 | POST | `/rooms/:id/host/mute` | Mute / cấm chat (UC-47) | Host | `{ userId, type: 'mute'\|'unmute' }` | ✅ |
 
 #### E2. Session & Replay
 
@@ -132,8 +132,8 @@ Production:  https://<domain>/api/v1
 
 | # | Method | Endpoint | Mô tả | Actor | Body / Params | Status |
 |---|--------|----------|--------|-------|---------------|--------|
-| 31 | GET | `/rooms/:id/session` | Trạng thái session (phase, turn, timer) | Participant/Viewer | — | ⚠️ Đã impl ở `/debate/:roomId/session` |
-| 32 | GET | `/rooms/:id/replay` | Replay trận (UC-66) | User | — | ⚠️ Đã impl ở `/debate/:roomId/replay` |
+| 31 | GET | `/rooms/:id/session` | Trạng thái session (phase, turn, timer) | Participant/Viewer | — | ✅ |
+| 32 | GET | `/rooms/:id/replay` | Replay trận (UC-66) | User | — | ✅ |
 
 ---
 
@@ -143,10 +143,10 @@ Production:  https://<domain>/api/v1
 
 | # | Method | Endpoint | Mô tả | Actor | Body / Params | Status |
 |---|--------|----------|--------|-------|---------------|--------|
-| 33 | POST | `/rooms/:id/cross-exam/pass-turn` | Pass Turn trong CE (UC-32) | Debator | — | ❌ **Chưa impl REST** |
-| 34 | POST | `/rooms/:id/cross-exam/finish` | Finish CE sớm (UC-32) | Debator | — | ❌ **Chưa impl REST** |
+| 33 | POST | `/rooms/:id/cross-exam/pass-turn` | Pass Turn trong CE (UC-32) | Debator | — | ✅ |
+| 34 | POST | `/rooms/:id/cross-exam/finish` | Finish CE sớm (UC-32) | Debator | — | ✅ |
 
-> Ghi chú: socket events `cross-exam:pass-turn` và `cross-exam:finish` có tồn tại nhưng mới là stub, chưa có REST endpoints tương ứng.
+> Ghi chú: REST endpoints đã impl. Socket events `cross-exam:pass-turn` và `cross-exam:finish` có tồn tại nhưng vẫn cần polish realtime.
 
 ---
 
@@ -156,9 +156,9 @@ Production:  https://<domain>/api/v1
 
 | # | Method | Endpoint | Mô tả | Actor | Body / Params | Status |
 |---|--------|----------|--------|-------|---------------|--------|
-| 35 | POST | `/rooms/:id/judge/submit-score` | Nộp điểm (6 tiêu chí / 100) (UC-48) | Judge (human) | `{ speaker, logic, rebuttal, evidence, crossExam, strategy, communication, notes? }` | ⚠️ Đã impl ở `/debate/:roomId/judge/submit-score`, còn stub |
-| 36 | GET | `/rooms/:id/scores` | Xem điểm tổng hợp (judges + AI) (UC-49–50) | Participant/Viewer | — | ❌ **Chưa impl** |
-| 37 | POST | `/debate/:roomId/result` | Apply kết quả trận rank vào ELO/tier | Owner/Host | — | ✅ |
+| 35 | POST | `/rooms/:id/judge/submit-score` | Nộp điểm (6 tiêu chí / 100) (UC-48) | Judge (human) | `{ speaker, logic, rebuttal, evidence, crossExam, strategy, communication, notes? }` | ✅ |
+| 36 | GET | `/rooms/:id/scores` | Xem điểm tổng hợp (judges + AI) (UC-49–50) | Participant/Viewer | — | ✅ |
+| 37 | POST | `/rooms/:id/result` | Apply kết quả trận rank vào ELO/tier | Owner/Host | — | ✅ |
 
 ---
 
@@ -225,7 +225,7 @@ Chi tiết đầy đủ: xem [08_Socket_Realtime_Guide.md](./08_Socket_Realtime_
 | `chat:system` | Thông báo hệ thống | `{ content, timestamp }` | ❌ Chưa impl |
 | `ai:analysis-ready` | AI phân tích xong | `{ speaker, analysis }` | ❌ Chưa impl |
 | `score:updated` | Điểm cập nhật | `{ scores }` | ❌ Chưa impl |
-| `match:found` | Ghép trận thành công (rank) | `{ roomId, opponent }` | ❌ Chưa impl matcher |
+| `match:found` | Ghép trận thành công (rank) | `{ roomId }` | ✅ Emit từ matcher service |
 | `cross-exam:phase-update` | Cập nhật trạng thái CE | `{ timeRemaining, questionsAsked }` | ❌ Chưa impl |
 
 ---
@@ -312,14 +312,14 @@ VITE_SOCKET_URL=http://localhost:3000
 - [x] User history — `GET /users/:id/history`
 - [x] User search — `GET /users/search?q=`
 - [x] Room CRUD — create, list, detail, join, leave, position, lock, kick
-- [ ] Room edit — `PUT /rooms/:id`
-- [ ] Room delete — `DELETE /rooms/:id`
-- [ ] Assign role — `POST /rooms/:id/assign-role`
+- [x] Room edit — `PUT /rooms/:id`
+- [x] Room delete — `DELETE /rooms/:id`
+- [x] Assign role — `POST /rooms/:id/assign-role`
 
 ### Sprint 2 (Matchmaking + Socket)
 
 - [x] Matchmaking routes (3 endpoints)
-- [ ] Matcher service (tạo room khi ghép được, emit `match:found`)
+- [x] Matcher service (tạo room khi ghép được, emit `match:found`)
 - [x] Socket setup — `src/socket/index.ts`
 - [x] Room socket — join/leave/participant updates
 - [x] Chat socket — message persistence + broadcast
@@ -327,18 +327,18 @@ VITE_SOCKET_URL=http://localhost:3000
 
 ### Sprint 3 (Debate Engine)
 
-- [ ] Host controls di chuyển về `/rooms/:id/host/*` (6 endpoints)
-- [ ] Cross-exam endpoints — `pass-turn`, `finish`
-- [x] Session route — `GET /rooms/:id/session` (đang nằm ở `/debate/:roomId/session`)
+- [x] Host controls di chuyển về `/rooms/:id/host/*` (6 endpoints)
+- [x] Cross-exam endpoints — `pass-turn`, `finish`
+- [x] Session route — `GET /rooms/:id/session`
 - [x] Timer service — `src/socket/timer.service.ts`
 - [ ] Debate orchestration — phase transitions + `debate:phase-change`, `debate:turn-change`
 - [x] CE socket events (stub)
 
 ### Sprint 4 (Scoring + AI)
 
-- [ ] Judge submit score hoàn thiện — validate + lưu vào DebateSession
-- [ ] `GET /rooms/:id/scores` — tổng hợp điểm judges + AI
-- [ ] `GET /rooms/:id/result` — winner + ELO update
+- [x] Judge submit score hoàn thiện — lưu vào DebateSession
+- [x] `GET /rooms/:id/scores` — tổng hợp điểm judges + AI
+- [x] `POST /rooms/:id/result` — winner + ELO update
 - [ ] `POST /ai/judge-turn` — AI BGK per-turn
 - [ ] `POST /ai/final-verdict` — AI verdict cuối
 - [ ] AI fallbacks khi API key không set

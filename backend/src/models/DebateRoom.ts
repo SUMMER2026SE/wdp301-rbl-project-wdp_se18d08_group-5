@@ -22,6 +22,7 @@ export interface IDebateRoom extends Document {
     team: string | null;
     speakerSlot: string | null;
     positionLocked: boolean;
+    muted: boolean;
   }[];
   currentPhase: string;
   eloApplied: boolean;
@@ -90,6 +91,7 @@ const debateRoomSchema = new Schema<IDebateRoom>(
           default: null,
         },
         positionLocked: { type: Boolean, default: false },
+        muted: { type: Boolean, default: false },
       },
     ],
     currentPhase: {

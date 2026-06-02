@@ -49,9 +49,16 @@ export interface IDebateSession extends Document {
   finalScores: {
     teamProposition: { total: number; breakdown: object };
     teamOpposition: { total: number; breakdown: object };
-    winner: string;
-    aiVerdict: string;
-    judgeVerdicts: { judgeId: mongoose.Types.ObjectId; winner: string; notes: string }[];
+    winner: string | null;
+    aiVerdict: string | null;
+    judgeVerdicts: Array<{
+      judgeId: mongoose.Types.ObjectId;
+      winner?: string;
+      speaker?: string;
+      score?: any;
+      notes: string;
+      submittedAt: Date;
+    }>;
   } | null;
   aiSummary: string | null;
   createdAt: Date;

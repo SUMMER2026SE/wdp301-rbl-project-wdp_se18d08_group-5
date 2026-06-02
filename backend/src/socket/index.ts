@@ -42,6 +42,7 @@ export function initSocket(server: HttpServer) {
   io.on('connection', (socket: Socket) => {
     const userId = (socket as any).userId;
     console.log(`🔌 User connected: ${userId} [${socket.id}]`);
+    socket.join(`user:${userId}`);
 
     // Register event handlers
     registerRoomHandlers(io, socket);
