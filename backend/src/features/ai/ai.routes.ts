@@ -50,4 +50,26 @@ router.post(
   }),
 );
 
+// POST /api/v1/ai/judge-turn — AI judge a turn (UC-40)
+router.post(
+  '/judge-turn',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { roomId, speaker, transcript, context } = req.body;
+    const result = await aiService.judgeTurn(roomId, speaker, transcript, context);
+    sendSuccess(res, result);
+  }),
+);
+
+// POST /api/v1/ai/final-verdict — AI final verdict (UC-41)
+router.post(
+  '/final-verdict',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { roomId, sessionData } = req.body;
+    const verdict = await aiService.finalVerdict(roomId, sessionData);
+    sendSuccess(res, verdict);
+  }),
+);
+
 export default router;
