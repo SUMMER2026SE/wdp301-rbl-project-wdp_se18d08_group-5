@@ -5,6 +5,7 @@ import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
+import { startDebate } from '../debate/debate.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
 
@@ -246,6 +247,9 @@ router.post(
     if (team) participant.team = team;
     if (speakerSlot) participant.speakerSlot = speakerSlot;
     if (roomRole) participant.roomRole = roomRole;
+    if (!roomRole && team && speakerSlot && participant.roomRole === 'viewer') {
+      participant.roomRole = 'debater';
+    }
 
     await room.save();
     sendSuccess(res, room, 'Position updated');
@@ -271,29 +275,32 @@ router.post(
   }),
 );
 
+// POST /api/v1/rooms/:id/lock — Alias for checklist/Postman compatibility
+router.post(
+  '/:id/lock',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+    if (room.createdBy.toString() !== req.user!.userId) {
+      throw new ForbiddenError('Only owner can lock positions');
+    }
+
+    room.participants.forEach((p) => {
+      p.positionLocked = true;
+    });
+    await room.save();
+    sendSuccess(res, room, 'Positions locked');
+  }),
+);
+
 // POST /api/v1/rooms/:id/start — Start debate (UC-22)
 router.post(
   '/:id/start',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    // Only owner or host can start
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    if (!isOwner && !isHost) throw new ForbiddenError('Only owner or host can start');
-
-    if (room.status !== 'waiting' && room.status !== 'ready') {
-      throw new BadRequestError('Room cannot be started in current state');
-    }
-
-    room.status = 'active';
-    room.currentPhase = 'motion';
-    room.startedAt = new Date();
-    await room.save();
-
-    sendSuccess(res, room, 'Debate started');
+    const result = await startDebate(req.params.id, req.user!.userId);
+    sendSuccess(res, result, 'Debate started');
   }),
 );
 

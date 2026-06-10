@@ -9,6 +9,15 @@ export interface IDebateSession extends Document {
     timeLimit: number;
     timeRemaining: number;
     status: string;
+    ceState?: {
+      askingTeam: string;
+      answeringTeam: string;
+      quotaPerTeam: number;
+      questionsAsked: number;
+      questionsAnswered: number;
+      currentRole: string;
+      transcript: { team: string; type: string; content: string; timestamp: Date }[];
+    };
   };
   turnHistory: {
     speaker: string;
@@ -74,6 +83,10 @@ const debateSessionSchema = new Schema<IDebateSession>(
       timeLimit: { type: Number, default: 0 },
       timeRemaining: { type: Number, default: 0 },
       status: { type: String, enum: ['active', 'paused', 'completed'], default: 'active' },
+      ceState: {
+        type: Schema.Types.Mixed,
+        default: null,
+      },
     },
     turnHistory: [
       {
