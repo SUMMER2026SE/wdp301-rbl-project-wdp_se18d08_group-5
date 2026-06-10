@@ -1,5 +1,20 @@
 # 14 — Implementation Guide
 
+## Implementation Update - Dev 2, June 10 2026
+
+The Dev 2 backend services referenced as future/pseudocode below now exist in source code:
+
+- `backend/src/features/matchmaking/matchmaking.service.ts`
+- `backend/src/features/debate/debate.service.ts`
+- REST routes in `backend/src/features/debate/debate.routes.ts`
+- Room start/lock integration in `backend/src/features/room/room.routes.ts`
+
+Current Dev 2 implementation is REST-first. It covers ranked matchmaking, active room creation, debate session creation, next turn, finish phase, CE state, scoring aggregation, debate completion, replay payloads, and frontend screens for matchmaking/lobby/debate/result. Socket.IO realtime broadcast polish remains Dev 3 scope.
+
+For the latest concrete endpoint list, read `docs/12_API_Endpoints_MVP.md` first.
+
+---
+
 **Phiên bản:** v1.1 | **Ngày:** 25/05/2026
 **Loại tài liệu:** Hướng dẫn kỹ thuật — cách implement các tính năng MVP
 **Tham chiếu:** [01_Debate_Rule.md](./01_Debate_Rule.md) · [13_Todo_List_MVP.md](./13_Todo_List_MVP.md) · [12_API_Endpoints_MVP.md](./12_API_Endpoints_MVP.md)

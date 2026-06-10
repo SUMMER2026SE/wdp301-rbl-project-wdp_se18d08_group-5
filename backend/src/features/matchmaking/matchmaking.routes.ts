@@ -18,8 +18,11 @@ router.post(
     const { format } = req.body; // '1v1' | '3v3'
     const userId = req.user!.userId;
 
-    // Check if already in queue
-    const existing = await MatchQueue.findOne({ userId, status: 'waiting' });
+    // Check if already in queue or already matched
+    const existing = await MatchQueue.findOne({
+      userId,
+      status: { $in: ['waiting', 'matched'] },
+    });
     if (existing) throw new BadRequestError('Already in queue');
 
     const user = await User.findById(userId);
@@ -55,7 +58,7 @@ router.delete(
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await MatchQueue.findOneAndUpdate(
-      { userId: req.user!.userId, status: 'waiting' },
+      { userId: req.user!.userId, status: { $in: ['waiting', 'matched'] } },
       { status: 'cancelled' },
     );
     if (!result) throw new NotFoundError('Not in queue');

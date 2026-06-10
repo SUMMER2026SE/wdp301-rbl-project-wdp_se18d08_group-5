@@ -6,9 +6,66 @@ import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/AppError.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
+import {
+  advanceTurn,
+  endDebate,
+  finishCe,
+  finishPhase,
+  passCeTurn,
+} from './debate.service.js';
 import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
+
+// POST /api/v1/debate/:roomId/next-turn — Advance turn using the debate flow
+router.post(
+  '/:roomId/next-turn',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await advanceTurn(req.params.roomId, req.user!.userId, req.body.transcript || '');
+    sendSuccess(res, result, 'Turn advanced');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/finish-phase — Finish current phase and enter the next one
+router.post(
+  '/:roomId/finish-phase',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await finishPhase(req.params.roomId, req.user!.userId, req.body.transcript || '');
+    sendSuccess(res, result, 'Phase finished');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/ce/pass-turn — Pass CE turn for asking team
+router.post(
+  '/:roomId/ce/pass-turn',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await passCeTurn(req.params.roomId, req.user!.userId, req.body.content || '');
+    sendSuccess(res, result, 'Cross-exam turn passed');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/ce/finish — Finish CE phase
+router.post(
+  '/:roomId/ce/finish',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await finishCe(req.params.roomId, req.user!.userId, req.body.transcript || '');
+    sendSuccess(res, result, 'Cross-exam finished');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/end — Complete debate and apply ranking when eligible
+router.post(
+  '/:roomId/end',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await endDebate(req.params.roomId, req.user!.userId, req.body.summary || '');
+    sendSuccess(res, result, 'Debate completed');
+  }),
+);
 
 // POST /api/v1/debate/:roomId/host/pause — Pause debate (UC-44)
 router.post(

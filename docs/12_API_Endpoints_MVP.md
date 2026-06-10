@@ -1,5 +1,65 @@
 # 12 — API Endpoints MVP
 
+## Implementation Update - Dev 2, June 10 2026
+
+This section reflects the current implemented code for Dev 2 and should be used when older sections below are out of date.
+
+### Runtime URLs
+
+- Backend API: `http://localhost:4300/api/v1`
+- Backend health: `http://localhost:4300/health`
+- Frontend Vite: `http://localhost:5173`
+
+### Matchmaking
+
+| Method | Endpoint | Status | Notes |
+|--------|----------|--------|-------|
+| POST | `/matchmaking/queue` | Done | Joins ranked queue. Response includes `roomId` when matched. |
+| DELETE | `/matchmaking/queue` | Done | Cancels both `waiting` and `matched` queue entries. |
+| GET | `/matchmaking/status` | Done | Returns `idle`, `waiting`, or `matched`; matched payload includes `roomId`. |
+
+When enough players are matched, backend creates an active rank room, creates a `DebateSession`, locks speaker positions, updates queue entries to `matched`, and emits `match:found`.
+
+### Room
+
+| Method | Endpoint | Status | Notes |
+|--------|----------|--------|-------|
+| POST | `/rooms/:id/start` | Done | Validates locked debater positions, creates `DebateSession`, sets room active. |
+| POST | `/rooms/:id/position/lock` | Done | Owner locks positions. |
+| POST | `/rooms/:id/lock` | Done | Alias for `/rooms/:id/position/lock`. |
+
+### Debate Engine
+
+| Method | Endpoint | Status | Notes |
+|--------|----------|--------|-------|
+| POST | `/debate/:roomId/next-turn` | Done | Advances through the REST debate state machine. |
+| POST | `/debate/:roomId/finish-phase` | Done | Finishes current phase and enters the next step. |
+| POST | `/debate/:roomId/ce/pass-turn` | Done | CE asking team passes turn; enforces quota. |
+| POST | `/debate/:roomId/ce/finish` | Done | Finishes CE early and advances phase. |
+| POST | `/debate/:roomId/end` | Done | Completes debate, aggregates scores, applies ranking when eligible. |
+| GET | `/debate/:roomId/session` | Done | Returns current turn, phase, timer, CE state, history, scores. |
+| GET | `/debate/:roomId/replay` | Done | Returns room + session replay payload. |
+
+Legacy room-scoped endpoints still exist for compatibility: `/rooms/:id/session`, `/rooms/:id/replay`, `/rooms/:id/cross-exam/pass-turn`, `/rooms/:id/cross-exam/finish`, `/rooms/:id/judge/submit-score`, `/rooms/:id/scores`, `/rooms/:id/result`.
+
+### Frontend Dev 2 Screens
+
+- `/matchmaking`: ranked queue, leave queue, auto-enter debate when matched.
+- `/rooms/create`: custom room form.
+- `/matches`: room list, filters, join modal.
+- `/rooms/:roomId/lobby`: participant list, position selection, lock/start controls.
+- `/debate/:roomId`: debate layout, host controls, CE panel, judge scoring, score breakdown.
+- `/replay/:sessionId`: replay/result display; currently expects a room/session id compatible with replay endpoint.
+
+### Verification
+
+- `backend`: `npm run build` passes.
+- `frontend`: `npm run build` passes.
+
+Realtime Socket.IO polish remains Dev 3 scope: timer sync, live phase broadcasts, CE broadcasts, chat transcript capture, reconnect/disconnect handling.
+
+---
+
 **Phiên bản:** v1.1 | **Ngày:** 25/05/2026
 **Loại tài liệu:** Danh sách API Backend — phạm vi MVP
 **Tham chiếu:** [05_Use_Cases.md](./05_Use_Cases.md) · [04_TRD](./04_TRD_Technical_Requirements.md) · [08_Socket](./08_Socket_Realtime_Guide.md)

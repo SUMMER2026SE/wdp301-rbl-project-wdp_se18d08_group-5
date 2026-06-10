@@ -83,11 +83,23 @@ export async function tryCreateRankMatch(entry: IMatchQueue): Promise<MatchResul
     isPrivate: false,
     password: null,
     createdBy: entry.userId,
-    status: 'ready',
+    status: 'active',
+    currentPhase: 'motion',
+    startedAt: new Date(),
     participants: buildRankParticipants(orderedUsers),
   });
 
-  await DebateSession.create({ roomId: room._id });
+  await DebateSession.create({
+    roomId: room._id,
+    currentTurn: {
+      speaker: 'HOST',
+      phase: 'motion',
+      startTime: new Date(),
+      timeLimit: 60,
+      timeRemaining: 60,
+      status: 'active',
+    },
+  });
 
   await MatchQueue.updateMany(
     { _id: { $in: matchedEntries.map((queueEntry) => queueEntry._id) } },

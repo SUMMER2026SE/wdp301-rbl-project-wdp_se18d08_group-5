@@ -136,6 +136,7 @@ export interface RoomParticipant {
   team: Team | null;
   speakerSlot: SpeakerSlot | null;
   positionLocked: boolean;
+  muted?: boolean;
 }
 
 export interface DebateRoom {
@@ -200,7 +201,15 @@ export interface FinalScores {
   teamProposition: { total: number; breakdown: ScoreBreakdown };
   teamOpposition: { total: number; breakdown: ScoreBreakdown };
   winner: Team | 'draw';
-  aiVerdict: string;
+  aiVerdict: string | null;
+  judgeVerdicts?: Array<{
+    judgeId: string;
+    speaker?: string;
+    team?: Team;
+    score?: Partial<ScoreBreakdown>;
+    notes: string;
+    submittedAt: string;
+  }>;
 }
 
 export interface DebateSession {
@@ -213,6 +222,15 @@ export interface DebateSession {
     timeLimit: number;
     timeRemaining: number;
     status: 'active' | 'paused' | 'completed';
+    ceState?: {
+      askingTeam: Team;
+      answeringTeam: Team;
+      quotaPerTeam: number;
+      questionsAsked: number;
+      questionsAnswered: number;
+      currentRole: 'asker' | 'answerer';
+      transcript: Array<{ team: Team; type: string; content: string; timestamp: string }>;
+    } | null;
   };
   turnHistory: TurnHistory[];
   cards: {
