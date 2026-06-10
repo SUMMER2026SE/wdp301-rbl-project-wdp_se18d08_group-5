@@ -38,11 +38,11 @@ export function useSocket() {
   }, [isAuthenticated, accessToken]);
 
   const joinRoom = useCallback((roomId: string) => {
-    socket?.emit('room:join', { roomId });
+    socket?.emit('join-room', { roomId });
   }, []);
 
   const leaveRoom = useCallback((roomId: string) => {
-    socket?.emit('room:leave', { roomId });
+    socket?.emit('leave-room', { roomId });
   }, []);
 
   const sendMessage = useCallback((roomId: string, content: string) => {

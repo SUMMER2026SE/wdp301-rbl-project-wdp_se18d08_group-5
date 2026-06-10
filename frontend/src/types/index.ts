@@ -150,6 +150,7 @@ export interface DebateRoom {
   createdBy: string;
   hostType: HostType;
   hostId: string | null;
+  viewerChatEnabled: boolean;
   judgeType: JudgeType;
   judgeCount: number;
   participants: RoomParticipant[];
@@ -180,12 +181,34 @@ export interface ScoreBreakdown {
   overall: number;
 }
 
+export interface SubmitJudgeScoreRequest {
+  speaker: SpeakerTurn;
+  logic: number;
+  rebuttal: number;
+  evidence: number;
+  crossExam: number;
+  strategy: number;
+  communication: number;
+  winner?: Team | 'draw';
+  notes?: string;
+}
+
+export interface SubmitJudgeScoreResponse {
+  speaker: SpeakerTurn;
+  winner: Team | 'draw' | null;
+  score: ScoreBreakdown;
+  notes: string;
+  finalScores: FinalScores;
+}
+
 export interface AIAnalysis {
   score: ScoreBreakdown;
   strengths: string[];
   weaknesses: string[];
   fallacies: { type: string; description: string }[];
   summary: string;
+  verdict?: Team | 'draw';
+  comments?: string;
 }
 
 export interface TurnHistory {
@@ -197,10 +220,22 @@ export interface TurnHistory {
   aiAnalysis: AIAnalysis | null;
 }
 
+export interface JudgeVerdict {
+  judgeId: string | null;
+  judgeName?: string;
+  speaker: SpeakerTurn;
+  winner: Team | 'draw' | null;
+  score: ScoreBreakdown;
+  notes: string;
+  source?: 'ai' | 'human';
+  submittedAt: string;
+}
+
 export interface FinalScores {
-  teamProposition: { total: number; breakdown: ScoreBreakdown };
-  teamOpposition: { total: number; breakdown: ScoreBreakdown };
+  teamProposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
+  teamOpposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
   winner: Team | 'draw';
+<<<<<<< HEAD
   aiVerdict: string | null;
   judgeVerdicts?: Array<{
     judgeId: string;
@@ -210,6 +245,52 @@ export interface FinalScores {
     notes: string;
     submittedAt: string;
   }>;
+=======
+  winnerTeam: Team | 'draw';
+  aiVerdict: Team | 'draw' | null;
+  judgeVerdicts: JudgeVerdict[];
+  aggregatePolicy?: {
+    humanJudgeWeight: number;
+    aiJudgeWeight: number;
+    method: string;
+    weightedVoteWinner?: Team | 'draw';
+    winnerMethod?: string;
+    verdictCount: number;
+    aggregatedAt: string;
+  };
+}
+
+export interface WinnerResult {
+  roomId?: string;
+  winnerTeam: Team | 'draw';
+  propositionTotal: number;
+  oppositionTotal: number;
+  finalScores: FinalScores;
+}
+
+export interface RankingUpdate {
+  userId: string;
+  username: string;
+  team: Team;
+  previousElo: number;
+  newElo: number;
+  eloDelta: number;
+  tier: RankTier;
+  result: 'win' | 'loss' | 'draw';
+}
+
+export interface RankingApplicationResult {
+  applied: boolean;
+  reason?: 'room_not_ranked' | 'already_applied' | 'missing_winner' | 'room_not_completed' | 'missing_debaters';
+  winner?: Team | 'draw';
+  winnerTeam?: Team | 'draw';
+  format?: DebateFormat;
+  teamElo?: {
+    proposition: number;
+    opposition: number;
+  };
+  updates?: RankingUpdate[];
+>>>>>>> 299167e (feat: implement UC58 UC65 room judging realtime)
 }
 
 export interface DebateSession {

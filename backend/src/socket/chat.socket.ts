@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { Message } from '../models/Message.js';
+import { DebateRoom } from '../models/DebateRoom.js';
 
 export function registerChatHandlers(io: Server, socket: Socket) {
   const userId = (socket as any).userId;
@@ -9,12 +10,36 @@ export function registerChatHandlers(io: Server, socket: Socket) {
     if (!content || !content.trim()) return;
 
     try {
+      const room = await DebateRoom.findById(roomId).select('participants viewerChatEnabled');
+      if (!room) {
+        socket.emit('chat:error', { message: 'Room not found' });
+        return;
+      }
+
+      const participant = room.participants.find(
+        (entry) => entry.userId.toString() === userId,
+      );
+      if (!participant) {
+        socket.emit('chat:error', { message: 'You are not in this room' });
+        return;
+      }
+
+      if (participant.muted) {
+        socket.emit('chat:error', { message: 'You are muted in this room' });
+        return;
+      }
+
+      if (participant.roomRole === 'viewer' && room.viewerChatEnabled === false) {
+        socket.emit('chat:error', { message: 'Viewer chat is disabled by the host' });
+        return;
+      }
+
       // Save to database
       const message = await Message.create({
         roomId,
         senderId: userId,
-        senderName: 'User', // TODO: Get from user data
-        senderRole: 'viewer', // TODO: Get from room participant
+        senderName: participant.username,
+        senderRole: participant.roomRole,
         content: content.trim(),
         type: 'chat',
         isToxic: false, // TODO: AI toxic check

@@ -11,6 +11,7 @@ export interface IDebateRoom extends Document {
   createdBy: mongoose.Types.ObjectId;
   hostType: string;
   hostId: mongoose.Types.ObjectId | null;
+  viewerChatEnabled: boolean;
   judgeType: string;
   judgeCount: number;
   judges: { userId: mongoose.Types.ObjectId; username: string }[];
@@ -59,6 +60,7 @@ const debateRoomSchema = new Schema<IDebateRoom>(
       default: 'human',
     },
     hostId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    viewerChatEnabled: { type: Boolean, default: true },
     judgeType: {
       type: String,
       enum: ['human', 'ai'],
