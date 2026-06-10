@@ -4,12 +4,336 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
+import { getIO } from '../../socket/index.js';
+import { aiService } from '../ai/ai.service.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { startDebate } from '../debate/debate.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
+
+const SCORE_LIMITS = {
+  logic: 30,
+  rebuttal: 20,
+  evidence: 15,
+  crossExam: 15,
+  strategy: 10,
+  communication: 10,
+} as const;
+
+type ScoreCriterion = keyof typeof SCORE_LIMITS;
+type DebateWinner = 'proposition' | 'opposition' | 'draw';
+
+const HUMAN_JUDGE_WEIGHT = 1;
+const AI_JUDGE_WEIGHT = 0.5;
+
+function parseScoreCriterion(body: Record<string, unknown>, criterion: ScoreCriterion) {
+  const value = body[criterion];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new BadRequestError(`${criterion} must be a number`);
+  }
+  if (value < 0 || value > SCORE_LIMITS[criterion]) {
+    throw new BadRequestError(`${criterion} must be between 0 and ${SCORE_LIMITS[criterion]}`);
+  }
+  return value;
+}
+
+function buildJudgeScore(body: Record<string, unknown>) {
+  const score = {
+    logic: parseScoreCriterion(body, 'logic'),
+    rebuttal: parseScoreCriterion(body, 'rebuttal'),
+    evidence: parseScoreCriterion(body, 'evidence'),
+    crossExam: parseScoreCriterion(body, 'crossExam'),
+    strategy: parseScoreCriterion(body, 'strategy'),
+    communication: parseScoreCriterion(body, 'communication'),
+    overall: 0,
+  };
+
+  score.overall =
+    score.logic +
+    score.rebuttal +
+    score.evidence +
+    score.crossExam +
+    score.strategy +
+    score.communication;
+
+  return score;
+}
+
+function clampScore(value: unknown, max: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.min(Math.max(value, 0), max);
+}
+
+function normalizeAIJudgeResult(result: any) {
+  const rawScore = result?.score || {};
+  const score = {
+    logic: clampScore(rawScore.logic, SCORE_LIMITS.logic),
+    rebuttal: clampScore(rawScore.rebuttal, SCORE_LIMITS.rebuttal),
+    evidence: clampScore(rawScore.evidence, SCORE_LIMITS.evidence),
+    crossExam: clampScore(rawScore.crossExam, SCORE_LIMITS.crossExam),
+    strategy: clampScore(rawScore.strategy, SCORE_LIMITS.strategy),
+    communication: clampScore(rawScore.communication, SCORE_LIMITS.communication),
+    overall: 0,
+  };
+
+  score.overall =
+    score.logic +
+    score.rebuttal +
+    score.evidence +
+    score.crossExam +
+    score.strategy +
+    score.communication;
+
+  const verdict = ['proposition', 'opposition', 'draw'].includes(result?.verdict)
+    ? result.verdict
+    : 'draw';
+
+  return {
+    score,
+    verdict,
+    comments: typeof result?.comments === 'string' ? result.comments : '',
+    strengths: Array.isArray(result?.strengths) ? result.strengths : [],
+    weaknesses: Array.isArray(result?.weaknesses) ? result.weaknesses : [],
+    fallacies: Array.isArray(result?.fallacies) ? result.fallacies : [],
+    summary:
+      typeof result?.summary === 'string'
+        ? result.summary
+        : typeof result?.comments === 'string'
+          ? result.comments
+          : '',
+  };
+}
+
+function createEmptyScoreBreakdown() {
+  return {
+    logic: 0,
+    rebuttal: 0,
+    evidence: 0,
+    crossExam: 0,
+    strategy: 0,
+    communication: 0,
+    overall: 0,
+  };
+}
+
+function getSpeakerTeam(speaker: unknown): 'proposition' | 'opposition' | null {
+  if (typeof speaker !== 'string') return null;
+  if (speaker.startsWith('PRO_')) return 'proposition';
+  if (speaker.startsWith('OPP_')) return 'opposition';
+  return null;
+}
+
+function getVerdictWeight(verdict: any) {
+  return verdict?.source === 'ai' || verdict?.judgeId === null ? AI_JUDGE_WEIGHT : HUMAN_JUDGE_WEIGHT;
+}
+
+function getLatestVerdicts(verdicts: any[]) {
+  const latestByJudgeAndSpeaker = new Map<string, any>();
+
+  verdicts.forEach((verdict, index) => {
+    const judgeKey = verdict?.source === 'ai'
+      ? `ai:${verdict.speaker}:${index}`
+      : `${verdict?.judgeId?.toString?.() || 'unknown'}:${verdict?.speaker || 'unknown'}`;
+    latestByJudgeAndSpeaker.set(judgeKey, verdict);
+  });
+
+  return Array.from(latestByJudgeAndSpeaker.values());
+}
+
+function aggregateTeamScores(verdicts: any[], team: 'proposition' | 'opposition') {
+  const totals = createEmptyScoreBreakdown();
+  let totalWeight = 0;
+
+  verdicts.forEach((verdict) => {
+    if (getSpeakerTeam(verdict?.speaker) !== team || !verdict?.score) return;
+
+    const weight = getVerdictWeight(verdict);
+    totalWeight += weight;
+
+    (Object.keys(SCORE_LIMITS) as ScoreCriterion[]).forEach((criterion) => {
+      totals[criterion] += clampScore(verdict.score[criterion], SCORE_LIMITS[criterion]) * weight;
+    });
+    totals.overall += clampScore(verdict.score.overall, 100) * weight;
+  });
+
+  if (totalWeight === 0) {
+    return { total: 0, breakdown: totals, weight: 0 };
+  }
+
+  const breakdown = createEmptyScoreBreakdown();
+  (Object.keys(SCORE_LIMITS) as ScoreCriterion[]).forEach((criterion) => {
+    breakdown[criterion] = Number((totals[criterion] / totalWeight).toFixed(2));
+  });
+  breakdown.overall = Number((totals.overall / totalWeight).toFixed(2));
+
+  return {
+    total: breakdown.overall,
+    breakdown,
+    weight: Number(totalWeight.toFixed(2)),
+  };
+}
+
+function resolveWinnerFromVerdicts(verdicts: any[], propositionTotal: number, oppositionTotal: number): DebateWinner {
+  const votes: Record<DebateWinner, number> = {
+    proposition: 0,
+    opposition: 0,
+    draw: 0,
+  };
+
+  verdicts.forEach((verdict) => {
+    if (!['proposition', 'opposition', 'draw'].includes(verdict?.winner)) return;
+    votes[verdict.winner as DebateWinner] += getVerdictWeight(verdict);
+  });
+
+  const voteEntries = Object.entries(votes) as Array<[DebateWinner, number]>;
+  const [topVote, secondVote] = voteEntries.sort((a, b) => b[1] - a[1]);
+  if (topVote && topVote[1] > 0 && (!secondVote || topVote[1] > secondVote[1])) {
+    return topVote[0];
+  }
+
+  const scoreDelta = propositionTotal - oppositionTotal;
+  if (Math.abs(scoreDelta) < 0.5) return 'draw';
+  return scoreDelta > 0 ? 'proposition' : 'opposition';
+}
+
+function resolveWinnerFromTeamScores(propositionTotal: number, oppositionTotal: number): DebateWinner {
+  const scoreDelta = propositionTotal - oppositionTotal;
+  if (Math.abs(scoreDelta) < 0.5) return 'draw';
+  return scoreDelta > 0 ? 'proposition' : 'opposition';
+}
+
+function aggregateFinalScores(session: any) {
+  if (!session.finalScores) {
+    session.finalScores = {
+      teamProposition: { total: 0, breakdown: {} },
+      teamOpposition: { total: 0, breakdown: {} },
+      winner: 'draw',
+      aiVerdict: 'pending',
+      judgeVerdicts: [],
+    };
+  }
+
+  const finalScores = session.finalScores as {
+    teamProposition: any;
+    teamOpposition: any;
+    winner: DebateWinner;
+    winnerTeam?: DebateWinner;
+    aiVerdict: string | null;
+    judgeVerdicts: any[];
+    aggregatePolicy?: any;
+  };
+  const verdicts = getLatestVerdicts(finalScores.judgeVerdicts || []);
+  const proposition = aggregateTeamScores(verdicts, 'proposition');
+  const opposition = aggregateTeamScores(verdicts, 'opposition');
+  const weightedVoteWinner = resolveWinnerFromVerdicts(verdicts, proposition.total, opposition.total);
+  const winnerTeam = resolveWinnerFromTeamScores(proposition.total, opposition.total);
+
+  const aiVotes = verdicts.filter((verdict) => verdict?.source === 'ai' && verdict?.winner);
+  const latestAIVote = aiVotes[aiVotes.length - 1]?.winner || null;
+
+  finalScores.teamProposition = {
+    total: proposition.total,
+    breakdown: proposition.breakdown,
+    weight: proposition.weight,
+  };
+  finalScores.teamOpposition = {
+    total: opposition.total,
+    breakdown: opposition.breakdown,
+    weight: opposition.weight,
+  };
+  finalScores.winner = winnerTeam;
+  finalScores.winnerTeam = winnerTeam;
+  finalScores.aiVerdict = latestAIVote;
+  finalScores.aggregatePolicy = {
+    humanJudgeWeight: HUMAN_JUDGE_WEIGHT,
+    aiJudgeWeight: AI_JUDGE_WEIGHT,
+    method: 'weighted_average_with_weighted_winner_votes',
+    weightedVoteWinner,
+    winnerMethod: 'compare_team_total_scores',
+    verdictCount: verdicts.length,
+    aggregatedAt: new Date(),
+  };
+
+  return finalScores;
+}
+
+async function judgeTurnWithAI(
+  room: any,
+  session: any,
+  turnHistoryIndex: number,
+  transcript: string,
+) {
+  if (room.judgeType !== 'ai' || !transcript.trim()) return null;
+
+  const turn = session.turnHistory[turnHistoryIndex];
+  if (!turn) return null;
+
+  const aiResult = await aiService.judgeTurn(room._id.toString(), turn.speaker, transcript, {
+    motion: room.motion,
+    format: room.format,
+    phase: turn.crossExamination ? 'cross_exam' : 'speech',
+    participants: room.participants,
+    currentPhase: room.currentPhase,
+  });
+  const normalized = normalizeAIJudgeResult(aiResult);
+
+  turn.aiAnalysis = {
+    score: normalized.score,
+    strengths: normalized.strengths,
+    weaknesses: normalized.weaknesses,
+    fallacies: normalized.fallacies,
+    summary: normalized.summary,
+    verdict: normalized.verdict,
+    comments: normalized.comments,
+  };
+
+  if (!session.finalScores) {
+    session.finalScores = {
+      teamProposition: { total: 0, breakdown: {} },
+      teamOpposition: { total: 0, breakdown: {} },
+      winner: 'draw',
+      aiVerdict: 'pending',
+      judgeVerdicts: [],
+    };
+  }
+
+  const finalScores = session.finalScores as { judgeVerdicts: any[]; aiVerdict: string | null };
+  finalScores.judgeVerdicts = finalScores.judgeVerdicts || [];
+  finalScores.judgeVerdicts.push({
+    judgeId: null,
+    judgeName: 'AI Judge',
+    speaker: turn.speaker,
+    winner: normalized.verdict,
+    score: normalized.score,
+    notes: normalized.summary,
+    source: 'ai',
+    submittedAt: new Date(),
+  });
+  aggregateFinalScores(session);
+
+  await session.save();
+
+  getIO().to(room._id.toString()).emit('ai:turn-judged', {
+    roomId: room._id,
+    speaker: turn.speaker,
+    analysis: turn.aiAnalysis,
+  });
+  getIO().to(room._id.toString()).emit('score:updated', {
+    roomId: room._id,
+    judgeId: 'ai',
+    speaker: turn.speaker,
+    score: normalized.score,
+    winner: normalized.verdict,
+  });
+  getIO().to(room._id.toString()).emit('score:aggregate-updated', {
+    roomId: room._id,
+    finalScores,
+  });
+
+  return normalized;
+}
 
 // POST /api/v1/rooms/create — Create custom room (UC-14)
 router.post(
@@ -416,6 +740,7 @@ router.post(
         crossExamination: currentTurn.phase === 'cross_exam' ? { questionsAsked: 0, questionsAnswered: 0, timeRemainingPro: 0, timeRemainingOpp: 0, transcript: [] } : null,
         aiAnalysis: null,
       });
+      await judgeTurnWithAI(room, session, session.turnHistory.length - 1, transcript || '');
     }
 
     session.currentTurn = {
@@ -511,12 +836,135 @@ router.post(
   }),
 );
 
+// POST /api/v1/rooms/:id/host/viewer-chat — Enable/disable viewer chat (UC-58)
+router.post(
+  '/:id/host/viewer-chat',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { enabled } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) {
+      throw new ForbiddenError('Only host or owner can control viewer chat');
+    }
+
+    if (typeof enabled !== 'boolean') {
+      throw new BadRequestError('enabled must be a boolean');
+    }
+
+    room.viewerChatEnabled = enabled;
+    await room.save();
+
+    getIO().to(req.params.id).emit('chat:viewer-chat-updated', {
+      roomId: room._id,
+      viewerChatEnabled: room.viewerChatEnabled,
+    });
+
+    sendSuccess(
+      res,
+      { viewerChatEnabled: room.viewerChatEnabled },
+      `Viewer chat ${room.viewerChatEnabled ? 'enabled' : 'disabled'}`,
+    );
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/transfer — Transfer human host role (UC-59)
+router.post(
+  '/:id/host/transfer',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { userId } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const requesterId = req.user!.userId;
+    const isHost = room.hostId?.toString() === requesterId;
+    const isOwner = room.createdBy.toString() === requesterId;
+    if (!isHost && !isOwner) {
+      throw new ForbiddenError('Only host or owner can transfer host role');
+    }
+
+    if (!userId || typeof userId !== 'string') {
+      throw new BadRequestError('userId is required');
+    }
+    if (room.hostId?.toString() === userId) {
+      throw new BadRequestError('User is already the host');
+    }
+
+    const nextHost = room.participants.find((participant) => participant.userId.toString() === userId);
+    if (!nextHost) throw new NotFoundError('Target participant not found');
+
+    const previousHostId = room.hostId?.toString() || null;
+    const previousHost = previousHostId
+      ? room.participants.find((participant) => participant.userId.toString() === previousHostId)
+      : null;
+
+    if (previousHost && previousHost.roomRole === 'host') {
+      previousHost.roomRole =
+        previousHost.userId.toString() === room.createdBy.toString() ? 'owner' : 'viewer';
+    }
+
+    room.hostType = 'human';
+    room.hostId = nextHost.userId as any;
+    nextHost.roomRole = 'host';
+    room.judges = (room.judges || []).filter(
+      (judge) => judge.userId.toString() !== nextHost.userId.toString(),
+    ) as any;
+
+    await room.save();
+
+    getIO().to(req.params.id).emit('room:host-transferred', {
+      roomId: room._id,
+      previousHostId,
+      hostId: room.hostId,
+      hostType: room.hostType,
+      participants: room.participants,
+    });
+    getIO().to(req.params.id).emit('room:participant-update', {
+      participants: room.participants,
+    });
+
+    sendSuccess(
+      res,
+      {
+        hostId: room.hostId,
+        hostType: room.hostType,
+        previousHostId,
+        participants: room.participants,
+      },
+      'Host role transferred',
+    );
+  }),
+);
+
 // POST /api/v1/rooms/:id/judge/submit-score — Judge submit score (UC-35)
 router.post(
   '/:id/judge/submit-score',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { speaker, score, notes, logic, rebuttal, evidence, crossExam, strategy, communication } = req.body;
+    const { speaker, winner, notes } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const judge = room.participants.find(
+      (participant) => participant.userId.toString() === req.user!.userId,
+    );
+    if (!judge || judge.roomRole !== 'judge') {
+      throw new ForbiddenError('Only human judges assigned to this room can submit scores');
+    }
+
+    if (!speaker || typeof speaker !== 'string') {
+      throw new BadRequestError('speaker is required');
+    }
+    if (winner !== undefined && !['proposition', 'opposition', 'draw'].includes(winner)) {
+      throw new BadRequestError('winner must be proposition, opposition, or draw');
+    }
+
+    const scorePayload = buildJudgeScore(req.body);
+
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
 
@@ -534,25 +982,57 @@ router.post(
       judgeVerdicts: any[];
     };
     finalScores.judgeVerdicts = finalScores.judgeVerdicts || [];
-    const scorePayload = score || {
-      logic,
-      rebuttal,
-      evidence,
-      crossExam,
-      strategy,
-      communication,
+
+    const existingVerdictIndex = finalScores.judgeVerdicts.findIndex(
+      (verdict) =>
+        verdict.judgeId?.toString() === req.user!.userId &&
+        verdict.speaker === speaker,
+    );
+
+    const verdictPayload = {
+      judgeId: req.user!.userId as any,
+      judgeName: judge.username,
+      speaker,
+      winner: winner || null,
+      score: scorePayload,
+      notes: typeof notes === 'string' ? notes.trim() : '',
+      submittedAt: new Date(),
     };
 
-    finalScores.judgeVerdicts.push({
-      judgeId: req.user!.userId as any,
-      speaker,
-      score: scorePayload,
-      notes: notes || '',
-      submittedAt: new Date(),
-    });
+    if (existingVerdictIndex >= 0) {
+      finalScores.judgeVerdicts[existingVerdictIndex] = verdictPayload;
+    } else {
+      finalScores.judgeVerdicts.push(verdictPayload);
+    }
+    const aggregatedScores = aggregateFinalScores(session);
 
     await session.save();
-    sendSuccess(res, { speaker, score: scorePayload, notes }, 'Score submitted');
+
+    getIO().to(req.params.id).emit('score:updated', {
+      roomId: req.params.id,
+      judgeId: req.user!.userId,
+      speaker,
+      score: scorePayload,
+      winner: winner || null,
+      aggregateWinner: aggregatedScores.winner,
+      finalScores: aggregatedScores,
+    });
+    getIO().to(req.params.id).emit('score:aggregate-updated', {
+      roomId: req.params.id,
+      finalScores: aggregatedScores,
+    });
+
+    sendSuccess(
+      res,
+      {
+        speaker,
+        winner: winner || null,
+        score: scorePayload,
+        notes: verdictPayload.notes,
+        finalScores: aggregatedScores,
+      },
+      existingVerdictIndex >= 0 ? 'Score updated' : 'Score submitted',
+    );
   }),
 );
 
@@ -565,13 +1045,115 @@ router.get(
 
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
+    const aggregatedScores = aggregateFinalScores(session);
+    await session.save();
 
     sendSuccess(res, {
-      finalScores: session.finalScores,
-      judgeVerdicts: session.finalScores?.judgeVerdicts || [],
+      finalScores: aggregatedScores,
+      judgeVerdicts: aggregatedScores.judgeVerdicts || [],
       turnHistory: session.turnHistory,
       participants: room.participants,
     });
+  }),
+);
+
+// POST /api/v1/rooms/:id/scores/aggregate — Aggregate human judges + AI scores (UC-62)
+router.post(
+  '/:id/scores/aggregate',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    const isJudge = room.participants.some(
+      (participant) =>
+        participant.userId.toString() === req.user!.userId &&
+        participant.roomRole === 'judge',
+    );
+    if (!isHost && !isOwner && !isJudge) {
+      throw new ForbiddenError('Only host, owner, or judge can aggregate scores');
+    }
+
+    const session = await DebateSession.findOne({ roomId: req.params.id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const aggregatedScores = aggregateFinalScores(session);
+    await session.save();
+
+    getIO().to(req.params.id).emit('score:aggregate-updated', {
+      roomId: req.params.id,
+      finalScores: aggregatedScores,
+    });
+
+    sendSuccess(res, aggregatedScores, 'Scores aggregated');
+  }),
+);
+
+// GET /api/v1/rooms/:id/winner — Determine winner by team totals (UC-63)
+router.get(
+  '/:id/winner',
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id).select('participants judgeType');
+    if (!room) throw new NotFoundError('Room not found');
+
+    const session = await DebateSession.findOne({ roomId: req.params.id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const finalScores = aggregateFinalScores(session);
+    await session.save();
+
+    sendSuccess(res, {
+      winnerTeam: finalScores.winnerTeam || finalScores.winner,
+      propositionTotal: finalScores.teamProposition.total,
+      oppositionTotal: finalScores.teamOpposition.total,
+      finalScores,
+      participants: room.participants,
+    });
+  }),
+);
+
+// POST /api/v1/rooms/:id/winner — Recompute and broadcast winner (UC-63)
+router.post(
+  '/:id/winner',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    const isJudge = room.participants.some(
+      (participant) =>
+        participant.userId.toString() === req.user!.userId &&
+        participant.roomRole === 'judge',
+    );
+    if (!isHost && !isOwner && !isJudge) {
+      throw new ForbiddenError('Only host, owner, or judge can determine winner');
+    }
+
+    const session = await DebateSession.findOne({ roomId: req.params.id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const finalScores = aggregateFinalScores(session);
+    await session.save();
+
+    const payload = {
+      roomId: req.params.id,
+      winnerTeam: finalScores.winnerTeam || finalScores.winner,
+      propositionTotal: finalScores.teamProposition.total,
+      oppositionTotal: finalScores.teamOpposition.total,
+      finalScores,
+    };
+
+    getIO().to(req.params.id).emit('score:winner-determined', payload);
+    getIO().to(req.params.id).emit('score:aggregate-updated', {
+      roomId: req.params.id,
+      finalScores,
+    });
+
+    sendSuccess(res, payload, 'Winner determined');
   }),
 );
 
@@ -581,6 +1163,9 @@ router.post(
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker, transcript } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
     if (session.currentTurn.phase !== 'cross_exam') {
@@ -598,6 +1183,7 @@ router.post(
       crossExamination: { questionsAsked: 0, questionsAnswered: 0, timeRemainingPro: 0, timeRemainingOpp: 0, transcript: [] },
       aiAnalysis: null,
     });
+    await judgeTurnWithAI(room, session, session.turnHistory.length - 1, transcript || '');
 
     session.currentTurn = {
       speaker: nextSpeaker || session.currentTurn.speaker,
@@ -665,6 +1251,11 @@ router.post(
     const isHost = room.hostId?.toString() === req.user!.userId;
     const isOwner = room.createdBy.toString() === req.user!.userId;
     if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can finalize result');
+
+    const session = await DebateSession.findOne({ roomId: req.params.id });
+    if (!session) throw new NotFoundError('Session not found');
+    aggregateFinalScores(session);
+    await session.save();
 
     const rankingResult = await applyDebateResult(req.params.id);
     sendSuccess(res, rankingResult, rankingResult.applied ? 'Result applied' : 'Result not applied');

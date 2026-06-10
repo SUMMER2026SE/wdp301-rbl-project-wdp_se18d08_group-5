@@ -2,7 +2,30 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
-import type { ChatMessage, DebatePhase, RoomParticipant, SpeakerTurn } from '@/types';
+import type {
+  AIAnalysis,
+  ChatMessage,
+  DebatePhase,
+  DebateRoom,
+  DebateSession,
+  FinalScores,
+  RoomParticipant,
+  SpeakerTurn,
+  WinnerResult,
+} from '@/types';
+
+interface RoomStateRestore {
+  room: DebateRoom;
+  session: DebateSession | null;
+  participants: RoomParticipant[];
+  currentPhase: DebatePhase;
+  currentTurn: DebateSession['currentTurn'] | null;
+  timeRemaining: number;
+  isPaused: boolean;
+  messages: ChatMessage[];
+  finalScores: FinalScores | null;
+  viewerChatEnabled: boolean;
+}
 
 /**
  * Listen to debate-specific socket events and update store.
@@ -10,14 +33,21 @@ import type { ChatMessage, DebatePhase, RoomParticipant, SpeakerTurn } from '@/t
 export function useDebateSocket(roomId: string | undefined) {
   const { t } = useTranslation('errors');
   const {
+    setRoom,
     setPhase,
     setSpeaker,
     setTimeRemaining,
     setPaused,
     setCEState,
     addMessage,
+    setMessages,
+    setViewerChatEnabled,
     setParticipants,
+    setHost,
     setScore,
+    setAIAnalysis,
+    setFinalScores,
+    setWinnerResult,
   } = useDebateStore();
 
   useEffect(() => {
@@ -25,6 +55,29 @@ export function useDebateSocket(roomId: string | undefined) {
 
     const socket = getSocket();
     if (!socket) return;
+
+    const restoreState = (data: RoomStateRestore) => {
+      setRoom(data.room);
+      setParticipants(data.participants);
+      setPhase(data.currentPhase);
+      setTimeRemaining(data.timeRemaining);
+      setPaused(data.isPaused);
+      setMessages(data.messages);
+      setViewerChatEnabled(data.viewerChatEnabled);
+
+      if (data.currentTurn?.speaker) {
+        setSpeaker(data.currentTurn.speaker);
+      }
+      if (data.finalScores) {
+        setFinalScores(data.finalScores);
+      }
+    };
+
+    socket.on('room:joined', restoreState);
+    socket.on('room:state-restore', restoreState);
+    socket.on('chat:history', (messages: ChatMessage[]) => {
+      setMessages(messages);
+    });
 
     // Phase change
     socket.on('debate:phase-change', (data: { phase: DebatePhase }) => {
@@ -55,14 +108,37 @@ export function useDebateSocket(roomId: string | undefined) {
       addMessage(message);
     });
 
+    socket.on('chat:viewer-chat-updated', (data: { viewerChatEnabled: boolean }) => {
+      setViewerChatEnabled(data.viewerChatEnabled);
+    });
+
     // Participants
     socket.on('room:participant-update', (data: { participants: RoomParticipant[] }) => {
       setParticipants(data.participants);
     });
 
+    socket.on(
+      'room:host-transferred',
+      (data: { hostId: string; participants: RoomParticipant[] }) => {
+        setHost(data.hostId, data.participants);
+      },
+    );
+
     // Score
     socket.on('score:updated', (data: { speaker: string; score: ReturnType<typeof useDebateStore.getState>['scores'][string] }) => {
       setScore(data.speaker, data.score);
+    });
+
+    socket.on('ai:turn-judged', (data: { speaker: string; analysis: AIAnalysis }) => {
+      setAIAnalysis(data.speaker, data.analysis);
+    });
+
+    socket.on('score:aggregate-updated', (data: { finalScores: FinalScores }) => {
+      setFinalScores(data.finalScores);
+    });
+
+    socket.on('score:winner-determined', (data: WinnerResult) => {
+      setWinnerResult(data);
     });
 
     // Card issued
@@ -82,7 +158,13 @@ export function useDebateSocket(roomId: string | undefined) {
       });
     });
 
+    socket.emit('join-room', { roomId });
+
     return () => {
+      socket.emit('leave-room', { roomId });
+      socket.off('room:joined');
+      socket.off('room:state-restore');
+      socket.off('chat:history');
       socket.off('debate:phase-change');
       socket.off('debate:turn-change');
       socket.off('debate:timer-update');
@@ -90,9 +172,14 @@ export function useDebateSocket(roomId: string | undefined) {
       socket.off('debate:resumed');
       socket.off('cross-exam:update');
       socket.off('chat:message');
+      socket.off('chat:viewer-chat-updated');
       socket.off('room:participant-update');
+      socket.off('room:host-transferred');
       socket.off('score:updated');
+      socket.off('ai:turn-judged');
+      socket.off('score:aggregate-updated');
+      socket.off('score:winner-determined');
       socket.off('debate:card-issued');
     };
-  }, [addMessage, roomId, setCEState, setParticipants, setPaused, setPhase, setScore, setSpeaker, setTimeRemaining, t]);
+  }, [addMessage, roomId, setAIAnalysis, setCEState, setFinalScores, setHost, setMessages, setParticipants, setPaused, setPhase, setRoom, setScore, setSpeaker, setTimeRemaining, setViewerChatEnabled, setWinnerResult, t]);
 }
