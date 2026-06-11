@@ -12,6 +12,8 @@ import {
   finishCe,
   finishPhase,
   passCeTurn,
+  requestDraw,
+  surrenderDebate,
 } from './debate.service.js';
 import type { AuthRequest } from '../../types/index.js';
 
@@ -64,6 +66,26 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await endDebate(req.params.roomId, req.user!.userId, req.body.summary || '');
     sendSuccess(res, result, 'Debate completed');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/surrender — Debater forfeits the match
+router.post(
+  '/:roomId/surrender',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await surrenderDebate(req.params.roomId, req.user!.userId);
+    sendSuccess(res, result, 'Debate surrendered');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/draw/request — Debater requests a draw
+router.post(
+  '/:roomId/draw/request',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await requestDraw(req.params.roomId, req.user!.userId);
+    sendSuccess(res, result, 'Draw requested');
   }),
 );
 
@@ -228,6 +250,18 @@ router.post(
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { speaker, score, notes } = req.body;
+    const room = await DebateRoom.findById(req.params.roomId).select('participants');
+    if (!room) throw new NotFoundError('Room not found');
+
+    const judge = room.participants.find(
+      (participant) =>
+        participant.userId.toString() === req.user!.userId &&
+        participant.roomRole === 'judge',
+    );
+    if (!judge) {
+      throw new ForbiddenError('Only assigned judges can submit scores');
+    }
+
     const session = await DebateSession.findOne({ roomId: req.params.roomId });
     if (!session) throw new NotFoundError('Session not found');
 

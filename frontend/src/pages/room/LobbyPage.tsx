@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Badge, Button, ButtonGroup, Card, Col, Container, Form, Row, Spinner, Table } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
 import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
 import type { SpeakerSlot, Team } from '@/types';
+
+type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
 
 export default function LobbyPage() {
   const { roomId = '' } = useParams();
@@ -14,6 +16,10 @@ export default function LobbyPage() {
   const user = useAuthStore((state) => state.user);
   const [team, setTeam] = useState<Team>('proposition');
   const [speakerSlot, setSpeakerSlot] = useState<SpeakerSlot>('S1');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [assignRole, setAssignRole] = useState<AssignableRole>('debater');
+  const [assignTeam, setAssignTeam] = useState<Team>('proposition');
+  const [assignSlot, setAssignSlot] = useState<SpeakerSlot>('S1');
 
   const roomQuery = useQuery({
     queryKey: ['room', roomId],
@@ -21,20 +27,37 @@ export default function LobbyPage() {
     enabled: Boolean(roomId),
   });
 
+  const invalidateRoom = () => queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+
   const selectMutation = useMutation({
     mutationFn: () => roomService.selectPosition(roomId, team, speakerSlot),
     onSuccess: () => {
       toast.success('Position selected');
-      queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+      invalidateRoom();
     },
-    onError: () => toast.error('Could not select position'),
+    onError: () => toast.error('Only assigned debaters can select position'),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: () =>
+      roomService.assignParticipant(roomId, {
+        userId: selectedUserId,
+        role: assignRole,
+        team: assignRole === 'debater' ? assignTeam : null,
+        speakerSlot: assignRole === 'debater' ? assignSlot : null,
+      }),
+    onSuccess: () => {
+      toast.success('Participant updated');
+      invalidateRoom();
+    },
+    onError: () => toast.error('Could not update participant'),
   });
 
   const lockMutation = useMutation({
     mutationFn: () => roomService.lockPositions(roomId),
     onSuccess: () => {
-      toast.success('Positions locked');
-      queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+      toast.success('Debater positions locked');
+      invalidateRoom();
     },
     onError: () => toast.error('Only owner can lock positions'),
   });
@@ -45,12 +68,14 @@ export default function LobbyPage() {
       toast.success('Debate started');
       navigate(`/debate/${roomId}`);
     },
-    onError: () => toast.error('Fill and lock all debater positions first'),
+    onError: () => toast.error('Assign host, fill debaters, then lock positions first'),
   });
 
   const room = roomQuery.data;
   const isOwner = Boolean(user && room?.createdBy === user._id);
   const currentParticipant = room?.participants.find((item) => item.userId === user?._id);
+  const isAssignedDebater = currentParticipant?.roomRole === 'debater';
+  const slots = useMemo(() => (room?.format === '1v1' ? ['S1'] : ['S1', 'S2', 'S3']) as SpeakerSlot[], [room?.format]);
 
   if (roomQuery.isLoading) {
     return <Container className="py-4"><Spinner animation="border" /></Container>;
@@ -73,7 +98,7 @@ export default function LobbyPage() {
       </div>
 
       <Row className="g-4">
-        <Col lg={8}>
+        <Col xl={8}>
           <Card>
             <Card.Body>
               <Card.Title>Participants</Card.Title>
@@ -103,10 +128,73 @@ export default function LobbyPage() {
           </Card>
         </Col>
 
-        <Col lg={4}>
+        <Col xl={4}>
+          {isOwner && (
+            <Card className="mb-3">
+              <Card.Body>
+                <Card.Title>Assign Participant</Card.Title>
+                <Form.Group className="mb-3">
+                  <Form.Label>User</Form.Label>
+                  <Form.Select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>
+                    <option value="">Select user</option>
+                    {room.participants.map((participant) => (
+                      <option key={participant.userId} value={participant.userId}>
+                        {participant.username} ({participant.roomRole})
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Role</Form.Label>
+                  <Form.Select value={assignRole} onChange={(event) => setAssignRole(event.target.value as AssignableRole)}>
+                    <option value="debater">Debater</option>
+                    <option value="host">Host</option>
+                    <option value="judge">Judge</option>
+                    <option value="viewer">Viewer</option>
+                  </Form.Select>
+                </Form.Group>
+                {assignRole === 'debater' && (
+                  <>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Team</Form.Label>
+                      <ButtonGroup className="w-100">
+                        {(['proposition', 'opposition'] as Team[]).map((item) => (
+                          <Button
+                            key={item}
+                            type="button"
+                            variant={assignTeam === item ? 'primary' : 'outline-primary'}
+                            onClick={() => setAssignTeam(item)}
+                          >
+                            {item}
+                          </Button>
+                        ))}
+                      </ButtonGroup>
+                    </Form.Group>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Speaker</Form.Label>
+                      <Form.Select value={assignSlot} onChange={(event) => setAssignSlot(event.target.value as SpeakerSlot)}>
+                        {slots.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
+                      </Form.Select>
+                    </Form.Group>
+                  </>
+                )}
+                <Button
+                  className="w-100"
+                  disabled={!selectedUserId || assignMutation.isPending}
+                  onClick={() => assignMutation.mutate()}
+                >
+                  Save Assignment
+                </Button>
+              </Card.Body>
+            </Card>
+          )}
+
           <Card className="mb-3">
             <Card.Body>
-              <Card.Title>Select Position</Card.Title>
+              <Card.Title>My Debater Position</Card.Title>
+              {!isAssignedDebater && (
+                <Alert variant="info">Wait for the owner to assign you as a debater.</Alert>
+              )}
               {currentParticipant?.positionLocked && (
                 <Alert variant="success">Your position is locked.</Alert>
               )}
@@ -116,8 +204,10 @@ export default function LobbyPage() {
                   {(['proposition', 'opposition'] as Team[]).map((item) => (
                     <Button
                       key={item}
+                      type="button"
                       variant={team === item ? 'primary' : 'outline-primary'}
                       onClick={() => setTeam(item)}
+                      disabled={!isAssignedDebater || currentParticipant?.positionLocked}
                     >
                       {item}
                     </Button>
@@ -126,14 +216,20 @@ export default function LobbyPage() {
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Speaker</Form.Label>
-                <Form.Select value={speakerSlot} onChange={(event) => setSpeakerSlot(event.target.value as SpeakerSlot)}>
-                  {(room.format === '1v1' ? ['S1'] : ['S1', 'S2', 'S3']).map((slot) => (
-                    <option key={slot} value={slot}>{slot}</option>
-                  ))}
+                <Form.Select
+                  value={speakerSlot}
+                  disabled={!isAssignedDebater || currentParticipant?.positionLocked}
+                  onChange={(event) => setSpeakerSlot(event.target.value as SpeakerSlot)}
+                >
+                  {slots.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
                 </Form.Select>
               </Form.Group>
-              <Button className="w-100" onClick={() => selectMutation.mutate()} disabled={selectMutation.isPending}>
-                Save Position
+              <Button
+                className="w-100"
+                onClick={() => selectMutation.mutate()}
+                disabled={!isAssignedDebater || Boolean(currentParticipant?.positionLocked) || selectMutation.isPending}
+              >
+                Save My Position
               </Button>
             </Card.Body>
           </Card>
@@ -141,11 +237,11 @@ export default function LobbyPage() {
           {isOwner && (
             <Card>
               <Card.Body>
-                <Card.Title>Owner Controls</Card.Title>
+                <Card.Title>Room Setup</Card.Title>
                 <div className="d-grid gap-2">
                   <Button variant="outline-secondary" onClick={() => lockMutation.mutate()} disabled={lockMutation.isPending}>
                     <i className="bi bi-lock me-2" />
-                    Lock Positions
+                    Lock Debaters
                   </Button>
                   <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
                     <i className="bi bi-play-fill me-2" />

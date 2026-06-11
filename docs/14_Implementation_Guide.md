@@ -1,5 +1,60 @@
 # 14 — Implementation Guide
 
+## Current Delivered Scope - Full Summary
+
+This guide is now backed by the implemented REST-first flow in source code. The delivered scope includes Dev 2 plus related lobby, judge, host, player action, and frontend integration work:
+
+### Backend
+
+- Matchmaking queue: join queue, leave queue, status polling, matched room creation, `DebateSession` creation, and rank-room activation.
+- Custom rooms: create, list, detail, update, delete, join, leave, private room password flow, and room detail hydration with real user display name/avatar.
+- Lobby assignment: owner assigns each participant as `debater`, `host`, `judge`, or `viewer`; owner can place debaters into team/speaker slots.
+- Debater self-positioning: only assigned debaters can choose or update their own team and speaker slot.
+- Position locking: lock endpoints lock debaters only, not host/judge/viewer rows.
+- Start debate: validates filled and locked debater positions; human-host rooms require an assigned `hostId`.
+- Debate engine: session retrieval, next turn, finish phase, CE pass turn, CE finish, manual end, result/replay payloads, final score persistence, and ranking updates for eligible rank rooms.
+- Host controls: pause, resume, issue card, and kick remain tied to assigned host behavior.
+- Judge scoring: backend allows score submission only from assigned judges.
+- Player actions: assigned debaters can surrender (`/debate/:roomId/surrender`) or request draw (`/debate/:roomId/draw/request`); a draw completes only when both opposing teams request it.
+
+### Frontend
+
+- `/matchmaking`: ranked queue UI, leave queue, matched-room handoff.
+- `/matches`: live/custom room list, filters, room cards, private join modal.
+- `/rooms/create`: custom room creation.
+- `/rooms/:roomId/lobby`: owner assignment panel, debater-only position panel, debater lock, host requirement, and start debate controls.
+- `/debate/:roomId`: debate status, phase/turn/timer, team layout, CE controls, assigned-host controls, assigned-judge scoring, debater gear menu for surrender/draw, score display, and completed-state `Thoát phòng` action.
+- `/replay/:sessionId`: replay/result view based on replay payload.
+
+### Dev 3 Boundary
+
+The current behavior is intentionally REST-first. Socket.IO polish remains the next realtime layer: room role sync, phase/timer broadcasts, CE updates, surrender/draw notifications, chat transcript capture, reconnect/disconnect handling, and post-match presence cleanup.
+
+---
+
+## Implementation Update - Dev 2, June 11 2026
+
+Dev 2 lobby/debate control rules now follow the implemented room ownership model:
+
+- Room owner is a lobby coordinator by default and is not forced into proposition/opposition.
+- Owner assigns participants to `debater`, `host`, `judge`, or `viewer` from the lobby.
+- Only assigned debaters can choose or change their own team/speaker slot.
+- Locking positions locks debaters only.
+- Human-host rooms must have an assigned host before start.
+- Host controls in the live debate are available only to the assigned host (`hostId`).
+- Judge scoring is available only to assigned judges.
+- Debaters can use a gear menu to surrender or request a draw.
+- Completed debates expose a `Thoát phòng` action to return to live matches.
+
+REST additions:
+
+- `POST /api/v1/debate/:roomId/surrender`
+- `POST /api/v1/debate/:roomId/draw/request`
+
+These updates remain REST-first. Realtime broadcast/acknowledgement for draw requests, surrender notifications, and post-match presence cleanup can be handled by Dev 3 socket work.
+
+---
+
 ## Implementation Update - Dev 2, June 10 2026
 
 The Dev 2 backend services referenced as future/pseudocode below now exist in source code:

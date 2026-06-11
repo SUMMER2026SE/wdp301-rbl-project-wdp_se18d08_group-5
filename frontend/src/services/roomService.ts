@@ -45,6 +45,18 @@ export const roomService = {
     return api.post(`/rooms/${roomId}/position`, { team, speakerSlot });
   },
 
+  assignParticipant(
+    roomId: string,
+    data: {
+      userId: string;
+      role: 'debater' | 'host' | 'judge' | 'viewer';
+      team?: Team | null;
+      speakerSlot?: SpeakerSlot | null;
+    },
+  ) {
+    return api.post<ApiResponse<DebateRoom>>(`/rooms/${roomId}/assign-role`, data);
+  },
+
   lockPositions(roomId: string) {
     return api.post(`/rooms/${roomId}/position/lock`);
   },

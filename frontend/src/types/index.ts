@@ -235,20 +235,9 @@ export interface FinalScores {
   teamProposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
   teamOpposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
   winner: Team | 'draw';
-<<<<<<< HEAD
-  aiVerdict: string | null;
-  judgeVerdicts?: Array<{
-    judgeId: string;
-    speaker?: string;
-    team?: Team;
-    score?: Partial<ScoreBreakdown>;
-    notes: string;
-    submittedAt: string;
-  }>;
-=======
-  winnerTeam: Team | 'draw';
+  winnerTeam?: Team | 'draw';
   aiVerdict: Team | 'draw' | null;
-  judgeVerdicts: JudgeVerdict[];
+  judgeVerdicts?: JudgeVerdict[];
   aggregatePolicy?: {
     humanJudgeWeight: number;
     aiJudgeWeight: number;
@@ -290,7 +279,6 @@ export interface RankingApplicationResult {
     opposition: number;
   };
   updates?: RankingUpdate[];
->>>>>>> 299167e (feat: implement UC58 UC65 room judging realtime)
 }
 
 export interface DebateSession {

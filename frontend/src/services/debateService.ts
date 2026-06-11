@@ -53,6 +53,14 @@ export const debateService = {
     return api.post<ApiResponse<DebateControlResult>>(`/debate/${roomId}/end`, { summary });
   },
 
+  surrender(roomId: string) {
+    return api.post<ApiResponse<DebateControlResult>>(`/debate/${roomId}/surrender`);
+  },
+
+  requestDraw(roomId: string) {
+    return api.post<ApiResponse<DebateControlResult>>(`/debate/${roomId}/draw/request`);
+  },
+
   getScores(roomId: string) {
     return api.get<ApiResponse<{
       finalScores: DebateSession['finalScores'];
