@@ -192,6 +192,10 @@ export async function startDebate(roomId: string, userId: string) {
     throw new BadRequestError('Room cannot be started in current state');
   }
 
+  if (room.hostType === 'human' && !room.hostId) {
+    throw new BadRequestError('Assign a host before starting the debate');
+  }
+
   if (!hasLockedRequiredPositions(room)) {
     throw new BadRequestError('All debater positions must be filled and locked before starting');
   }
@@ -323,4 +327,127 @@ export async function endDebate(roomId: string, userId: string, summary = ''): P
   const ranking = await applyDebateResult(roomId);
 
   return { room, session, ranking };
+}
+
+function getDebaterOrThrow(room: any, userId: string) {
+  const participant = room.participants.find(
+    (item: any) => item.userId.toString() === userId && item.roomRole === 'debater',
+  );
+
+  if (!participant || !participant.team) {
+    throw new ForbiddenError('Only assigned debaters can use this action');
+  }
+
+  return participant;
+}
+
+function assertDebateInProgress(room: any) {
+  if (!['active', 'paused'].includes(room.status)) {
+    throw new BadRequestError('Debate is not in progress');
+  }
+}
+
+async function completeDebateWithWinner(room: any, session: any, winner: 'proposition' | 'opposition' | 'draw', summary: string) {
+  const propositionTotal = winner === 'proposition' ? 100 : winner === 'draw' ? 50 : 0;
+  const oppositionTotal = winner === 'opposition' ? 100 : winner === 'draw' ? 50 : 0;
+
+  session.finalScores = {
+    ...(session.finalScores || {}),
+    teamProposition: { total: propositionTotal, breakdown: {} },
+    teamOpposition: { total: oppositionTotal, breakdown: {} },
+    winner,
+    winnerTeam: winner,
+    aiVerdict: (session.finalScores as any)?.aiVerdict || null,
+    judgeVerdicts: (session.finalScores as any)?.judgeVerdicts || [],
+  };
+  session.aiSummary = summary;
+  session.currentTurn.status = 'completed';
+  session.currentTurn.phase = 'completed';
+
+  room.status = 'completed';
+  room.currentPhase = 'completed';
+  room.endedAt = new Date();
+
+  await Promise.all([session.save(), room.save()]);
+  const ranking = await applyDebateResult(room._id.toString());
+
+  return { room, session, ranking };
+}
+
+export async function surrenderDebate(roomId: string, userId: string): Promise<any> {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) throw new NotFoundError('Room not found');
+  assertDebateInProgress(room);
+
+  const participant = getDebaterOrThrow(room, userId);
+  const winner = participant.team === 'proposition' ? 'opposition' : 'proposition';
+
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session) throw new NotFoundError('Session not found');
+
+  return completeDebateWithWinner(
+    room,
+    session,
+    winner,
+    `${participant.username} surrendered. ${winner} wins.`,
+  );
+}
+
+export async function requestDraw(roomId: string, userId: string): Promise<any> {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) throw new NotFoundError('Room not found');
+  assertDebateInProgress(room);
+
+  const participant = getDebaterOrThrow(room, userId);
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session) throw new NotFoundError('Session not found');
+
+  const finalScores = (session.finalScores || {
+    teamProposition: { total: 0, breakdown: {} },
+    teamOpposition: { total: 0, breakdown: {} },
+    winner: null,
+    winnerTeam: null,
+    aiVerdict: null,
+    judgeVerdicts: [],
+  }) as any;
+
+  const drawRequests = Array.isArray(finalScores.drawRequests) ? finalScores.drawRequests : [];
+  const oppositeRequest = drawRequests.find(
+    (request: any) => request.status === 'pending' && request.team !== participant.team,
+  );
+
+  if (oppositeRequest) {
+    oppositeRequest.status = 'accepted';
+    oppositeRequest.acceptedBy = participant.userId;
+    oppositeRequest.acceptedAt = new Date();
+    finalScores.drawRequests = drawRequests;
+    session.finalScores = finalScores;
+
+    return completeDebateWithWinner(
+      room,
+      session,
+      'draw',
+      'Both teams agreed to a draw.',
+    );
+  }
+
+  const existingRequest = drawRequests.find(
+    (request: any) => request.status === 'pending' && request.team === participant.team,
+  );
+
+  if (!existingRequest) {
+    drawRequests.push({
+      requestedBy: participant.userId,
+      requestedByName: participant.username,
+      team: participant.team,
+      status: 'pending',
+      requestedAt: new Date(),
+    });
+  }
+
+  finalScores.drawRequests = drawRequests;
+  session.finalScores = finalScores;
+  await session.save();
+
+  return { room, session, currentTurn: session.currentTurn };
 }

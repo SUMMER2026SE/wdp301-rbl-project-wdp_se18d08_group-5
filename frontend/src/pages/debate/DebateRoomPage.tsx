@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Col, Container, Form, ListGroup, ProgressBar, Row, Spinner, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Container, Dropdown, Form, ListGroup, ProgressBar, Row, Spinner, Table } from 'react-bootstrap';
 import toast from 'react-hot-toast';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { debateService } from '@services/debateService';
 import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
@@ -19,6 +19,7 @@ const scoreFields: Array<keyof ScoreBreakdown> = [
 
 export default function DebateRoomPage() {
   const { roomId = '' } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -94,9 +95,35 @@ export default function DebateRoomPage() {
     onError: () => toast.error('Could not submit score'),
   });
 
+  const playerActionMutation = useMutation({
+    mutationFn: (action: 'surrender' | 'draw') => {
+      if (action === 'surrender') return debateService.surrender(roomId);
+      return debateService.requestDraw(roomId);
+    },
+    onSuccess: (_response, action) => {
+      toast.success(action === 'surrender' ? 'Surrender submitted' : 'Draw request sent');
+      invalidate();
+    },
+    onError: () => toast.error('Action failed'),
+  });
+
+  const leaveMutation = useMutation({
+    mutationFn: () => roomService.leave(roomId),
+    onSuccess: () => {
+      toast.success('Left debate room');
+      navigate('/matches');
+    },
+    onError: () => {
+      navigate('/matches');
+    },
+  });
+
   const room = roomQuery.data;
   const session = sessionQuery.data;
-  const isController = Boolean(user && room && (room.createdBy === user._id || room.hostId === user._id));
+  const isController = Boolean(user && room?.hostId === user._id);
+  const currentParticipant = room?.participants.find((participant) => participant.userId === user?._id);
+  const canUseDebaterActions = currentParticipant?.roomRole === 'debater' && ['active', 'paused'].includes(room?.status || '');
+  const isJudge = currentParticipant?.roomRole === 'judge';
   const debaters = room?.participants.filter((participant) => participant.roomRole === 'debater') || [];
   const judges = room?.participants.filter((participant) => participant.roomRole === 'judge') || [];
   const selectedParticipant = room?.participants.find((participant) => participant.userId === selectedUserId);
@@ -124,9 +151,43 @@ export default function DebateRoomPage() {
               <h2 className="mb-1">{room.title || 'Live Debate'}</h2>
               <div className="text-muted">{room.motion}</div>
             </div>
-            <Badge bg={room.status === 'active' ? 'success' : 'secondary'} className="fs-6">
-              {room.status}
-            </Badge>
+            <div className="d-flex align-items-center gap-2">
+              <Badge bg={room.status === 'active' ? 'success' : 'secondary'} className="fs-6">
+                {room.status}
+              </Badge>
+              {room.status === 'completed' && (
+                <Button
+                  size="sm"
+                  variant="outline-light"
+                  onClick={() => leaveMutation.mutate()}
+                  disabled={leaveMutation.isPending}
+                >
+                  <i className="bi bi-box-arrow-right me-2" />
+                  Thoát phòng
+                </Button>
+              )}
+              {canUseDebaterActions && (
+                <Dropdown align="end">
+                  <Dropdown.Toggle variant="outline-light" size="sm" id="debater-actions">
+                    <i className="bi bi-gear" />
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Item
+                      onClick={() => {
+                        if (window.confirm('Surrender this debate?')) {
+                          playerActionMutation.mutate('surrender');
+                        }
+                      }}
+                    >
+                      Surrender
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => playerActionMutation.mutate('draw')}>
+                      Request Draw
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              )}
+            </div>
           </div>
 
           <Card className="mb-4">
@@ -223,23 +284,25 @@ export default function DebateRoomPage() {
             </Card>
           )}
 
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Judge Scoring</Card.Title>
-              <Form.Select className="mb-3" value={scoreTeam} onChange={(event) => setScoreTeam(event.target.value as Team)}>
-                <option value="proposition">Proposition</option>
-                <option value="opposition">Opposition</option>
-              </Form.Select>
-              {scoreFields.map((field) => (
-                <Form.Group className="mb-2" key={field}>
-                  <Form.Label className="text-capitalize">{field}: {scores[field]}</Form.Label>
-                  <Form.Range min={1} max={10} value={scores[field]} onChange={(event) => setScores((current) => ({ ...current, [field]: Number(event.target.value) }))} />
-                </Form.Group>
-              ))}
-              <Form.Control as="textarea" rows={2} placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
-              <Button className="w-100 mt-3" onClick={() => scoreMutation.mutate()}>Submit Score</Button>
-            </Card.Body>
-          </Card>
+          {isJudge && (
+            <Card className="mb-3">
+              <Card.Body>
+                <Card.Title>Judge Scoring</Card.Title>
+                <Form.Select className="mb-3" value={scoreTeam} onChange={(event) => setScoreTeam(event.target.value as Team)}>
+                  <option value="proposition">Proposition</option>
+                  <option value="opposition">Opposition</option>
+                </Form.Select>
+                {scoreFields.map((field) => (
+                  <Form.Group className="mb-2" key={field}>
+                    <Form.Label className="text-capitalize">{field}: {scores[field]}</Form.Label>
+                    <Form.Range min={1} max={10} value={scores[field]} onChange={(event) => setScores((current) => ({ ...current, [field]: Number(event.target.value) }))} />
+                  </Form.Group>
+                ))}
+                <Form.Control as="textarea" rows={2} placeholder="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
+                <Button className="w-100 mt-3" onClick={() => scoreMutation.mutate()}>Submit Score</Button>
+              </Card.Body>
+            </Card>
+          )}
 
           <Card>
             <Card.Body>

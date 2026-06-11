@@ -1,5 +1,60 @@
 # DEV 2 — Checklist & Status Report
 
+## Current Delivered Scope - Full Summary
+
+This is the current source-of-truth summary for what has been implemented in this workspace. It includes Dev 2 plus related room, judge, host, player action, and frontend integration updates.
+
+### Backend Delivered
+
+- Matchmaking: ranked queue join/leave/status, auto-match, active rank room creation, and `DebateSession` creation.
+- Custom rooms: create/list/detail/update/delete/join/leave, private room password support, and hydrated participant display names/avatars.
+- Lobby roles: owner assigns `debater`, `host`, `judge`, or `viewer`; owner can place debaters into team/speaker slots.
+- Debater flow: only assigned debaters can choose their own team and speaker slot.
+- Lock/start: lock applies to debaters only; start validates filled/locked debater slots and requires assigned human host for human-host rooms.
+- Debate engine: current session, next turn, finish phase, CE pass, CE finish, end debate, replay/result payloads, final scores, and rank updates when eligible.
+- Permissions: assigned host controls only for `hostId`; judge scoring only for assigned judges, enforced by backend.
+- Player actions: debaters can `surrender` to forfeit or `request draw`; draw completes when both teams request it.
+
+### Frontend Delivered
+
+- Ranked matchmaking page with queue status and matched-room navigation.
+- Room list, filters, private-room join, and custom room creation.
+- Lobby owner assignment panel for debater/host/judge/viewer.
+- Debater-only team/speaker selection.
+- Debate room with phase/turn/timer, CE controls, host controls, judge scoring, score display, surrender/draw gear menu, and completed-state `Thoát phòng` button.
+- Replay/result screen using the replay payload.
+
+### Documentation / Verification
+
+- API endpoints and implementation guide have been updated to match current code behavior.
+- `backend npm run build` passes.
+- `frontend npm run build` passes.
+
+Older progress tables below are historical checklist material and may not reflect the latest completed implementation as accurately as this section.
+
+---
+
+## Implementation Update - Dev 2, June 11 2026
+
+Added latest Dev 2 lobby/debate polish:
+
+- Owner can assign participants as debater/host/judge/viewer in custom room lobby.
+- Owner is not forced into a debate team by default.
+- Only assigned debaters can select team and speaker slot.
+- Lock positions now locks debaters only.
+- Human-host rooms require an assigned host before start.
+- Live debate host controls show only for the assigned host.
+- Judge scoring shows only for assigned judges and backend enforces judge-only submit.
+- Debaters have a gear menu for surrender and draw request.
+- Completed debates show `Thoát phòng` to leave and return to `/matches`.
+
+Verification:
+
+- `backend npm run build` passes.
+- `frontend npm run build` passes.
+
+---
+
 **Date:** June 10, 2026  
 **Feature:** Matchmaking + Custom Room + Debate Engine  
 **Complexity:** ⭐⭐⭐⭐⭐ (Highest)

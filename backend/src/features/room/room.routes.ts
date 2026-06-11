@@ -4,6 +4,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
+import { User } from '../../models/User.js';
 import { getIO } from '../../socket/index.js';
 import { aiService } from '../ai/ai.service.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
@@ -27,6 +28,24 @@ type DebateWinner = 'proposition' | 'opposition' | 'draw';
 
 const HUMAN_JUDGE_WEIGHT = 1;
 const AI_JUDGE_WEIGHT = 0.5;
+
+async function buildRoomPayload(room: any) {
+  const payload = room.toObject ? room.toObject() : room;
+  const userIds = (payload.participants || []).map((participant: any) => participant.userId);
+  const users = await User.find({ _id: { $in: userIds } }).select('username profile.displayName profile.avatar');
+  const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+
+  payload.participants = (payload.participants || []).map((participant: any) => {
+    const user = usersById.get(participant.userId?.toString?.() || '');
+    return {
+      ...participant,
+      username: user?.profile?.displayName || user?.username || participant.username,
+      avatar: user?.profile?.avatar || participant.avatar || '',
+    };
+  });
+
+  return payload;
+}
 
 function parseScoreCriterion(body: Record<string, unknown>, criterion: ScoreCriterion) {
   const value = body[criterion];
@@ -342,6 +361,8 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { title, format, hostType, judgeType, judgeCount, isPrivate, password } = req.body;
     const userId = req.user!.userId;
+    const user = await User.findById(userId).select('username profile.displayName profile.avatar');
+    if (!user) throw new NotFoundError('User not found');
 
     const room = await DebateRoom.create({
       roomType: 'custom',
@@ -356,7 +377,8 @@ router.post(
       participants: [
         {
           userId,
-          username: req.body.username || 'Owner',
+          username: user.profile?.displayName || user.username,
+          avatar: user.profile?.avatar || '',
           roomRole: 'owner',
           team: null,
           speakerSlot: null,
@@ -407,7 +429,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const room = await DebateRoom.findById(req.params.id).select('-password');
     if (!room) throw new NotFoundError('Room not found');
-    sendSuccess(res, room);
+    sendSuccess(res, await buildRoomPayload(room));
   }),
 );
 
@@ -479,14 +501,14 @@ router.post(
   '/:id/assign-role',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { userId, role } = req.body;
+    const { userId, role, team, speakerSlot } = req.body;
     const room = await DebateRoom.findById(req.params.id);
     if (!room) throw new NotFoundError('Room not found');
     if (room.createdBy.toString() !== req.user!.userId) {
       throw new ForbiddenError('Only the room owner can assign roles');
     }
-    if (!['host', 'judge'].includes(role)) {
-      throw new BadRequestError('Role must be host or judge');
+    if (!['debater', 'host', 'judge', 'viewer'].includes(role)) {
+      throw new BadRequestError('Role must be debater, host, judge, or viewer');
     }
 
     const participant = room.participants.find((p) => p.userId.toString() === userId);
@@ -494,22 +516,69 @@ router.post(
       throw new NotFoundError('Participant not found');
     }
 
+    room.judges = (room.judges || []).filter(
+      (judge) => judge.userId.toString() !== participant.userId.toString(),
+    ) as any;
+
     if (role === 'host') {
+      const previousHost = room.hostId
+        ? room.participants.find((p) => p.userId.toString() === room.hostId?.toString())
+        : null;
+      if (previousHost && previousHost.userId.toString() !== participant.userId.toString()) {
+        previousHost.roomRole =
+          previousHost.userId.toString() === room.createdBy.toString() ? 'owner' : 'viewer';
+        previousHost.team = null;
+        previousHost.speakerSlot = null;
+        previousHost.positionLocked = false;
+      }
       room.hostId = participant.userId as any;
+      room.hostType = 'human';
       participant.roomRole = 'host';
+      participant.team = null;
+      participant.speakerSlot = null;
+      participant.positionLocked = false;
     }
 
     if (role === 'judge') {
       participant.roomRole = 'judge';
-      room.judges = room.judges || [];
-      const alreadyJudge = room.judges.some((judge) => judge.userId.toString() === userId);
-      if (!alreadyJudge) {
-        room.judges.push({ userId: participant.userId as any, username: participant.username });
+      participant.team = null;
+      participant.speakerSlot = null;
+      participant.positionLocked = false;
+      if (room.hostId?.toString() === participant.userId.toString()) {
+        room.hostId = null;
+      }
+      room.judges.push({ userId: participant.userId as any, username: participant.username });
+    }
+
+    if (role === 'debater') {
+      if (team !== undefined && !['proposition', 'opposition', null].includes(team)) {
+        throw new BadRequestError('Team must be proposition or opposition');
+      }
+      if (speakerSlot !== undefined && !['S1', 'S2', 'S3', null].includes(speakerSlot)) {
+        throw new BadRequestError('speakerSlot must be S1, S2, or S3');
+      }
+      participant.roomRole = 'debater';
+      participant.team = team ?? null;
+      participant.speakerSlot = speakerSlot ?? null;
+      participant.positionLocked = false;
+      if (room.hostId?.toString() === participant.userId.toString()) {
+        room.hostId = null;
+      }
+    }
+
+    if (role === 'viewer') {
+      participant.roomRole =
+        participant.userId.toString() === room.createdBy.toString() ? 'owner' : 'viewer';
+      participant.team = null;
+      participant.speakerSlot = null;
+      participant.positionLocked = false;
+      if (room.hostId?.toString() === participant.userId.toString()) {
+        room.hostId = null;
       }
     }
 
     await room.save();
-    sendSuccess(res, room, 'Role assigned');
+    sendSuccess(res, room, 'Participant assignment updated');
   }),
 );
 
@@ -537,10 +606,13 @@ router.post(
     );
     if (alreadyIn) throw new BadRequestError('Already in room');
 
+    const user = await User.findById(req.user!.userId).select('username profile.displayName profile.avatar');
+    if (!user) throw new NotFoundError('User not found');
+
     room.participants.push({
       userId: req.user!.userId as any,
-      username: req.body.username || 'User',
-      avatar: '',
+      username: user.profile?.displayName || user.username,
+      avatar: user.profile?.avatar || '',
       roomRole: 'viewer',
       team: null,
       speakerSlot: null,
@@ -558,7 +630,7 @@ router.post(
   '/:id/position',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { team, speakerSlot, roomRole } = req.body;
+    const { team, speakerSlot } = req.body;
     const room = await DebateRoom.findById(req.params.id);
     if (!room) throw new NotFoundError('Room not found');
 
@@ -567,13 +639,12 @@ router.post(
     );
     if (!participant) throw new BadRequestError('Not in room');
     if (participant.positionLocked) throw new BadRequestError('Position is locked');
+    if (participant.roomRole !== 'debater') {
+      throw new ForbiddenError('Only assigned debaters can select team and speaker slot');
+    }
 
     if (team) participant.team = team;
     if (speakerSlot) participant.speakerSlot = speakerSlot;
-    if (roomRole) participant.roomRole = roomRole;
-    if (!roomRole && team && speakerSlot && participant.roomRole === 'viewer') {
-      participant.roomRole = 'debater';
-    }
 
     await room.save();
     sendSuccess(res, room, 'Position updated');
@@ -592,7 +663,9 @@ router.post(
     }
 
     room.participants.forEach((p) => {
-      p.positionLocked = true;
+      if (p.roomRole === 'debater') {
+        p.positionLocked = true;
+      }
     });
     await room.save();
     sendSuccess(res, room, 'Positions locked');
@@ -611,7 +684,9 @@ router.post(
     }
 
     room.participants.forEach((p) => {
-      p.positionLocked = true;
+      if (p.roomRole === 'debater') {
+        p.positionLocked = true;
+      }
     });
     await room.save();
     sendSuccess(res, room, 'Positions locked');

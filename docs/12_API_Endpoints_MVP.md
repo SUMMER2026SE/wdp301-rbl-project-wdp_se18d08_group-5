@@ -1,5 +1,73 @@
 # 12 — API Endpoints MVP
 
+## Current Delivered Scope - Full Summary
+
+This is the full implementation currently reflected in source code, including Dev 2 work plus related room, judge, host, player action, and frontend integration updates:
+
+### Backend REST APIs
+
+| Area | Endpoints / Behavior | Status |
+|------|----------------------|--------|
+| Matchmaking | `POST /matchmaking/queue`, `DELETE /matchmaking/queue`, `GET /matchmaking/status`; auto-creates active rank room and `DebateSession`; matched status returns `roomId`. | Done |
+| Custom rooms | `POST /rooms/create`, `GET /rooms`, `GET /rooms/:id`, `PUT /rooms/:id`, `DELETE /rooms/:id`, `POST /rooms/:id/join`, `POST /rooms/:id/leave`. | Done |
+| Lobby assignment | `POST /rooms/:id/assign-role`; owner assigns `debater`, `host`, `judge`, `viewer`; debater assignment may include `team` and `speakerSlot`. | Done |
+| Position flow | `POST /rooms/:id/position`; only assigned debaters can self-select team/slot. `POST /rooms/:id/position/lock` and `/rooms/:id/lock` lock debaters only. | Done |
+| Start debate | `POST /rooms/:id/start`; validates filled/locked debater slots, requires assigned human host when room uses human host, creates session, activates room. | Done |
+| Debate engine | `POST /debate/:roomId/next-turn`, `/finish-phase`, `/end`, `GET /debate/:roomId/session`, `GET /debate/:roomId/replay`. | Done |
+| Cross examination | `POST /debate/:roomId/ce/pass-turn`, `POST /debate/:roomId/ce/finish`; CE state/quota are persisted in `DebateSession.currentTurn.ceState`. | Done |
+| Host controls | Pause/resume/card/kick remain available to assigned host through debate routes. | Done |
+| Judge scoring | `POST /debate/:roomId/judge/submit-score`; backend enforces assigned judge only. Scores can be read via scores endpoints. | Done |
+| Player actions | `POST /debate/:roomId/surrender` for đầu hàng; `POST /debate/:roomId/draw/request` for cầu hòa. Opponent also requesting draw completes match as `draw`. | Done |
+| Completion/ranking | Debate completion stores final scores/winner and applies ranking when eligible for rank rooms. | Done |
+
+### Frontend Screens
+
+| Screen | Implemented behavior | Status |
+|--------|----------------------|--------|
+| `/matchmaking` | Ranked queue, leave queue, matched room auto-entry. | Done |
+| `/matches` | Room list, filters, room cards, private join modal. | Done |
+| `/rooms/create` | Custom room creation form. | Done |
+| `/rooms/:roomId/lobby` | Owner role assignment, debater position selection, lock debaters, start debate. | Done |
+| `/debate/:roomId` | Team layout, phase/turn/timer display, host controls for assigned host, CE panel, judge-only scoring, score breakdown, debater gear menu for đầu hàng/cầu hòa, completed-state `Thoát phòng`. | Done |
+| `/replay/:sessionId` | Basic result/replay display from replay payload. | Done |
+
+### Dev 3 Boundary
+
+The current delivery is REST-first. Socket.IO realtime polish remains Dev 3 scope: timer broadcasts, live role/phase/CE synchronization, surrender/draw notifications, chat transcript capture, reconnect/disconnect behavior, and post-match presence cleanup.
+
+---
+
+## Implementation Update - Dev 2, June 11 2026
+
+Latest Dev 2 changes implemented in code:
+
+### Custom Room Lobby Role Assignment
+
+| Method | Endpoint | Status | Notes |
+|--------|----------|--------|-------|
+| POST | `/rooms/:id/assign-role` | Done | Owner assigns each participant as `debater`, `host`, `judge`, or `viewer`. When assigning `debater`, owner can also set `team` and `speakerSlot`. |
+| POST | `/rooms/:id/position` | Done | Only participants already assigned as `debater` can update their own `team` and `speakerSlot`. Viewers/hosts/judges are blocked. |
+| POST | `/rooms/:id/position/lock` | Done | Locks only debater positions; host/viewer/judge are not position-locked. |
+| POST | `/rooms/:id/start` | Done | Requires filled/locked debater slots and, for human-host rooms, an assigned `hostId`. |
+
+Room detail now hydrates participant display names and avatars from `User`, so custom rooms show real usernames/display names instead of hardcoded `Owner` / `User`.
+
+### Debate Player Actions
+
+| Method | Endpoint | Status | Notes |
+|--------|----------|--------|-------|
+| POST | `/debate/:roomId/surrender` | Done | Assigned debater forfeits; debate completes and the opposing team wins. |
+| POST | `/debate/:roomId/draw/request` | Done | Assigned debater requests a draw. If the opposite team also requests a draw, debate completes as `draw`. |
+
+### Debate UI Permissions
+
+- `Host Controls` are shown only to the assigned host (`room.hostId`), not automatically to the room owner.
+- `Judge Scoring` is shown only to participants with `roomRole === 'judge'`; the API also enforces this.
+- Debaters see a gear menu during active/paused debates for `Surrender` and `Request Draw`.
+- When a debate is completed, users see `Thoát phòng`, which leaves the room and navigates back to `/matches`.
+
+---
+
 ## Implementation Update - Dev 2, June 10 2026
 
 This section reflects the current implemented code for Dev 2 and should be used when older sections below are out of date.
