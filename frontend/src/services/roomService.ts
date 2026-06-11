@@ -65,6 +65,22 @@ export const roomService = {
     return api.post(`/rooms/${roomId}/start`);
   },
 
+  nextTurnWithTranscript(
+    roomId: string,
+    data: {
+      nextSpeaker?: string;
+      phase?: string;
+      timeLimit?: number;
+      transcript?: string;
+    },
+  ) {
+    return api.post(`/rooms/${roomId}/host/next-turn`, data);
+  },
+
+  passCrossExamWithTranscript(roomId: string, data: { nextSpeaker?: string; transcript?: string }) {
+    return api.post(`/rooms/${roomId}/cross-exam/pass-turn`, data);
+  },
+
   kick(roomId: string, userId: string) {
     return api.post(`/rooms/${roomId}/kick`, { userId });
   },

@@ -72,10 +72,20 @@ export default function LobbyPage() {
   });
 
   const room = roomQuery.data;
+  const viewerChatEnabled = room?.viewerChatEnabled ?? true;
   const isOwner = Boolean(user && room?.createdBy === user._id);
   const currentParticipant = room?.participants.find((item) => item.userId === user?._id);
   const isAssignedDebater = currentParticipant?.roomRole === 'debater';
   const slots = useMemo(() => (room?.format === '1v1' ? ['S1'] : ['S1', 'S2', 'S3']) as SpeakerSlot[], [room?.format]);
+
+  const viewerChatMutation = useMutation({
+    mutationFn: () => roomService.setViewerChat(roomId, !viewerChatEnabled),
+    onSuccess: () => {
+      toast.success(`Viewer chat ${viewerChatEnabled ? 'disabled' : 'enabled'}`);
+      invalidateRoom();
+    },
+    onError: () => toast.error('Could not update viewer chat'),
+  });
 
   if (roomQuery.isLoading) {
     return <Container className="py-4"><Spinner animation="border" /></Container>;
@@ -239,6 +249,20 @@ export default function LobbyPage() {
               <Card.Body>
                 <Card.Title>Room Setup</Card.Title>
                 <div className="d-grid gap-2">
+                  <div className="d-flex align-items-center justify-content-between rounded border border-info px-3 py-2">
+                    <span>Viewer Chat</span>
+                    <Badge bg={viewerChatEnabled ? 'success' : 'secondary'}>
+                      {viewerChatEnabled ? 'On' : 'Off'}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant={viewerChatEnabled ? 'outline-warning' : 'outline-info'}
+                    onClick={() => viewerChatMutation.mutate()}
+                    disabled={viewerChatMutation.isPending}
+                  >
+                    <i className={`bi ${viewerChatEnabled ? 'bi-chat-square-x' : 'bi-chat-square-text'} me-2`} />
+                    {viewerChatEnabled ? 'Disable Viewer Chat' : 'Enable Viewer Chat'}
+                  </Button>
                   <Button variant="outline-secondary" onClick={() => lockMutation.mutate()} disabled={lockMutation.isPending}>
                     <i className="bi bi-lock me-2" />
                     Lock Debaters

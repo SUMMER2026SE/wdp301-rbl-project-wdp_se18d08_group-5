@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
@@ -32,6 +32,7 @@ interface RoomStateRestore {
  */
 export function useDebateSocket(roomId: string | undefined) {
   const { t } = useTranslation('errors');
+  const [socketRetry, setSocketRetry] = useState(0);
   const {
     setRoom,
     setPhase,
@@ -54,7 +55,13 @@ export function useDebateSocket(roomId: string | undefined) {
     if (!roomId) return;
 
     const socket = getSocket();
-    if (!socket) return;
+    if (!socket) {
+      if (socketRetry < 10) {
+        const retryTimer = window.setTimeout(() => setSocketRetry((value) => value + 1), 150);
+        return () => window.clearTimeout(retryTimer);
+      }
+      return;
+    }
 
     const restoreState = (data: RoomStateRestore) => {
       setRoom(data.room);
@@ -181,5 +188,5 @@ export function useDebateSocket(roomId: string | undefined) {
       socket.off('score:winner-determined');
       socket.off('debate:card-issued');
     };
-  }, [addMessage, roomId, setAIAnalysis, setCEState, setFinalScores, setHost, setMessages, setParticipants, setPaused, setPhase, setRoom, setScore, setSpeaker, setTimeRemaining, setViewerChatEnabled, setWinnerResult, t]);
+  }, [addMessage, roomId, setAIAnalysis, setCEState, setFinalScores, setHost, setMessages, setParticipants, setPaused, setPhase, setRoom, setScore, setSpeaker, setTimeRemaining, setViewerChatEnabled, setWinnerResult, socketRetry, t]);
 }
