@@ -74,6 +74,16 @@
 | A6-02 | Tier calculation (Novice → GrandMaster) | — | `ranking.service.ts` | ✅ Đã impl |
 | A6-03 | ELO update sau debate (trigger từ debate ended) | UC-52 | `debate.service.ts` | ✅ Đã impl |
 
+#### Admin & Reports (MVP-S)
+
+| # | Task | UC | File | Status |
+|---|------|----|------|--------|
+| A7-01 | Admin overview metrics API | UC-108-109 | `features/admin/admin.routes.ts` | ✅ Đã impl |
+| A7-02 | Admin user management — list/filter/role/ban/unban | UC-109 | `features/admin/admin.routes.ts` | ✅ Đã impl |
+| A7-03 | Admin room oversight — list/detail/status/kick/mute/viewer-chat | UC-108 | `features/admin/admin.routes.ts` | ✅ Đã impl |
+| A7-04 | Report model + user report submit API | UC-107 | `models/Report.ts`, `features/report/report.routes.ts` | ✅ Đã impl |
+| A7-05 | Admin report review — warned/muted/banned/dismissed | UC-108 | `features/admin/admin.routes.ts` | ✅ Đã impl |
+
 ### A2. Frontend Features
 
 #### Auth + Profile (Dev 1)
@@ -141,6 +151,16 @@
 | F6-01 | Leaderboard page — ELO + tier display | UC-64 | `pages/ranking/LeaderboardPage.tsx` | ✅ Đã impl |
 | F6-02 | Rank badge component | — | `components/ranking/RankBadge.tsx` | ✅ Đã impl |
 
+#### Admin (MVP-S)
+
+| # | Task | UC | File | Status |
+|---|------|----|------|--------|
+| F7-01 | Admin dashboard overview tab | UC-108-109 | `pages/admin/AdminDashboardPage.tsx` | ✅ Đã impl |
+| F7-02 | User management tab — search/filter/role/ban/unban | UC-109 | `pages/admin/AdminDashboardPage.tsx` | ✅ Đã impl |
+| F7-03 | Room moderation tab — status/viewer-chat/participant mute-kick | UC-108 | `pages/admin/AdminDashboardPage.tsx` | ✅ Đã impl |
+| F7-04 | Report review tab — status/resolution/ban/mute actions | UC-107-108 | `pages/admin/AdminDashboardPage.tsx` | ✅ Đã impl |
+| F7-05 | Admin/report service + shared types | — | `services/adminService.ts`, `services/reportService.ts`, `types/index.ts` | ✅ Đã impl |
+
 ---
 
 ## B. TECHNICAL REQUIREMENTS CẦN IMPLEMENT
@@ -153,6 +173,7 @@
 | B1-02 | **DebateSession schema** — đầy đủ fields theo TRD §5 (turnHistory, currentTurn, finalScores, cards, aiSummary) | `models/DebateSession.ts` | ⚠️ Partial, model exists |
 | B1-03 | **MatchQueue schema** — đầy đủ | `models/MatchQueue.ts` | ⚠️ Partial, model exists |
 | B1-04 | **Message schema** — type (chat/system/announcement), isToxic | `models/Message.ts` | ⚠️ Partial, model exists |
+| B1-04a | **Report schema** — target, reporter, status, resolution | `models/Report.ts` | ✅ Đã impl |
 | B1-05 | **Room validation schema** (Zod) — create + update | `features/room/room.schema.ts` | ❌ Chưa impl |
 | B1-06 | **Debate validation schema** (Zod) — submit score, cross-exam | `features/debate/debate.schema.ts` | ❌ Chưa impl |
 | B1-07 | `roomParticipantGuard` middleware — verify user in room | `middleware/roomGuard.ts` | ❌ Chưa impl |

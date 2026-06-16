@@ -11,6 +11,17 @@
   "errors": {
     "notFound": "Page not found"
   },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "subtitle": "Current ELO ranking for players.",
+    "empty": "No rankings yet.",
+    "columns": {
+      "player": "Player",
+      "elo": "ELO",
+      "tier": "Tier",
+      "winLoss": "W/L"
+    }
+  },
   "debate": {
     "phases": {
       "motion": "Motion announcement",

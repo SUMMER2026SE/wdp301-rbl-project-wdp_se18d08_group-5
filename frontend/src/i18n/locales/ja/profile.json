@@ -2,7 +2,7 @@
   "title": "プロフィール",
   "fields": {
     "displayName": "表示名",
-    "avatar": "アバターURL",
+    "avatar": "アバター",
     "bio": "Bio",
     "school": "学校",
     "club": "クラブ"
@@ -21,12 +21,24 @@
     "loadFailed": "プロフィールを読み込めませんでした",
     "updateSuccess": "プロフィールを更新しました。",
     "updateFailed": "プロフィールを更新できませんでした",
+    "avatarUploadSuccess": "アバターをアップロードしました。",
+    "avatarUploadFailed": "アバターをアップロードできませんでした。",
+    "avatarUploadNoUrl": "アップロード後のアバターURLを取得できませんでした",
     "notFound": "プロフィールが見つかりません"
+  },
+  "actions": {
+    "viewHistory": "ディベート履歴を見る",
+    "avatarUpload": "端末からアップロード",
+    "avatarUploading": "アップロード中..."
+  },
+  "avatarUpload": {
+    "hint": "JPG、PNG、GIF、WebPに対応。最大5MB。"
   },
   "validation": {
     "displayNameRequired": "表示名を入力してください",
     "displayNameMax": "50文字以内で入力してください",
     "avatarInvalid": "画像URLが正しくありません",
+    "avatarFileInvalid": "画像ファイルが正しくありません。JPG、PNG、GIF、WebP、最大5MBに対応しています。",
     "bioMax": "500文字以内で入力してください",
     "schoolMax": "100文字以内で入力してください",
     "clubMax": "100文字以内で入力してください"

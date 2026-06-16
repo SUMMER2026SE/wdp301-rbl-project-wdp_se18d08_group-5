@@ -11,6 +11,17 @@
   "errors": {
     "notFound": "Trang không tồn tại"
   },
+  "leaderboard": {
+    "title": "Bảng xếp hạng",
+    "subtitle": "Xếp hạng ELO hiện tại của người chơi.",
+    "empty": "Chưa có dữ liệu xếp hạng.",
+    "columns": {
+      "player": "Người chơi",
+      "elo": "ELO",
+      "tier": "Tier",
+      "winLoss": "Thắng / Thua"
+    }
+  },
   "debate": {
     "phases": {
       "motion": "Công bố chủ đề",

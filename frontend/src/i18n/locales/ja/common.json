@@ -11,6 +11,17 @@
   "errors": {
     "notFound": "ページが見つかりません"
   },
+  "leaderboard": {
+    "title": "ランキング",
+    "subtitle": "プレイヤーの現在のELOランキングです。",
+    "empty": "ランキングデータはまだありません。",
+    "columns": {
+      "player": "プレイヤー",
+      "elo": "ELO",
+      "tier": "Tier",
+      "winLoss": "勝ち / 負け"
+    }
+  },
   "debate": {
     "phases": {
       "motion": "論題発表",

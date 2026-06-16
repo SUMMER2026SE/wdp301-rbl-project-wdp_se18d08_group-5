@@ -18,9 +18,14 @@
   --bs-info-rgb: 0, 212, 255;
   --bs-body-bg: #0a0a0f;
   --bs-body-color: #e0e0ff;
+  --bs-body-color-rgb: 224, 224, 255;
   --bs-border-color: rgba(0, 245, 255, 0.2);
   --bs-link-color: #00f5ff;
   --bs-link-hover-color: #bf00ff;
+  --bs-secondary-color: #b8b8d8;
+  --bs-secondary-color-rgb: 184, 184, 216;
+  --bs-tertiary-color: #9c9cc0;
+  --bs-tertiary-color-rgb: 156, 156, 192;
 
   /* Extended palette */
   --color-proposition: #00f5ff;
@@ -32,8 +37,8 @@
   --bg-surface: #0a0a0f;
   --bg-card-hover: #1a1a2e;
   --text-primary: #e0e0ff;
-  --text-secondary: #8888aa;
-  --text-muted: #b8b8d8;
+  --text-secondary: #b8b8d8;
+  --text-muted: #9c9cc0;
   --border-neon: rgba(0, 245, 255, 0.25);
   --border-purple: rgba(191, 0, 255, 0.25);
 
@@ -83,6 +88,10 @@ h3 { font-size: 1.3rem; }
 /* ── Links ── */
 a { color: var(--bs-primary); transition: color 0.2s, text-shadow 0.2s; }
 a:hover { color: var(--bs-secondary); text-shadow: 0 0 8px var(--bs-secondary); }
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
 
 /* ── Cards ── */
 .card {
@@ -310,6 +319,35 @@ footer {
 .table-hover > tbody > tr:hover > * {
   background: rgba(0, 245, 255, 0.05);
   color: var(--bs-primary);
+}
+
+.table .text-muted {
+  color: #aeb0d2 !important;
+}
+
+.list-group-item {
+  border-color: var(--border-neon);
+}
+
+.nav-tabs {
+  border-bottom-color: var(--border-neon);
+}
+
+.nav-tabs .nav-link {
+  color: var(--text-muted) !important;
+  border-color: transparent;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-tabs .nav-link:focus {
+  color: var(--bs-primary) !important;
+  border-color: rgba(0, 245, 255, 0.35);
+}
+
+.nav-tabs .nav-link.active {
+  background: rgba(0, 245, 255, 0.06);
+  border-color: var(--border-neon) var(--border-neon) var(--bg-card);
+  color: var(--bs-primary) !important;
 }
 
 /* ── Modal ── */

@@ -3,9 +3,10 @@ import api from './api';
 export interface UploadResponse {
   avatar?: string;
   url?: string;
-  publicId: string;
-  fileName: string;
-  size: number;
+  publicId?: string;
+  storage?: 'cloudinary' | 'local';
+  fileName?: string;
+  size?: number;
   message: string;
 }
 

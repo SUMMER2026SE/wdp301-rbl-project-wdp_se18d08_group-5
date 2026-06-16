@@ -2,7 +2,7 @@
   "title": "Profile",
   "fields": {
     "displayName": "Display name",
-    "avatar": "Avatar URL",
+    "avatar": "Avatar",
     "bio": "Bio",
     "school": "School",
     "club": "Club"
@@ -21,12 +21,24 @@
     "loadFailed": "Unable to load profile",
     "updateSuccess": "Profile updated successfully.",
     "updateFailed": "Unable to update profile",
+    "avatarUploadSuccess": "Avatar uploaded successfully.",
+    "avatarUploadFailed": "Unable to upload avatar.",
+    "avatarUploadNoUrl": "Upload did not return an avatar URL",
     "notFound": "Profile not found"
+  },
+  "actions": {
+    "viewHistory": "View debate history",
+    "avatarUpload": "Upload from device",
+    "avatarUploading": "Uploading..."
+  },
+  "avatarUpload": {
+    "hint": "JPG, PNG, GIF, or WebP. Max 5MB."
   },
   "validation": {
     "displayNameRequired": "Please enter a display name",
     "displayNameMax": "Maximum 50 characters",
     "avatarInvalid": "Invalid image URL",
+    "avatarFileInvalid": "Invalid image file. Use JPG, PNG, GIF, or WebP up to 5MB.",
     "bioMax": "Maximum 500 characters",
     "schoolMax": "Maximum 100 characters",
     "clubMax": "Maximum 100 characters"
