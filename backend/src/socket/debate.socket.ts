@@ -8,7 +8,7 @@ import { Server, Socket } from 'socket.io';
  * - Score updates
  */
 export function registerDebateHandlers(io: Server, socket: Socket) {
-  const userId = (socket as any).userId;
+  const userId = (socket as unknown as { userId: string }).userId;
 
   // Cross Examination: Pass Turn
   socket.on('cross-exam:pass-turn', ({ roomId }: { roomId: string }) => {

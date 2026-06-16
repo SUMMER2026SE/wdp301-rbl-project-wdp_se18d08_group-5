@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Alert, Badge, Button, ButtonGroup, Card, Col, Container, Form, Row, Spinner, Table } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TopicPicker, getTopicValue, type TopicInputMode } from '@components/room/TopicPicker';
 import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
+import { useLobbySocket } from '@hooks/useLobbySocket';
 import { isSeededDebateTopic } from '@utils/debateTopics';
 import type { SpeakerSlot, Team } from '@/types';
 
@@ -32,7 +33,13 @@ export default function LobbyPage() {
     enabled: Boolean(roomId),
   });
 
-  const invalidateRoom = () => queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+  const invalidateRoom = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['room', roomId] }),
+    [queryClient, roomId],
+  );
+
+  // Live room state sync — refetch when other participants mutate the room.
+  useLobbySocket(roomId, invalidateRoom);
 
   const selectMutation = useMutation({
     mutationFn: () => roomService.selectPosition(roomId, team, speakerSlot),
@@ -60,8 +67,13 @@ export default function LobbyPage() {
 
   const lockMutation = useMutation({
     mutationFn: () => roomService.lockPositions(roomId),
-    onSuccess: () => {
-      toast.success('Debater positions locked');
+    onSuccess: (response) => {
+      const data = response?.data?.data as { lockedCount?: number } | undefined;
+      toast.success(
+        data?.lockedCount !== undefined
+          ? `All positions locked (${data.lockedCount} participants)`
+          : 'All positions locked',
+      );
       invalidateRoom();
     },
     onError: () => toast.error('Only owner can lock positions'),
@@ -329,7 +341,7 @@ export default function LobbyPage() {
                   </Button>
                   <Button variant="outline-secondary" onClick={() => lockMutation.mutate()} disabled={lockMutation.isPending}>
                     <i className="bi bi-lock me-2" />
-                    Lock Debaters
+                    Lock All Positions
                   </Button>
                   <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
                     <i className="bi bi-play-fill me-2" />
