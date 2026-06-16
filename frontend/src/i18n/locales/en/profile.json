@@ -1,5 +1,12 @@
 {
   "title": "Profile",
+  "hero": {
+    "ownerKicker": "Personal profile",
+    "publicKicker": "Public profile",
+    "title": "{{name}}",
+    "ownerSubtitle": "Keep your debate identity, stats, and ranking journey up to date.",
+    "publicSubtitle": "Profile overview, competitive record, and community details for {{name}}."
+  },
   "fields": {
     "displayName": "Display name",
     "avatar": "Avatar",
@@ -11,7 +18,19 @@
     "elo": "ELO",
     "tier": "Tier",
     "winLoss": "Wins / Losses",
-    "totalDebates": "Total debates"
+    "totalDebates": "Total debates",
+    "wins": "Wins",
+    "losses": "Losses",
+    "winRate": "Win rate",
+    "avgScore": "Avg score",
+    "profileCompletion": "Profile completion",
+    "memberSince": "Member since",
+    "role": "Role",
+    "otherResults": "Other",
+    "seasonPointsValue": "{{points}} season pts",
+    "winLossValue": "{{wins}} wins / {{losses}} losses",
+    "totalScoreValue": "{{score}} total pts",
+    "decidedDebates": "{{count}} decided matches"
   },
   "status": {
     "emailVerified": "Email verified",
@@ -29,7 +48,35 @@
   "actions": {
     "viewHistory": "View debate history",
     "avatarUpload": "Upload from device",
-    "avatarUploading": "Uploading..."
+    "avatarUploading": "Uploading...",
+    "viewLeaderboard": "Leaderboard",
+    "startRankQueue": "Join ranked queue",
+    "changePassword": "Change password",
+    "updateAvatar": "Update avatar"
+  },
+  "sections": {
+    "editProfile": "Edit",
+    "publicProfile": "Overview",
+    "activity": "Activity",
+    "account": "Account"
+  },
+  "form": {
+    "title": "Display information",
+    "bioPlaceholder": "Write a short note about your debating style...",
+    "schoolPlaceholder": "School or organization",
+    "clubPlaceholder": "Club or team"
+  },
+  "details": {
+    "title": "Community information"
+  },
+  "activity": {
+    "title": "Debate performance",
+    "winRateHint": "Calculated from decided wins and losses."
+  },
+  "account": {
+    "title": "Profile status",
+    "emailStatus": "Email",
+    "provider": "Login"
   },
   "avatarUpload": {
     "hint": "JPG, PNG, GIF, or WebP. Max 5MB."
