@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const isWindows = process.platform === 'win32';
+const npmCommand = isWindows ? 'npm.cmd' : 'npm';
 
 const services = [
   {
@@ -45,7 +46,7 @@ services.forEach((service) => {
   const child = spawn(npmCommand, service.args, {
     cwd: service.cwd,
     stdio: ['inherit', 'pipe', 'pipe'],
-    shell: false,
+    shell: isWindows,
   });
 
   children.push(child);
