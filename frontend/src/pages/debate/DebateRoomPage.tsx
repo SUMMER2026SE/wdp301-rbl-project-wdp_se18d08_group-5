@@ -35,7 +35,9 @@ export default function DebateRoomPage() {
   const [notes, setNotes] = useState('');
   const [turnTranscript, setTurnTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [isInDiscussionRoom, setIsInDiscussionRoom] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const lastNotifiedDrawRequestRef = useRef<string | null>(null);
   const [scores, setScores] = useState<Record<string, number>>(
     Object.fromEntries(scoreFields.map((field) => [field.key, Math.round(field.max * 0.7)])),
   );
@@ -190,6 +192,15 @@ export default function DebateRoomPage() {
   const judges = room?.participants.filter((participant) => participant.roomRole === 'judge') || [];
   const selectedParticipant = room?.participants.find((participant) => participant.userId === selectedUserId);
   const canManageScores = Boolean(isController || isJudge);
+  const isDiscussionPhase = ['prep_7', 'prep_1'].includes(session?.currentTurn.phase || '');
+  const canUseDiscussionRoom = room?.format === '3v3' && currentParticipant?.roomRole === 'debater' && isDiscussionPhase;
+  const pendingDrawRequest = session?.finalScores?.drawRequests?.find((request) => request.status === 'pending');
+  const ownTeamPendingDraw = Boolean(
+    pendingDrawRequest && currentParticipant?.team && pendingDrawRequest.team === currentParticipant.team,
+  );
+  const opponentPendingDraw = Boolean(
+    pendingDrawRequest && currentParticipant?.team && pendingDrawRequest.team !== currentParticipant.team,
+  );
 
   const startMic = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -233,6 +244,38 @@ export default function DebateRoomPage() {
     return Math.max(0, Math.min(100, (turn.timeRemaining / turn.timeLimit) * 100));
   }, [session]);
 
+  useEffect(() => {
+    if (!canUseDiscussionRoom) {
+      setIsInDiscussionRoom(false);
+    }
+  }, [canUseDiscussionRoom]);
+
+  useEffect(() => {
+    if (!isInDiscussionRoom || !session?.currentTurn.startTime || !session.currentTurn.timeLimit) return;
+
+    const interval = window.setInterval(() => {
+      const startTime = new Date(session.currentTurn.startTime).getTime();
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, session.currentTurn.timeLimit - elapsed);
+      if (remaining <= 0) {
+        setIsInDiscussionRoom(false);
+        toast('Discussion time ended. Back to main room.');
+      }
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [isInDiscussionRoom, session?.currentTurn.startTime, session?.currentTurn.timeLimit]);
+
+  useEffect(() => {
+    if (!opponentPendingDraw || !pendingDrawRequest) return;
+
+    const requestKey = `${pendingDrawRequest.team}:${pendingDrawRequest.requestedAt}`;
+    if (lastNotifiedDrawRequestRef.current === requestKey) return;
+
+    lastNotifiedDrawRequestRef.current = requestKey;
+    toast(`${pendingDrawRequest.requestedByName || 'Opponent'} requested a draw`);
+  }, [opponentPendingDraw, pendingDrawRequest]);
+
   if (roomQuery.isLoading || sessionQuery.isLoading) {
     return <Container fluid className="py-4"><Spinner animation="border" /></Container>;
   }
@@ -243,6 +286,29 @@ export default function DebateRoomPage() {
 
   return (
     <Container fluid className="py-4">
+      {opponentPendingDraw && (
+        <Alert variant="warning" className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div>
+            <strong>{pendingDrawRequest?.requestedByName || 'Opponent'}</strong> requested a draw.
+            Accepting will end this debate as a draw.
+          </div>
+          {canUseDebaterActions && (
+            <Button
+              size="sm"
+              variant="warning"
+              onClick={() => playerActionMutation.mutate('draw')}
+              disabled={playerActionMutation.isPending}
+            >
+              Accept Draw
+            </Button>
+          )}
+        </Alert>
+      )}
+      {ownTeamPendingDraw && (
+        <Alert variant="info">
+          Draw request sent. Waiting for the opposing team to accept.
+        </Alert>
+      )}
       <Row className="g-4">
         <Col xl={8}>
           <div className="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
@@ -306,16 +372,57 @@ export default function DebateRoomPage() {
                 </div>
               </div>
               <ProgressBar now={progress} variant={progress < 20 ? 'danger' : 'primary'} />
+              {canUseDiscussionRoom && (
+                <div className="mt-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                  <div className="text-muted small">
+                    {isInDiscussionRoom
+                      ? `You are in the ${currentParticipant?.team} discussion room.`
+                      : '3v3 team discussion is available during preparation.'}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isInDiscussionRoom ? 'outline-light' : 'outline-info'}
+                    onClick={() => setIsInDiscussionRoom((current) => !current)}
+                  >
+                    <i className={`bi ${isInDiscussionRoom ? 'bi-box-arrow-left' : 'bi-people'} me-2`} />
+                    {isInDiscussionRoom ? 'Back to Main Room' : 'Vào phòng thảo luận'}
+                  </Button>
+                </div>
+              )}
             </Card.Body>
           </Card>
 
-          <Row className="g-3">
-            {(['proposition', 'opposition'] as Team[]).map((team) => (
-              <Col md={6} key={team}>
-                <TeamCard team={team} participants={debaters.filter((participant) => participant.team === team)} currentSpeaker={session.currentTurn.speaker} />
-              </Col>
-            ))}
-          </Row>
+          {isInDiscussionRoom ? (
+            <Card className="mb-4 border-info">
+              <Card.Body>
+                <Card.Title className="text-capitalize">{currentParticipant?.team} Discussion Room</Card.Title>
+                <Alert variant="info" className="mb-3">
+                  This space is for your team during preparation. You will be returned to the main room when preparation time ends.
+                </Alert>
+                <Table responsive size="sm" className="mb-0 align-middle">
+                  <tbody>
+                    {debaters
+                      .filter((participant) => participant.team === currentParticipant?.team)
+                      .map((participant) => (
+                        <tr key={participant.userId}>
+                          <td>{participant.username}</td>
+                          <td>{participant.speakerSlot}</td>
+                          <td>{participant.userId === user?._id ? 'You' : 'Teammate'}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </Table>
+              </Card.Body>
+            </Card>
+          ) : (
+            <Row className="g-3">
+              {(['proposition', 'opposition'] as Team[]).map((team) => (
+                <Col md={6} key={team}>
+                  <TeamCard team={team} participants={debaters.filter((participant) => participant.team === team)} currentSpeaker={session.currentTurn.speaker} />
+                </Col>
+              ))}
+            </Row>
+          )}
 
           {session.currentTurn.phase === 'cross_exam' && (
             <Card className="mt-4">
