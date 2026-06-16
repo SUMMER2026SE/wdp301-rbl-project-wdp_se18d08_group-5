@@ -12,7 +12,7 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new UnauthorizedError('Access token required');
+    return next(new UnauthorizedError('Access token required'));
   }
 
   const token = authHeader.split(' ')[1];
@@ -30,10 +30,10 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
     next();
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
-      throw error;
+      return next(error);
     }
 
-    throw new UnauthorizedError('Invalid or expired token');
+    return next(new UnauthorizedError('Invalid or expired token'));
   }
 }
 
