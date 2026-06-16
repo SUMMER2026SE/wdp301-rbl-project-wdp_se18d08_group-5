@@ -231,6 +231,16 @@ export interface JudgeVerdict {
   submittedAt: string;
 }
 
+export interface DrawRequest {
+  requestedBy: string;
+  requestedByName: string;
+  team: Team;
+  status: 'pending' | 'accepted' | 'cancelled';
+  requestedAt: string;
+  acceptedBy?: string;
+  acceptedAt?: string;
+}
+
 export interface FinalScores {
   teamProposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
   teamOpposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
@@ -238,6 +248,7 @@ export interface FinalScores {
   winnerTeam?: Team | 'draw';
   aiVerdict: Team | 'draw' | null;
   judgeVerdicts?: JudgeVerdict[];
+  drawRequests?: DrawRequest[];
   aggregatePolicy?: {
     humanJudgeWeight: number;
     aiJudgeWeight: number;

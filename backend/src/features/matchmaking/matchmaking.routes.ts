@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess } from '../../utils/response.js';
 import { MatchQueue } from '../../models/MatchQueue.js';
+import { DebateRoom } from '../../models/DebateRoom.js';
 import { User } from '../../models/User.js';
 import { BadRequestError, NotFoundError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
@@ -18,12 +19,20 @@ router.post(
     const { format } = req.body; // '1v1' | '3v3'
     const userId = req.user!.userId;
 
-    // Check if already in queue or already matched
+    // Check if already in queue or already matched to an unfinished room.
     const existing = await MatchQueue.findOne({
       userId,
       status: { $in: ['waiting', 'matched'] },
     });
-    if (existing) throw new BadRequestError('Already in queue');
+    if (existing?.status === 'waiting') throw new BadRequestError('Already in queue');
+    if (existing?.status === 'matched') {
+      const room = existing.matchedRoomId ? await DebateRoom.findById(existing.matchedRoomId).select('status') : null;
+      if (room && !['completed', 'cancelled'].includes(room.status)) {
+        throw new BadRequestError('Already matched');
+      }
+      existing.status = 'cancelled';
+      await existing.save();
+    }
 
     const user = await User.findById(userId);
     if (!user) throw new NotFoundError('User not found');
@@ -79,6 +88,13 @@ router.get(
       return sendSuccess(res, { status: 'idle' });
     }
     if (entry.status === 'matched') {
+      const room = entry.matchedRoomId ? await DebateRoom.findById(entry.matchedRoomId).select('status') : null;
+      if (!room || ['completed', 'cancelled'].includes(room.status)) {
+        entry.status = 'cancelled';
+        await entry.save();
+        return sendSuccess(res, { status: 'idle' });
+      }
+
       return sendSuccess(res, {
         status: 'matched',
         format: entry.format,
