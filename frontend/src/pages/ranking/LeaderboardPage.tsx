@@ -137,7 +137,7 @@ export default function LeaderboardPage() {
                       <td>
                         <RankBadge tier={entry.tier} />
                       </td>
-                      <td>{entry.wins}/{entry.losses}</td>
+                      <td>{entry.wins}/{entry.losses}/{entry.draws ?? 0}</td>
                     </tr>
                   );
                 })}

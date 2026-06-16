@@ -29,6 +29,7 @@ export interface IUser extends Document {
     totalDebates: number;
     wins: number;
     losses: number;
+    draws: number;
     totalScore: number;
     avgScore: number;
   };
@@ -97,6 +98,7 @@ const userSchema = new Schema<IUser>(
       totalDebates: { type: Number, default: 0 },
       wins: { type: Number, default: 0 },
       losses: { type: Number, default: 0 },
+      draws: { type: Number, default: 0 },
       totalScore: { type: Number, default: 0 },
       avgScore: { type: Number, default: 0 },
     },

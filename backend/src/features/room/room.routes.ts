@@ -28,6 +28,30 @@ type DebateWinner = 'proposition' | 'opposition' | 'draw';
 
 const HUMAN_JUDGE_WEIGHT = 1;
 const AI_JUDGE_WEIGHT = 0.5;
+const MAX_MOTION_LENGTH = 240;
+
+function normalizeMotion(value: unknown) {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') {
+    throw new BadRequestError('motion must be a string');
+  }
+
+  const motion = value.trim().replace(/\s+/g, ' ');
+  if (motion.length > MAX_MOTION_LENGTH) {
+    throw new BadRequestError(`motion must be ${MAX_MOTION_LENGTH} characters or fewer`);
+  }
+
+  return motion;
+}
+
+function requireMotion(value: unknown) {
+  const motion = normalizeMotion(value);
+  if (!motion) {
+    throw new BadRequestError('motion is required');
+  }
+
+  return motion;
+}
 
 async function buildRoomPayload(room: any) {
   const payload = room.toObject ? room.toObject() : room;
@@ -359,7 +383,7 @@ router.post(
   '/create',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { title, format, hostType, judgeType, judgeCount, isPrivate, password } = req.body;
+    const { title, format, hostType, judgeType, judgeCount, isPrivate, password, motion } = req.body;
     const userId = req.user!.userId;
     const user = await User.findById(userId).select('username profile.displayName profile.avatar');
     if (!user) throw new NotFoundError('User not found');
@@ -367,6 +391,7 @@ router.post(
     const room = await DebateRoom.create({
       roomType: 'custom',
       title,
+      motion: normalizeMotion(motion),
       format,
       hostType,
       judgeType,
@@ -463,7 +488,7 @@ router.put(
     if (hostType !== undefined) room.hostType = hostType;
     if (judgeType !== undefined) room.judgeType = judgeType;
     if (judgeCount !== undefined) room.judgeCount = judgeCount;
-    if (motion !== undefined) room.motion = motion;
+    if (motion !== undefined) room.motion = normalizeMotion(motion);
     if (isPrivate !== undefined) {
       room.isPrivate = isPrivate;
       room.password = isPrivate ? password || room.password : null;
@@ -700,6 +725,35 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await startDebate(req.params.id, req.user!.userId);
     sendSuccess(res, result, 'Debate started');
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/motion — Host/owner selects debate topic before start
+router.post(
+  '/:id/host/motion',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) {
+      throw new ForbiddenError('Only host or owner can update the debate topic');
+    }
+    if (!['waiting', 'ready'].includes(room.status)) {
+      throw new BadRequestError('Cannot update the topic after the debate has started');
+    }
+
+    room.motion = requireMotion(req.body.motion);
+    await room.save();
+
+    getIO().to(req.params.id).emit('room:motion-updated', {
+      roomId: room._id,
+      motion: room.motion,
+    });
+
+    sendSuccess(res, { motion: room.motion }, 'Debate topic updated');
   }),
 );
 

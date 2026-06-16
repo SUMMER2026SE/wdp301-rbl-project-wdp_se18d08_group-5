@@ -196,6 +196,10 @@ export async function startDebate(roomId: string, userId: string) {
     throw new BadRequestError('Assign a host before starting the debate');
   }
 
+  if (room.roomType === 'custom' && !room.motion.trim()) {
+    throw new BadRequestError('Choose a debate topic before starting');
+  }
+
   if (!hasLockedRequiredPositions(room)) {
     throw new BadRequestError('All debater positions must be filled and locked before starting');
   }
