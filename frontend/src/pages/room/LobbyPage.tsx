@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, ButtonGroup, Card, Col, Container, Form, Row, Spinner, Table } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
+import { TopicPicker, getTopicValue, type TopicInputMode } from '@components/room/TopicPicker';
 import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
+import { isSeededDebateTopic } from '@utils/debateTopics';
 import type { SpeakerSlot, Team } from '@/types';
 
 type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
@@ -20,6 +22,9 @@ export default function LobbyPage() {
   const [assignRole, setAssignRole] = useState<AssignableRole>('debater');
   const [assignTeam, setAssignTeam] = useState<Team>('proposition');
   const [assignSlot, setAssignSlot] = useState<SpeakerSlot>('S1');
+  const [topicMode, setTopicMode] = useState<TopicInputMode>('preset');
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [customTopic, setCustomTopic] = useState('');
 
   const roomQuery = useQuery({
     queryKey: ['room', roomId],
@@ -68,15 +73,40 @@ export default function LobbyPage() {
       toast.success('Debate started');
       navigate(`/debate/${roomId}`);
     },
-    onError: () => toast.error('Assign host, fill debaters, then lock positions first'),
+    onError: () => toast.error('Assign host, choose topic, fill debaters, then lock positions first'),
   });
 
   const room = roomQuery.data;
   const viewerChatEnabled = room?.viewerChatEnabled ?? true;
   const isOwner = Boolean(user && room?.createdBy === user._id);
+  const isHost = Boolean(user && room?.hostId === user._id);
+  const canManageTopic = isOwner || isHost;
+  const topicValue = getTopicValue(topicMode, selectedTopic, customTopic);
   const currentParticipant = room?.participants.find((item) => item.userId === user?._id);
   const isAssignedDebater = currentParticipant?.roomRole === 'debater';
   const slots = useMemo(() => (room?.format === '1v1' ? ['S1'] : ['S1', 'S2', 'S3']) as SpeakerSlot[], [room?.format]);
+
+  useEffect(() => {
+    if (!room) return;
+
+    if (!room.motion) {
+      setTopicMode('preset');
+      setSelectedTopic('');
+      setCustomTopic('');
+      return;
+    }
+
+    if (isSeededDebateTopic(room.motion)) {
+      setTopicMode('preset');
+      setSelectedTopic(room.motion);
+      setCustomTopic('');
+      return;
+    }
+
+    setTopicMode('custom');
+    setSelectedTopic('');
+    setCustomTopic(room.motion);
+  }, [room?._id, room?.motion]);
 
   const viewerChatMutation = useMutation({
     mutationFn: () => roomService.setViewerChat(roomId, !viewerChatEnabled),
@@ -85,6 +115,15 @@ export default function LobbyPage() {
       invalidateRoom();
     },
     onError: () => toast.error('Could not update viewer chat'),
+  });
+
+  const topicMutation = useMutation({
+    mutationFn: () => roomService.updateMotion(roomId, topicValue),
+    onSuccess: () => {
+      toast.success('Topic saved');
+      invalidateRoom();
+    },
+    onError: () => toast.error('Choose or type a debate topic'),
   });
 
   if (roomQuery.isLoading) {
@@ -139,6 +178,31 @@ export default function LobbyPage() {
         </Col>
 
         <Col xl={4}>
+          {canManageTopic && ['waiting', 'ready'].includes(room.status) && (
+            <Card className="mb-3">
+              <Card.Body>
+                <Card.Title>Debate Topic</Card.Title>
+                <TopicPicker
+                  mode={topicMode}
+                  selectedTopic={selectedTopic}
+                  customTopic={customTopic}
+                  onModeChange={setTopicMode}
+                  onSelectedTopicChange={setSelectedTopic}
+                  onCustomTopicChange={setCustomTopic}
+                  disabled={topicMutation.isPending}
+                />
+                <Button
+                  className="w-100 mt-3"
+                  onClick={() => topicMutation.mutate()}
+                  disabled={!topicValue || topicMutation.isPending}
+                >
+                  <i className="bi bi-check2-circle me-2" />
+                  Save Topic
+                </Button>
+              </Card.Body>
+            </Card>
+          )}
+
           {isOwner && (
             <Card className="mb-3">
               <Card.Body>

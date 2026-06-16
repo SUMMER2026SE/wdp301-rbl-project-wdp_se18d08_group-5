@@ -15,7 +15,7 @@ router.get(
     const skip = (page - 1) * limit;
 
     const users = await User.find()
-      .select('username profile.displayName profile.avatar ranking stats.wins stats.losses')
+      .select('username profile.displayName profile.avatar ranking stats.wins stats.losses stats.draws')
       .sort({ 'ranking.elo': -1 })
       .skip(skip)
       .limit(limit);
@@ -29,6 +29,7 @@ router.get(
       tier: user.ranking.tier,
       wins: user.stats.wins,
       losses: user.stats.losses,
+      draws: user.stats.draws || 0,
       rank: skip + index + 1,
     }));
 
@@ -56,6 +57,7 @@ router.get(
       totalDebates: user.stats.totalDebates,
       wins: user.stats.wins,
       losses: user.stats.losses,
+      draws: user.stats.draws || 0,
     });
   }),
 );

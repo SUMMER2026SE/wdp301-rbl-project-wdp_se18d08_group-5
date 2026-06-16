@@ -56,6 +56,7 @@ export interface UserStats {
   totalDebates: number;
   wins: number;
   losses: number;
+  draws: number;
   totalScore: number;
   avgScore: number;
 }
@@ -161,6 +162,7 @@ export interface DebateRoom {
 
 export interface CreateRoomRequest {
   title: string;
+  motion: string;
   format: DebateFormat;
   hostType: HostType;
   judgeType: JudgeType;
@@ -348,6 +350,7 @@ export interface LeaderboardEntry {
   tier: RankTier;
   wins: number;
   losses: number;
+  draws: number;
   rank: number;
 }
 

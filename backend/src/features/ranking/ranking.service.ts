@@ -144,9 +144,12 @@ export async function applyDebateResult(roomId: string): Promise<RankingApplicat
     user.ranking.tier = getTierFromElo(newElo);
     user.ranking.seasonPoints += getSeasonPoints(actualScore);
     user.stats.totalDebates += 1;
+    user.stats.draws = user.stats.draws || 0;
 
     if (actualScore === 1) {
       user.stats.wins += 1;
+    } else if (actualScore === 0.5) {
+      user.stats.draws += 1;
     } else if (actualScore === 0) {
       user.stats.losses += 1;
     }

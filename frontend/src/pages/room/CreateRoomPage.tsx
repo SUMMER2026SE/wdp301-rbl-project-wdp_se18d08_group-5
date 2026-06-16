@@ -3,6 +3,7 @@ import { FormEvent, useState } from 'react';
 import { Alert, Button, ButtonGroup, Card, Col, Container, Form, Row } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { TopicPicker, getTopicValue, type TopicInputMode } from '@components/room/TopicPicker';
 import { roomService } from '@services/roomService';
 import type { CreateRoomRequest, DebateFormat, HostType, JudgeType } from '@/types';
 
@@ -10,6 +11,7 @@ export default function CreateRoomPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<CreateRoomRequest>({
     title: '',
+    motion: '',
     format: '1v1',
     hostType: 'human',
     judgeType: 'ai',
@@ -17,9 +19,12 @@ export default function CreateRoomPage() {
     isPrivate: false,
     password: '',
   });
+  const [topicMode, setTopicMode] = useState<TopicInputMode>('preset');
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [customTopic, setCustomTopic] = useState('');
 
   const createMutation = useMutation({
-    mutationFn: () => roomService.create(form),
+    mutationFn: (motion: string) => roomService.create({ ...form, motion }),
     onSuccess: (response) => {
       const roomId = response.data.data._id;
       toast.success('Room created');
@@ -34,7 +39,13 @@ export default function CreateRoomPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    createMutation.mutate();
+    const motion = getTopicValue(topicMode, selectedTopic, customTopic);
+    if (!motion) {
+      toast.error('Choose or type a debate topic');
+      return;
+    }
+
+    createMutation.mutate(motion);
   }
 
   return (
@@ -48,6 +59,19 @@ export default function CreateRoomPage() {
                 <Form.Group className="mb-3">
                   <Form.Label>Room title</Form.Label>
                   <Form.Control value={form.title} onChange={(event) => updateField('title', event.target.value)} required />
+                </Form.Group>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Debate topic</Form.Label>
+                  <TopicPicker
+                    mode={topicMode}
+                    selectedTopic={selectedTopic}
+                    customTopic={customTopic}
+                    onModeChange={setTopicMode}
+                    onSelectedTopicChange={setSelectedTopic}
+                    onCustomTopicChange={setCustomTopic}
+                    disabled={createMutation.isPending}
+                  />
                 </Form.Group>
 
                 <Row className="g-3">

@@ -65,6 +65,10 @@ export const roomService = {
     return api.post(`/rooms/${roomId}/start`);
   },
 
+  updateMotion(roomId: string, motion: string) {
+    return api.post<ApiResponse<{ motion: string }>>(`/rooms/${roomId}/host/motion`, { motion });
+  },
+
   nextTurnWithTranscript(
     roomId: string,
     data: {
