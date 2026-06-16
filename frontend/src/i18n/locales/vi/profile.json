@@ -1,5 +1,12 @@
 {
   "title": "Hồ sơ",
+  "hero": {
+    "ownerKicker": "Hồ sơ cá nhân",
+    "publicKicker": "Hồ sơ công khai",
+    "title": "{{name}}",
+    "ownerSubtitle": "Cập nhật danh tính tranh biện, thống kê và hành trình xếp hạng của bạn.",
+    "publicSubtitle": "Tổng quan hồ sơ, thành tích và thông tin cộng đồng của {{name}}."
+  },
   "fields": {
     "displayName": "Tên hiển thị",
     "avatar": "Ảnh đại diện",
@@ -11,7 +18,19 @@
     "elo": "ELO",
     "tier": "Tier",
     "winLoss": "Thắng / Thua",
-    "totalDebates": "Tổng debate"
+    "totalDebates": "Tổng debate",
+    "wins": "Thắng",
+    "losses": "Thua",
+    "winRate": "Tỉ lệ thắng",
+    "avgScore": "Điểm TB",
+    "profileCompletion": "Độ hoàn thiện",
+    "memberSince": "Tham gia",
+    "role": "Vai trò",
+    "otherResults": "Khác",
+    "seasonPointsValue": "{{points}} điểm mùa",
+    "winLossValue": "{{wins}} thắng / {{losses}} thua",
+    "totalScoreValue": "{{score}} điểm tổng",
+    "decidedDebates": "{{count}} trận có kết quả"
   },
   "status": {
     "emailVerified": "Email đã xác thực",
@@ -29,7 +48,35 @@
   "actions": {
     "viewHistory": "Xem lịch sử tranh biện",
     "avatarUpload": "Tải ảnh từ thiết bị",
-    "avatarUploading": "Đang tải..."
+    "avatarUploading": "Đang tải...",
+    "viewLeaderboard": "Bảng xếp hạng",
+    "startRankQueue": "Vào hàng chờ rank",
+    "changePassword": "Đổi mật khẩu",
+    "updateAvatar": "Cập nhật ảnh"
+  },
+  "sections": {
+    "editProfile": "Chỉnh sửa",
+    "publicProfile": "Giới thiệu",
+    "activity": "Hoạt động",
+    "account": "Tài khoản"
+  },
+  "form": {
+    "title": "Thông tin hiển thị",
+    "bioPlaceholder": "Viết vài dòng giới thiệu phong cách tranh biện của bạn...",
+    "schoolPlaceholder": "Tên trường hoặc tổ chức",
+    "clubPlaceholder": "Tên CLB hoặc đội nhóm"
+  },
+  "details": {
+    "title": "Thông tin cộng đồng"
+  },
+  "activity": {
+    "title": "Phong độ tranh biện",
+    "winRateHint": "Tính theo các trận thắng/thua đã chốt."
+  },
+  "account": {
+    "title": "Trạng thái hồ sơ",
+    "emailStatus": "Email",
+    "provider": "Đăng nhập"
   },
   "avatarUpload": {
     "hint": "JPG, PNG, GIF hoặc WebP. Tối đa 5MB."

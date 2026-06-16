@@ -1,5 +1,12 @@
 {
   "title": "プロフィール",
+  "hero": {
+    "ownerKicker": "マイプロフィール",
+    "publicKicker": "公開プロフィール",
+    "title": "{{name}}",
+    "ownerSubtitle": "ディベートでの表示情報、成績、ランキングの歩みを更新できます。",
+    "publicSubtitle": "{{name}} のプロフィール概要、成績、コミュニティ情報です。"
+  },
   "fields": {
     "displayName": "表示名",
     "avatar": "アバター",
@@ -11,7 +18,19 @@
     "elo": "ELO",
     "tier": "Tier",
     "winLoss": "勝ち / 負け",
-    "totalDebates": "総ディベート数"
+    "totalDebates": "総ディベート数",
+    "wins": "勝ち",
+    "losses": "負け",
+    "winRate": "勝率",
+    "avgScore": "平均スコア",
+    "profileCompletion": "プロフィール完成度",
+    "memberSince": "参加日",
+    "role": "ロール",
+    "otherResults": "その他",
+    "seasonPointsValue": "シーズン {{points}} pts",
+    "winLossValue": "{{wins}} 勝 / {{losses}} 敗",
+    "totalScoreValue": "合計 {{score}} pts",
+    "decidedDebates": "結果確定 {{count}} 試合"
   },
   "status": {
     "emailVerified": "メール認証済み",
@@ -29,7 +48,35 @@
   "actions": {
     "viewHistory": "ディベート履歴を見る",
     "avatarUpload": "端末からアップロード",
-    "avatarUploading": "アップロード中..."
+    "avatarUploading": "アップロード中...",
+    "viewLeaderboard": "ランキング",
+    "startRankQueue": "ランク待機へ",
+    "changePassword": "パスワード変更",
+    "updateAvatar": "アバター更新"
+  },
+  "sections": {
+    "editProfile": "編集",
+    "publicProfile": "概要",
+    "activity": "活動",
+    "account": "アカウント"
+  },
+  "form": {
+    "title": "表示情報",
+    "bioPlaceholder": "あなたのディベートスタイルを短く書いてください...",
+    "schoolPlaceholder": "学校または所属組織",
+    "clubPlaceholder": "クラブまたはチーム"
+  },
+  "details": {
+    "title": "コミュニティ情報"
+  },
+  "activity": {
+    "title": "ディベート成績",
+    "winRateHint": "勝敗が確定した試合から計算されます。"
+  },
+  "account": {
+    "title": "プロフィール状態",
+    "emailStatus": "メール",
+    "provider": "ログイン"
   },
   "avatarUpload": {
     "hint": "JPG、PNG、GIF、WebPに対応。最大5MB。"
