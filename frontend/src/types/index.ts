@@ -380,7 +380,10 @@ export interface AdminUser {
     displayName: string;
     avatar: string;
   };
+  stats?: UserStats;
+  ranking?: UserRanking;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AdminUsersQueryParams {
@@ -388,6 +391,7 @@ export interface AdminUsersQueryParams {
   limit?: number;
   search?: string;
   role?: 'admin' | 'user';
+  status?: 'active' | 'banned' | 'pending';
 }
 
 export interface UpdateUserRoleRequest {
@@ -402,6 +406,151 @@ export interface BanUserRequest {
   customDurationValue?: number;
   customDurationUnit?: CustomBanDurationUnit;
   reason?: string;
+}
+
+export interface AdminRoom {
+  _id: string;
+  roomType: RoomType;
+  title: string;
+  motion: string;
+  status: RoomStatus;
+  format: DebateFormat;
+  isPrivate: boolean;
+  createdBy: string;
+  hostType: HostType;
+  hostId: string | null;
+  hostName: string;
+  viewerChatEnabled: boolean;
+  judgeType: JudgeType;
+  judgeCount: number;
+  participants: RoomParticipant[];
+  participantCount: number;
+  debaterCount: number;
+  judgeAssignedCount: number;
+  mutedCount: number;
+  currentPhase: DebatePhase;
+  eloApplied: boolean;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  session: {
+    _id: string;
+    currentTurn: DebateSession['currentTurn'];
+    turnCount: number;
+    cardCount: number;
+    hasFinalScores: boolean;
+    finalScores: FinalScores | null;
+  } | null;
+}
+
+export interface AdminRoomsQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: RoomStatus;
+  roomType?: RoomType;
+  format?: DebateFormat;
+}
+
+export interface AdminRoomDetail {
+  room: AdminRoom;
+  toxicMessages: Array<{
+    _id: string;
+    senderId: string;
+    senderName: string;
+    senderRole: RoomRole;
+    content: string;
+    type: MessageType;
+    timestamp: string;
+  }>;
+}
+
+export type ReportTargetType = 'user' | 'message' | 'room' | 'debate' | 'other';
+export type ReportReason = 'harassment' | 'toxic_chat' | 'spam' | 'cheating' | 'inappropriate_content' | 'other';
+export type ReportStatus = 'open' | 'reviewing' | 'resolved' | 'dismissed';
+export type ReportResolution = 'none' | 'warned' | 'muted' | 'banned' | 'dismissed';
+
+export interface AdminReport {
+  _id: string;
+  targetType: ReportTargetType;
+  targetId: string | null;
+  reporterId: string;
+  reporterName: string;
+  reportedUserId: string | null;
+  reportedUserName: string;
+  roomId: string | null;
+  roomTitle: string;
+  messageId: string | null;
+  messageSnippet: string;
+  reason: ReportReason;
+  details: string;
+  status: ReportStatus;
+  resolution: ReportResolution;
+  adminNote: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AdminReportsQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: ReportStatus;
+  targetType?: ReportTargetType;
+}
+
+export interface UpdateReportRequest {
+  status: ReportStatus;
+  resolution?: ReportResolution;
+  adminNote?: string;
+  ban?: BanUserRequest;
+}
+
+export interface CreateReportRequest {
+  targetType: ReportTargetType;
+  targetId?: string;
+  reportedUserId?: string;
+  roomId?: string;
+  reason: ReportReason;
+  details?: string;
+}
+
+export interface AdminOverview {
+  users: {
+    total: number;
+    admins: number;
+    banned: number;
+    pendingVerification: number;
+    newToday: number;
+  };
+  rooms: {
+    total: number;
+    waiting: number;
+    ready: number;
+    active: number;
+    paused: number;
+    completed: number;
+    cancelled: number;
+    rank: number;
+    custom: number;
+  };
+  reports: {
+    total: number;
+    open: number;
+    reviewing: number;
+    resolved: number;
+    dismissed: number;
+  };
+  moderation: {
+    toxicMessages: number;
+    yellowCards: number;
+  };
+  recentUsers: AdminUser[];
+  recentRooms: AdminRoom[];
+  recentReports: AdminReport[];
 }
 
 // --- API Response ---

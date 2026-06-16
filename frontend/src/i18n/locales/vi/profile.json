@@ -2,7 +2,7 @@
   "title": "Hồ sơ",
   "fields": {
     "displayName": "Tên hiển thị",
-    "avatar": "Avatar URL",
+    "avatar": "Ảnh đại diện",
     "bio": "Bio",
     "school": "Trường",
     "club": "CLB"
@@ -21,12 +21,24 @@
     "loadFailed": "Không thể tải hồ sơ",
     "updateSuccess": "Cập nhật hồ sơ thành công.",
     "updateFailed": "Không thể cập nhật hồ sơ",
+    "avatarUploadSuccess": "Tải ảnh đại diện thành công.",
+    "avatarUploadFailed": "Tải ảnh đại diện thất bại.",
+    "avatarUploadNoUrl": "Upload không trả về URL ảnh đại diện",
     "notFound": "Không tìm thấy hồ sơ"
+  },
+  "actions": {
+    "viewHistory": "Xem lịch sử tranh biện",
+    "avatarUpload": "Tải ảnh từ thiết bị",
+    "avatarUploading": "Đang tải..."
+  },
+  "avatarUpload": {
+    "hint": "JPG, PNG, GIF hoặc WebP. Tối đa 5MB."
   },
   "validation": {
     "displayNameRequired": "Vui lòng nhập tên hiển thị",
     "displayNameMax": "Tối đa 50 ký tự",
     "avatarInvalid": "URL ảnh không hợp lệ",
+    "avatarFileInvalid": "File ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, GIF hoặc WebP, tối đa 5MB.",
     "bioMax": "Tối đa 500 ký tự",
     "schoolMax": "Tối đa 100 ký tự",
     "clubMax": "Tối đa 100 ký tự"

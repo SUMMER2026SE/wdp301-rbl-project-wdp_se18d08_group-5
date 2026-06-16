@@ -2,17 +2,58 @@ import { useState } from 'react';
 import { Alert, Button, Container, Pagination, Table } from 'react-bootstrap';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LoadingScreen } from '@components/common/LoadingScreen';
 import { RankBadge } from '@components/ranking/RankBadge';
 import { rankingService } from '@services/rankingService';
 import { useAuthStore } from '@stores/authStore';
 
 const PAGE_SIZE = 20;
-const fallbackAvatar = 'https://via.placeholder.com/40?text=U';
+
+function getPlayerInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase() || 'U';
+}
+
+function LeaderboardAvatar({ src, name }: { src?: string; name: string }) {
+  const [hasError, setHasError] = useState(false);
+  const shouldUseFallback = !src || hasError;
+
+  if (shouldUseFallback) {
+    return (
+      <span
+        className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
+        style={{
+          width: 40,
+          height: 40,
+          flex: '0 0 40px',
+          color: '#0a0a0f',
+          background: 'var(--gradient-neon)',
+          border: '1px solid rgba(0, 245, 255, 0.45)',
+          boxShadow: '0 0 12px rgba(0, 245, 255, 0.18)',
+        }}
+        aria-label={name}
+      >
+        {getPlayerInitial(name)}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      width={40}
+      height={40}
+      className="rounded-circle object-fit-cover"
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 export default function LeaderboardPage() {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const currentUserId = useAuthStore((state) => state.user?._id);
 
   const leaderboardQuery = useQuery({
@@ -42,13 +83,13 @@ export default function LeaderboardPage() {
       <div className="mb-4">
         <h2>
           <i className="bi bi-trophy me-2" />
-          Bảng xếp hạng
+          {t('leaderboard.title')}
         </h2>
-        <p className="landing-subtitle mb-0">Xếp hạng ELO hiện tại của người chơi.</p>
+        <p className="landing-subtitle mb-0">{t('leaderboard.subtitle')}</p>
       </div>
 
       {entries.length === 0 ? (
-        <Alert variant="info">No rankings yet.</Alert>
+        <Alert variant="info">{t('leaderboard.empty')}</Alert>
       ) : (
         <>
           <div className="table-responsive">
@@ -56,26 +97,21 @@ export default function LeaderboardPage() {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Người chơi</th>
-                  <th>ELO</th>
-                  <th>Tier</th>
-                  <th>W/L</th>
+                  <th>{t('leaderboard.columns.player')}</th>
+                  <th>{t('leaderboard.columns.elo')}</th>
+                  <th>{t('leaderboard.columns.tier')}</th>
+                  <th>{t('leaderboard.columns.winLoss')}</th>
                 </tr>
               </thead>
               <tbody>
                 {entries.map((entry) => {
                   const isCurrentUser = entry._id === currentUserId;
+                  const playerName = entry.displayName || entry.username;
                   const playerContent = (
                     <div className="d-flex align-items-center gap-2 text-start">
-                      <img
-                        src={entry.avatar || fallbackAvatar}
-                        alt={entry.displayName || entry.username}
-                        width={40}
-                        height={40}
-                        className="rounded-circle object-fit-cover"
-                      />
+                      <LeaderboardAvatar src={entry.avatar} name={playerName} />
                       <div>
-                        <div className="fw-semibold">{entry.displayName || entry.username}</div>
+                        <div className="fw-semibold">{playerName}</div>
                         <div className="text-muted small">@{entry.username}</div>
                       </div>
                     </div>

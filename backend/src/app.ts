@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import path from 'path';
 import { ENV } from './config/env.js';
 import { globalErrorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
@@ -18,11 +19,14 @@ import aiRoutes from './features/ai/ai.routes.js';
 import rankingRoutes from './features/ranking/ranking.routes.js';
 import adminRoutes from './features/admin/admin.routes.js';
 import uploadRoutes from './features/upload/upload.routes.js';
+import reportRoutes from './features/report/report.routes.js';
 
 const app = express();
 
 // --- Global Middleware ---
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({
   origin: ENV.CLIENT_URL,
   credentials: true,
@@ -32,6 +36,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use('/api', apiLimiter);
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // --- Health Check ---
 app.get('/health', (_req, res) => {
@@ -48,6 +53,7 @@ app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/rankings', rankingRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/upload', uploadRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

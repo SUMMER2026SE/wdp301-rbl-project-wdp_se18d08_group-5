@@ -147,6 +147,7 @@ Realtime Socket.IO polish remains Dev 3 scope: timer sync, live phase broadcasts
 | G. Judge/Scoring | 3 / 3 impl | ✅ Complete | Submit score, scores, apply result |
 | H. AI | 4 / 6 impl | ⚠️ Incomplete | Thiếu judge-turn + final-verdict |
 | I. Ranking | 2 + service hook | ✅ Đã impl | Leaderboard/user rank + ELO apply flow |
+| J. Admin & Reports | 13 + report submit | ✅ Đã impl | Overview, user moderation, room operations, report review |
 | **Tổng REST** | **Dev 2 scope complete** | **⚠️ Partial overall** | AI/socket polish ngoài Dev 2 còn mục stub/missing |
 | Socket events | ~20 | ⚠️ Cần xem 08_Socket | Bidirectional |
 
@@ -315,6 +316,30 @@ Production:  https://<domain>/api/v1
 |---|--------|----------|--------|-------|---------------|--------|
 | 44 | GET | `/rankings/leaderboard` | Leaderboard Global (ELO) (UC-64) | Guest/User | Query: `?page=&limit=` | ✅ |
 | 45 | GET | `/rankings/user/:id` | Rank cá nhân (ELO, tier) | Guest/User | — | ✅ |
+
+---
+
+### J. Admin / Reports (UC-107 → UC-109) — ✅ Đã impl
+
+**Files:** `src/features/admin/admin.routes.ts`, `src/features/report/report.routes.ts`
+
+| # | Method | Endpoint | Mô tả | Actor | Body / Params | Status |
+|---|--------|----------|--------|-------|---------------|--------|
+| 46 | GET | `/admin/overview` | Dashboard metrics: users, rooms, reports, moderation | Admin | — | ✅ |
+| 47 | GET | `/admin/users` | Danh sách user + search/filter/pagination | Admin | Query: `?page=&limit=&search=&role=&status=` | ✅ |
+| 48 | GET | `/admin/users/:userId` | Chi tiết user + activity summary | Admin | — | ✅ |
+| 49 | PATCH | `/admin/users/:userId/role` | Đổi role hệ thống | Admin | `{ role: 'admin'\|'user' }` | ✅ |
+| 50 | POST | `/admin/users/:userId/ban` | Ban account có thời hạn | Admin | `{ durationPreset, customDurationValue?, customDurationUnit?, reason? }` | ✅ |
+| 51 | POST | `/admin/users/:userId/unban` | Gỡ ban account | Admin | — | ✅ |
+| 52 | GET | `/admin/rooms` | Danh sách phòng/trận + filter | Admin | Query: `?page=&limit=&search=&status=&roomType=&format=` | ✅ |
+| 53 | GET | `/admin/rooms/:roomId` | Chi tiết phòng + toxic messages gần nhất | Admin | — | ✅ |
+| 54 | PATCH | `/admin/rooms/:roomId/status` | Cập nhật status phòng/trận | Admin | `{ status, reason? }` | ✅ |
+| 55 | POST | `/admin/rooms/:roomId/kick` | Remove participant khỏi phòng | Admin | `{ userId, reason? }` | ✅ |
+| 56 | POST | `/admin/rooms/:roomId/mute` | Mute/unmute participant | Admin | `{ userId, muted, reason? }` | ✅ |
+| 57 | PATCH | `/admin/rooms/:roomId/viewer-chat` | Bật/tắt viewer chat | Admin | `{ enabled }` | ✅ |
+| 58 | POST | `/reports` | User gửi báo cáo vi phạm | User | `{ targetType, targetId?, reportedUserId?, roomId?, reason, details? }` | ✅ |
+| 59 | GET | `/admin/reports` | Danh sách report + search/filter/pagination | Admin | Query: `?page=&limit=&search=&status=&targetType=` | ✅ |
+| 60 | PATCH | `/admin/reports/:reportId` | Review report: warned/muted/banned/dismissed | Admin | `{ status, resolution?, adminNote?, ban? }` | ✅ |
 
 ---
 

@@ -1,32 +1,94 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Alert, Badge, Button, Card, Col, Container, Form, Image, Row, Spinner } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Container, Form, Row, Spinner } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import { RankBadge } from '@components/ranking/RankBadge';
+import { uploadAvatar, validateImageFile } from '@services/uploadService';
 import { userService } from '@services/userService';
 import { useAuthStore } from '@stores/authStore';
 import type { User } from '@/types';
 
-const fallbackAvatar = 'https://via.placeholder.com/160?text=User';
+function getProfileInitial(profile: User) {
+  const name = profile.profile.displayName || profile.username;
+  return name.trim().charAt(0).toUpperCase() || 'U';
+}
+
+function ProfileAvatar({ profile, preview }: { profile: User; preview: string }) {
+  const [hasError, setHasError] = useState(false);
+  const avatar = preview || profile.profile.avatar;
+  const shouldUseFallback = !avatar || hasError;
+
+  useEffect(() => {
+    setHasError(false);
+  }, [avatar]);
+
+  if (shouldUseFallback) {
+    return (
+      <span
+        className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold mb-3"
+        style={{
+          width: 160,
+          height: 160,
+          fontSize: '3.5rem',
+          color: '#0a0a0f',
+          background: 'var(--gradient-neon)',
+          border: '1px solid rgba(0, 245, 255, 0.45)',
+          boxShadow: '0 0 24px rgba(0, 245, 255, 0.18)',
+        }}
+      >
+        {getProfileInitial(profile)}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      key={avatar}
+      src={avatar}
+      alt={profile.profile.displayName || profile.username}
+      width={160}
+      height={160}
+      className="rounded-circle object-fit-cover mb-3"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
+function getRequestErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'response' in error
+    && typeof (error as { response?: { data?: { message?: unknown } } }).response?.data?.message === 'string'
+  ) {
+    return (error as { response: { data: { message: string } } }).response.data.message;
+  }
+
+  return fallback;
+}
 
 export default function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user: currentUser, setUser } = useAuthStore();
   const { t } = useTranslation('profile');
   const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [avatarError, setAvatarError] = useState('');
   const isOwner = !!currentUser && currentUser._id === userId;
 
   const profileSchema = z.object({
     displayName: z.string().min(1, t('validation.displayNameRequired')).max(50, t('validation.displayNameMax')),
-    avatar: z.union([z.string().url(t('validation.avatarInvalid')), z.literal('')]),
+    avatar: z.string().optional().default(''),
     bio: z.string().max(500, t('validation.bioMax')),
     school: z.string().max(100, t('validation.schoolMax')),
     club: z.string().max(100, t('validation.clubMax')),
@@ -34,7 +96,7 @@ export default function ProfilePage() {
 
   type ProfileForm = z.infer<typeof profileSchema>;
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileForm>({ resolver: zodResolver(profileSchema) });
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProfileForm>({ resolver: zodResolver(profileSchema) });
 
   useEffect(() => {
     if (!userId) return;
@@ -52,9 +114,57 @@ export default function ProfilePage() {
           club: user.profile.club || '',
         });
       })
-      .catch((err) => setError(err.response?.data?.message || t('messages.loadFailed')))
+      .catch((err: unknown) => setError(getRequestErrorMessage(err, t('messages.loadFailed'))))
       .finally(() => setLoading(false));
   }, [reset, t, userId]);
+
+  const handleAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !profile) return;
+
+    const validation = validateImageFile(file, 5);
+    if (!validation.isValid) {
+      setAvatarError(t('validation.avatarFileInvalid'));
+      return;
+    }
+
+    setAvatarUploading(true);
+    setAvatarError('');
+    setError('');
+    setMessage('');
+
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarPreview(objectUrl);
+
+    try {
+      const result = await uploadAvatar(file);
+      const avatarUrl = result.avatar || result.url || '';
+      if (!avatarUrl) {
+        throw new Error(t('messages.avatarUploadNoUrl'));
+      }
+
+      const updatedUser = {
+        ...profile,
+        profile: {
+          ...profile.profile,
+          avatar: avatarUrl,
+        },
+      };
+
+      setProfile(updatedUser);
+      setValue('avatar', avatarUrl, { shouldDirty: true });
+      if (isOwner) setUser(updatedUser);
+      setAvatarPreview('');
+      setMessage(t('messages.avatarUploadSuccess'));
+    } catch (err: unknown) {
+      setAvatarPreview('');
+      setAvatarError(getRequestErrorMessage(err, t('messages.avatarUploadFailed')));
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+      setAvatarUploading(false);
+    }
+  };
 
   const onSubmit = async (data: ProfileForm) => {
     if (!userId) return;
@@ -74,8 +184,8 @@ export default function ProfilePage() {
       });
       if (isOwner) setUser(updatedUser);
       setMessage(t('messages.updateSuccess'));
-    } catch (err: any) {
-      setError(err.response?.data?.message || t('messages.updateFailed'));
+    } catch (err: unknown) {
+      setError(getRequestErrorMessage(err, t('messages.updateFailed')));
     } finally {
       setSaving(false);
     }
@@ -95,18 +205,7 @@ export default function ProfilePage() {
         <Col lg={4}>
           <Card className="shadow-sm">
             <Card.Body className="text-center">
-              <Image
-                src={profile.profile.avatar || fallbackAvatar}
-                roundedCircle
-                width={160}
-                height={160}
-                className="object-fit-cover mb-3"
-                onError={(event) => {
-                  if (event.currentTarget.src !== fallbackAvatar) {
-                    event.currentTarget.src = fallbackAvatar;
-                  }
-                }}
-              />
+              <ProfileAvatar profile={profile} preview={avatarPreview} />
               <h3>{profile.profile.displayName || profile.username}</h3>
               <p className="landing-subtitle mb-2">@{profile.username}</p>
               <div className="d-flex justify-content-center gap-2 flex-wrap mb-2">
@@ -123,7 +222,7 @@ export default function ProfilePage() {
                 variant="outline-primary"
                 className="mt-3 w-100"
               >
-                Xem lịch sử tranh biện
+                {t('actions.viewHistory')}
               </Button>
             </Card.Body>
           </Card>
@@ -145,7 +244,27 @@ export default function ProfilePage() {
                   </Form.Group>
                   <Form.Group className="mb-3">
                     <Form.Label>{t('fields.avatar')}</Form.Label>
-                    <Form.Control isInvalid={!!errors.avatar} {...register('avatar')} />
+                    <input type="hidden" {...register('avatar')} />
+                    <div className="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline-primary"
+                        disabled={avatarUploading}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <i className="bi bi-upload me-1" />
+                        {avatarUploading ? t('actions.avatarUploading') : t('actions.avatarUpload')}
+                      </Button>
+                      <span className="text-muted small">{t('avatarUpload.hint')}</span>
+                    </div>
+                    <Form.Control
+                      ref={fileInputRef}
+                      className="d-none"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleAvatarFileChange}
+                    />
+                    {avatarError && <div className="text-danger small mt-2">{avatarError}</div>}
                     <Form.Control.Feedback type="invalid">{errors.avatar?.message}</Form.Control.Feedback>
                   </Form.Group>
                   <Form.Group className="mb-3">
