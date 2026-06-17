@@ -11,7 +11,7 @@
 
 | Thuật ngữ | Ý nghĩa |
 |-----------|---------|
-| **Actor** | Guest · User · **Debator** · **Host** · **Judge (BGK)** · **Viewer** · **Room Owner** · System · Admin |
+| **Actor** | Guest · User · **Debator** · **Host** · **Judge (BGK)** · **Viewer** · **Room Owner** · Admin |
 | **Ưu tiên** | **MVP** (bắt buộc 6 tuần) · **P2** (phase 2 — sau MVP) |
 | **Format** | Proposition (Ủng hộ) / Opposition (Phản đối) · Speaker S1–S3 · 1v1 / 3v3 |
 | **Phase trận** | `motion` → `prep_7` → `speech` → `cross_exam` → `judge_feedback` → `prep_1` → … → `closing` → `final_judging` → `completed` |

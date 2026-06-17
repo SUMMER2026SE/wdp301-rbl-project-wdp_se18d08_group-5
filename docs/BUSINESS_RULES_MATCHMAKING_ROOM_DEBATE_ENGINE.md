@@ -30,7 +30,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>User</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -109,7 +109,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Queued User</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>User, AI Host, AI Judge</td>
   </tr>
@@ -192,7 +192,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>User</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -273,7 +273,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Owner</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -354,7 +354,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Owner</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -435,7 +435,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>User</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Owner, System</td>
+    <td>Owner</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -516,7 +516,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Owner, System</td>
+    <td>Owner</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -597,7 +597,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Owner</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Debater, System</td>
+    <td>Debater</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -678,7 +678,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Owner</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Host, Judge, System</td>
+    <td>Host, Judge</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -757,7 +757,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Owner</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Owner, Host, Debater, Judge</td>
   </tr>
@@ -840,7 +840,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Owner or Host</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System, Debaters, Judges</td>
+    <td>Debaters, Judges</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -921,7 +921,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Participant</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1002,7 +1002,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Owner</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Participant, System</td>
+    <td>Participant</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1083,7 +1083,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Guest or User</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1162,7 +1162,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>Host or System</td>
+    <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Debaters, Judges, Viewers</td>
   </tr>
@@ -1245,7 +1245,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Host, System</td>
+    <td>Host</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1326,7 +1326,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>Host</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1405,7 +1405,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>Host or System</td>
+    <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Debaters</td>
   </tr>
@@ -1488,7 +1488,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Host, Judge, System</td>
+    <td>Host, Judge</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1567,7 +1567,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Debaters, Host</td>
   </tr>
@@ -1650,7 +1650,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Host, System</td>
+    <td>Host</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1729,7 +1729,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Judge</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Judge, Debaters</td>
   </tr>
@@ -1812,7 +1812,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Judge</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System, AI Judge, Debaters</td>
+    <td>AI Judge, Debaters</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1893,7 +1893,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System, Host</td>
+    <td>Host</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -1974,7 +1974,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System, Judge</td>
+    <td>Judge</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2055,7 +2055,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Judge</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>AI Judge, System</td>
+    <td>AI Judge</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2136,7 +2136,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Host or Judge</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System, Participants</td>
+    <td>Participants</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2215,7 +2215,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Host or Judge</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Debaters, Judges, Viewers</td>
   </tr>
@@ -2298,7 +2298,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Debater</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System</td>
+    <td>None</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2377,7 +2377,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Host, Debaters, Judges</td>
   </tr>
@@ -2539,7 +2539,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System or Host</td>
+    <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Judge, Debater</td>
   </tr>
@@ -2622,7 +2622,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>System, Participants</td>
+    <td>Participants</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2703,7 +2703,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Participant, System</td>
+    <td>Participant</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2784,7 +2784,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Participant, System</td>
+    <td>Participant</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2865,7 +2865,7 @@
     <td><strong>Primary Actor:</strong></td>
     <td>Host</td>
     <td><strong>Secondary Actors:</strong></td>
-    <td>Participant, System</td>
+    <td>Participant</td>
   </tr>
   <tr>
     <td><strong>Trigger:</strong></td>
@@ -2944,7 +2944,7 @@
   </tr>
   <tr>
     <td><strong>Primary Actor:</strong></td>
-    <td>System</td>
+    <td>Ranking Service</td>
     <td><strong>Secondary Actors:</strong></td>
     <td>Ranking Service, Debaters</td>
   </tr>

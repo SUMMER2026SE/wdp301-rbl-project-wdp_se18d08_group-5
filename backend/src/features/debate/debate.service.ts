@@ -96,6 +96,7 @@ function hasLockedRequiredPositions(room: any) {
   return getRequiredSlots(room.format).every(({ team, slot }) =>
     room.participants.some(
       (participant: any) =>
+        participant.roomRole === 'debater' &&
         participant.team === team &&
         participant.speakerSlot === slot &&
         participant.positionLocked,

@@ -23,7 +23,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | Guest |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | Guest clicks the Register button or accesses the Register page directly. |
 | Description | As a guest, I want to create a new account so that I can log in and use the debate platform. |
 | Preconditions | Guest is not authenticated. |
@@ -57,7 +57,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | Guest / User |
-| Secondary Actors | System |
+| Secondary Actors | Google OAuth Provider |
 | Trigger | User clicks Login or accesses an authenticated feature while not logged in. |
 | Description | As a user, I want to log in to the system so that I can access authenticated features and my personalized account. |
 | Preconditions | User account has been created and is active. |
@@ -93,7 +93,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | User clicks the Logout button. |
 | Description | As a user, I want to log out so that my session is ended safely on the current device. |
 | Preconditions | User is authenticated. |
@@ -124,7 +124,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | Access token expires while user is still using the system. |
 | Description | As a user, I want the system to refresh my access token so that I can continue using authenticated features without logging in again. |
 | Preconditions | User has a valid refresh token/session. |
@@ -156,7 +156,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | User opens the application or refreshes the page. |
 | Description | As a user, I want the system to retrieve my current session so that the application can display my account state correctly. |
 | Preconditions | User sends a valid access token. |
@@ -186,10 +186,10 @@
 | UC ID and Name | **UC-06_JWT & RBAC Authorization** |
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
-| Primary Actor | System |
-| Secondary Actors | User, Admin |
+| Primary Actor | User / Admin |
+| Secondary Actors | None |
 | Trigger | Any protected API endpoint is requested. |
-| Description | As the system, I want to verify JWT and role permissions so that only authorized users can access protected features. |
+| Description | As a user or admin, I want protected APIs to verify JWT and role permissions so that only authorized users can access protected features. |
 | Preconditions | Protected endpoint requires authentication and/or role permission. |
 | Postconditions | Request is either allowed to continue or rejected with proper error response. |
 | Normal Flow | 1. Client sends Authorization header with Bearer token.<br>2. System verifies token signature and expiration.<br>3. System loads user role and status.<br>4. System checks whether user is allowed to access the endpoint.<br>5. System forwards the request to the controller. |
@@ -223,7 +223,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | Guest / User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | Actor opens a user's public profile page. |
 | Description | As a guest or user, I want to view a public profile so that I can see basic information and debate identity of a participant. |
 | Preconditions | Target user exists. |
@@ -254,7 +254,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | User opens profile edit page and submits changes. |
 | Description | As a user, I want to update my profile information so that my public debate identity stays accurate. |
 | Preconditions | User is authenticated and edits their own profile. |
@@ -286,7 +286,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | File Storage Service |
 | Trigger | User submits avatar URL or uploads avatar according to implementation design. |
 | Description | As a user, I want to update my avatar so that my account is recognizable in profile, lobby, and leaderboard. |
 | Preconditions | User is authenticated. |
@@ -317,7 +317,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | Guest / User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | Actor opens stats section on a user's profile. |
 | Description | As a guest or user, I want to view match statistics so that I can understand a debater's performance. |
 | Preconditions | Target user exists. |
@@ -349,7 +349,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | User opens debate history from profile or dashboard. |
 | Description | As a user, I want to view my debate history so that I can review past matches and track progress. |
 | Preconditions | User is authenticated. |
@@ -384,10 +384,10 @@
 | UC ID and Name | **UC-52_Update ELO After Rank Match** |
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
-| Primary Actor | System |
-| Secondary Actors | User |
+| Primary Actor | Ranked Debater |
+| Secondary Actors | Ranking Service |
 | Trigger | A ranked debate match is completed and winner/draw result is finalized. |
-| Description | As the system, I want to update ELO after ranked matches so that ranking reflects user performance. |
+| Description | As a ranked debater, I want ELO to update after ranked matches so that ranking reflects user performance. |
 | Preconditions | Debate session is completed, result is final, and session is a ranked match. |
 | Postconditions | User ELO, rank tier, ELO history, and stats are updated once. |
 | Normal Flow | 1. Debate result is finalized.<br>2. System checks whether the match is ranked.<br>3. System checks whether ELO has already been applied.<br>4. System calculates ELO changes for both sides.<br>5. System updates each participant's ELO and rank tier.<br>6. System records ELO history and marks session as ELO applied.<br>7. Updated ranking data becomes available in profile and leaderboard. |
@@ -419,7 +419,7 @@
 | Created By | Dev 1 |
 | Date Created | 15/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | Guest, System |
+| Secondary Actors | Guest |
 | Trigger | Actor opens Leaderboard page. |
 | Description | As a user, I want to view the global leaderboard so that I can compare rankings based on ELO. |
 | Preconditions | Ranking data exists in the system. |

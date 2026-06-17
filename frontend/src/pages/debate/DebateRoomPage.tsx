@@ -51,6 +51,32 @@ const speakerTurns: SpeakerTurn[] = [
   'PRO_S1', 'OPP_S1', 'PRO_S2', 'OPP_S2', 'PRO_S3', 'OPP_S3',
 ];
 
+type DebateWorkflowStep = {
+  speaker: string;
+  phase: string;
+  label: string;
+  detail: string;
+};
+
+const debateWorkflow: DebateWorkflowStep[] = [
+  { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Host announces the topic' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Pro S1', detail: 'Opening constructive speech' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp S1', detail: 'Opening opposition speech' },
+  { speaker: 'PRO_CE_1', phase: 'cross_exam', label: 'Pro CE 1', detail: 'Proposition questions opposition' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Pro S2', detail: 'Extension and rebuttal' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp S2', detail: 'Extension and rebuttal' },
+  { speaker: 'OPP_CE_1', phase: 'cross_exam', label: 'Opp CE 1', detail: 'Opposition questions proposition' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Pro S3', detail: 'Final speaker summary' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp S3', detail: 'Final speaker summary' },
+  { speaker: 'PRO_CE_2', phase: 'cross_exam', label: 'Pro CE 2', detail: 'Final cross-exam exchange' },
+  { speaker: 'JUDGES', phase: 'judge_feedback', label: 'Judge Feedback', detail: 'Judges review key clashes' },
+  { speaker: 'BOTH_TEAMS', phase: 'prep_1', label: 'Final Prep', detail: 'Teams prepare closing' },
+  { speaker: 'PRO_CLOSE', phase: 'closing', label: 'Pro Closing', detail: 'Proposition closing statement' },
+  { speaker: 'OPP_CLOSE', phase: 'closing', label: 'Opp Closing', detail: 'Opposition closing statement' },
+  { speaker: 'JUDGES', phase: 'final_judging', label: 'Final Judging', detail: 'Judges submit final decision' },
+  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Result is announced' },
+];
+
 export default function DebateRoomPage() {
   const { roomId = '' } = useParams();
   const { t } = useTranslation('common');
@@ -376,6 +402,23 @@ export default function DebateRoomPage() {
   const displayTime = timeRemaining || serverTime;
   const displayTotal = totalTime || serverTotal;
 
+  const currentWorkflowIndex = useMemo(() => {
+    const phase = currentPhase || session?.currentTurn?.phase;
+    const speaker = currentSpeaker || session?.currentTurn?.speaker;
+    if (!phase && !speaker) return -1;
+
+    const exactIndex = debateWorkflow.findIndex(
+      (step) => step.speaker === speaker && step.phase === phase,
+    );
+    if (exactIndex >= 0) return exactIndex;
+
+    const phaseIndex = debateWorkflow.findIndex((step) => step.phase === phase);
+    return phaseIndex >= 0 ? phaseIndex : 0;
+  }, [currentPhase, currentSpeaker, session?.currentTurn?.phase, session?.currentTurn?.speaker]);
+
+  const currentWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex] : null;
+  const nextWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex + 1] : debateWorkflow[0];
+
 
 
   const activeSpeakerParticipant = useMemo(() => {
@@ -653,28 +696,123 @@ export default function DebateRoomPage() {
               </Row>
             </div>
 
-            {/* Row 2: Host & Judge Announcements Box */}
-            <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3" style={{ minHeight: '110px' }}>
-              <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
-                <span className="text-neon-yellow text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.08em', fontFamily: 'Orbitron' }}>
-                  <i className="bi bi-bell-fill me-1"></i> Host & Judge Feed
-                </span>
-                <Badge bg="secondary" className="small" style={{ fontSize: '9px' }}>Announcements</Badge>
-              </div>
-              
-              <div className="flex-grow-1 overflow-y-auto space-y-2 pr-1" style={{ minHeight: 0 }}>
-                {announcements.length === 0 ? (
-                  <p className="text-muted small italic text-center py-3">No system notifications yet.</p>
-                ) : (
-                  announcements.map((ann, idx) => (
-                    <div key={idx} className="p-2 mb-1 bg-secondary bg-opacity-10 border border-secondary border-opacity-25 rounded small text-white" style={{ fontSize: '12px' }}>
-                      <i className="bi bi-info-circle text-neon-yellow me-2"></i>
-                      {ann}
+            {/* Row 2: Debate workflow + Host/Judge announcements */}
+            <Row className="g-3 flex-grow-1 overflow-hidden" style={{ minHeight: '180px' }}>
+              <Col lg={6} className="d-flex overflow-hidden">
+                <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3">
+                  <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
+                    <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.08em', fontFamily: 'Orbitron' }}>
+                      <i className="bi bi-diagram-3-fill me-1"></i> Debate Workflow
+                    </span>
+                    <Badge bg="secondary" className="small" style={{ fontSize: '9px' }}>
+                      {currentWorkflowIndex >= 0 ? `${currentWorkflowIndex + 1}/${debateWorkflow.length}` : 'Pending'}
+                    </Badge>
+                  </div>
+
+                  <div className="d-flex gap-2 mb-2 flex-shrink-0">
+                    <div className="flex-grow-1 rounded-2 border border-info border-opacity-25 bg-info bg-opacity-10 p-2">
+                      <div className="text-neon-cyan text-uppercase fw-bold mb-1" style={{ fontSize: '9px', letterSpacing: '0.08em' }}>Now</div>
+                      <div className="fw-bold text-white" style={{ fontSize: '13px' }}>{currentWorkflowStep?.label || phaseLabel || 'Waiting'}</div>
+                      <div className="text-muted" style={{ fontSize: '11px' }}>{activeSpeakerName}</div>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
+                    <div className="flex-grow-1 rounded-2 border border-warning border-opacity-25 bg-warning bg-opacity-10 p-2">
+                      <div className="text-neon-yellow text-uppercase fw-bold mb-1" style={{ fontSize: '9px', letterSpacing: '0.08em' }}>Next</div>
+                      <div className="fw-bold text-white" style={{ fontSize: '13px' }}>{nextWorkflowStep?.label || 'Result'}</div>
+                      <div className="text-muted" style={{ fontSize: '11px' }}>{nextWorkflowStep?.detail || 'Debate complete'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex-grow-1 overflow-y-auto pe-1" style={{ minHeight: 0 }}>
+                    {debateWorkflow.map((step, idx) => {
+                      const isDone = currentWorkflowIndex > idx;
+                      const isActive = currentWorkflowIndex === idx;
+                      const isNext = currentWorkflowIndex + 1 === idx;
+
+                      return (
+                        <div key={`${step.speaker}-${step.phase}-${idx}`} className="d-flex gap-2 pb-2">
+                          <div className="d-flex flex-column align-items-center flex-shrink-0" style={{ width: '18px' }}>
+                            <div
+                              className="d-flex align-items-center justify-content-center rounded-circle border"
+                              style={{
+                                width: '18px',
+                                height: '18px',
+                                fontSize: '9px',
+                                background: isActive ? '#00f5ff' : isDone ? '#198754' : isNext ? 'rgba(255, 214, 10, 0.2)' : 'rgba(255,255,255,0.04)',
+                                borderColor: isActive ? '#00f5ff' : isDone ? '#198754' : isNext ? '#ffd60a' : 'rgba(255,255,255,0.18)',
+                                color: isActive ? '#050812' : '#ffffff',
+                                boxShadow: isActive ? '0 0 10px rgba(0,245,255,0.55)' : 'none',
+                              }}
+                            >
+                              {isDone ? <i className="bi bi-check" /> : idx + 1}
+                            </div>
+                            {idx < debateWorkflow.length - 1 && (
+                              <div
+                                className="flex-grow-1"
+                                style={{
+                                  width: '1px',
+                                  minHeight: '12px',
+                                  background: isDone ? 'rgba(25,135,84,0.65)' : 'rgba(255,255,255,0.12)',
+                                }}
+                              />
+                            )}
+                          </div>
+                          <div
+                            className="flex-grow-1 rounded-2 border px-2 py-1"
+                            style={{
+                              background: isActive
+                                ? 'rgba(0, 245, 255, 0.12)'
+                                : isNext
+                                  ? 'rgba(255, 214, 10, 0.08)'
+                                  : 'rgba(255,255,255,0.03)',
+                              borderColor: isActive
+                                ? 'rgba(0,245,255,0.4)'
+                                : isNext
+                                  ? 'rgba(255,214,10,0.28)'
+                                  : 'rgba(255,255,255,0.1)',
+                              opacity: isDone ? 0.68 : 1,
+                            }}
+                          >
+                            <div className="d-flex align-items-center justify-content-between gap-2">
+                              <span className={isActive ? 'text-neon-cyan fw-bold' : 'text-white fw-semibold'} style={{ fontSize: '12px' }}>
+                                {step.label}
+                              </span>
+                              <Badge bg={isActive ? 'info' : isNext ? 'warning' : isDone ? 'success' : 'secondary'} text={isNext ? 'dark' : undefined} style={{ fontSize: '8px' }}>
+                                {isActive ? 'Current' : isNext ? 'Next' : isDone ? 'Done' : step.phase}
+                              </Badge>
+                            </div>
+                            <div className="text-muted" style={{ fontSize: '10px' }}>{step.detail}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Col>
+
+              <Col lg={6} className="d-flex overflow-hidden">
+                <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3">
+                  <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
+                    <span className="text-neon-yellow text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.08em', fontFamily: 'Orbitron' }}>
+                      <i className="bi bi-bell-fill me-1"></i> Host & Judge Feed
+                    </span>
+                    <Badge bg="secondary" className="small" style={{ fontSize: '9px' }}>Announcements</Badge>
+                  </div>
+
+                  <div className="flex-grow-1 overflow-y-auto space-y-2 pr-1" style={{ minHeight: 0 }}>
+                    {announcements.length === 0 ? (
+                      <p className="text-muted small italic text-center py-3">No system notifications yet.</p>
+                    ) : (
+                      announcements.map((ann, idx) => (
+                        <div key={idx} className="p-2 mb-1 bg-secondary bg-opacity-10 border border-secondary border-opacity-25 rounded small text-white" style={{ fontSize: '12px' }}>
+                          <i className="bi bi-info-circle text-neon-yellow me-2"></i>
+                          {ann}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </Col>
+            </Row>
 
             {/* Row 3: Inside Match Chat Box */}
             <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3" style={{ minHeight: '180px' }}>
