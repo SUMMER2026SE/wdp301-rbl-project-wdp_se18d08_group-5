@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
@@ -11,6 +12,21 @@ import { applyDebateResult } from '../ranking/ranking.service.js';
 import { startDebate } from '../debate/debate.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
+import {
+  assignRoleSchema,
+  createRoomSchema,
+  crossExamPassSchema,
+  hostNextTurnSchema,
+  issueCardSchema,
+  joinRoomSchema,
+  judgeScoreSchema,
+  muteParticipantSchema,
+  participantActionSchema,
+  selectPositionSchema,
+  updateMotionSchema,
+  updateRoomSchema,
+  viewerChatSchema,
+} from './room.schema.js';
 
 const router = Router();
 
@@ -382,6 +398,7 @@ async function judgeTurnWithAI(
 router.post(
   '/create',
   authenticate,
+  validate(createRoomSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { title, format, hostType, judgeType, judgeCount, isPrivate, password, motion } = req.body;
     const userId = req.user!.userId;
@@ -462,6 +479,7 @@ router.get(
 router.put(
   '/:id',
   authenticate,
+  validate(updateRoomSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = await DebateRoom.findById(req.params.id).select('+password');
     if (!room) throw new NotFoundError('Room not found');
@@ -525,6 +543,7 @@ router.delete(
 router.post(
   '/:id/assign-role',
   authenticate,
+  validate(assignRoleSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, role, team, speakerSlot } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -611,10 +630,11 @@ router.post(
 router.post(
   '/:id/join',
   authenticate,
+  validate(joinRoomSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = await DebateRoom.findById(req.params.id).select('+password');
     if (!room) throw new NotFoundError('Room not found');
-    if (room.status !== 'waiting' && room.status !== 'ready') {
+    if (!['waiting', 'ready', 'active', 'paused'].includes(room.status)) {
       throw new BadRequestError('Room is not accepting participants');
     }
 
@@ -646,7 +666,7 @@ router.post(
     });
 
     await room.save();
-    sendSuccess(res, room, 'Joined room');
+    sendSuccess(res, room, ['active', 'paused'].includes(room.status) ? 'Joined as viewer' : 'Joined room');
   }),
 );
 
@@ -654,6 +674,7 @@ router.post(
 router.post(
   '/:id/position',
   authenticate,
+  validate(selectPositionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { team, speakerSlot } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -732,6 +753,7 @@ router.post(
 router.post(
   '/:id/host/motion',
   authenticate,
+  validate(updateMotionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = await DebateRoom.findById(req.params.id);
     if (!room) throw new NotFoundError('Room not found');
@@ -778,6 +800,7 @@ router.post(
 router.post(
   '/:id/kick',
   authenticate,
+  validate(participantActionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = await DebateRoom.findById(req.params.id);
     if (!room) throw new NotFoundError('Room not found');
@@ -843,6 +866,7 @@ router.post(
 router.post(
   '/:id/host/next-turn',
   authenticate,
+  validate(hostNextTurnSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker, phase, timeLimit, transcript } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -890,6 +914,7 @@ router.post(
 router.post(
   '/:id/host/issue-card',
   authenticate,
+  validate(issueCardSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, reason } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -919,6 +944,7 @@ router.post(
 router.post(
   '/:id/host/kick',
   authenticate,
+  validate(participantActionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -941,6 +967,7 @@ router.post(
 router.post(
   '/:id/host/mute',
   authenticate,
+  validate(muteParticipantSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, action, type } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -969,6 +996,7 @@ router.post(
 router.post(
   '/:id/host/viewer-chat',
   authenticate,
+  validate(viewerChatSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { enabled } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -1004,6 +1032,7 @@ router.post(
 router.post(
   '/:id/host/transfer',
   authenticate,
+  validate(participantActionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -1073,6 +1102,7 @@ router.post(
 router.post(
   '/:id/judge/submit-score',
   authenticate,
+  validate(judgeScoreSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { speaker, winner, notes } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -1290,6 +1320,7 @@ router.post(
 router.post(
   '/:id/cross-exam/pass-turn',
   authenticate,
+  validate(crossExamPassSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker, transcript } = req.body;
     const room = await DebateRoom.findById(req.params.id);
@@ -1366,6 +1397,31 @@ router.get(
 
     const room = await DebateRoom.findById(req.params.id).select('title motion format participants');
     sendSuccess(res, { room, session });
+  }),
+);
+
+// GET /api/v1/rooms/:id/result — Get final result without applying ranking changes
+router.get(
+  '/:id/result',
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id).select('-password');
+    if (!room) throw new NotFoundError('Room not found');
+
+    const session = await DebateSession.findOne({ roomId: req.params.id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const finalScores = aggregateFinalScores(session);
+    await session.save();
+
+    sendSuccess(res, {
+      room,
+      session,
+      finalScores,
+      winnerTeam: finalScores.winnerTeam || finalScores.winner,
+      propositionTotal: finalScores.teamProposition.total,
+      oppositionTotal: finalScores.teamOpposition.total,
+      eloApplied: room.eloApplied,
+    });
   }),
 );
 

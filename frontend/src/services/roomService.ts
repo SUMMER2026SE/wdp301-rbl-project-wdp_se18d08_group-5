@@ -129,4 +129,8 @@ export const roomService = {
   applyRankResult(roomId: string) {
     return api.post<ApiResponse<RankingApplicationResult>>(`/rooms/${roomId}/result`);
   },
+
+  getResult(roomId: string) {
+    return api.get<ApiResponse<WinnerResult>>(`/rooms/${roomId}/result`);
+  },
 };

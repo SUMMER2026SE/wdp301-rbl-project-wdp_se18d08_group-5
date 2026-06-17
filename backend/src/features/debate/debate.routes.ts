@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticate } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
@@ -16,6 +17,17 @@ import {
   surrenderDebate,
 } from './debate.service.js';
 import type { AuthRequest } from '../../types/index.js';
+import {
+  cePassTurnSchema,
+  endDebateSchema,
+  hostNextTurnSchema,
+  issueCardSchema,
+  judgeSubmitScoreSchema,
+  legacyCrossExamPassSchema,
+  muteParticipantSchema,
+  participantActionSchema,
+  transcriptBodySchema,
+} from './debate.schema.js';
 
 const router = Router();
 
@@ -23,6 +35,7 @@ const router = Router();
 router.post(
   '/:roomId/next-turn',
   authenticate,
+  validate(transcriptBodySchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await advanceTurn(req.params.roomId, req.user!.userId, req.body.transcript || '');
     sendSuccess(res, result, 'Turn advanced');
@@ -33,6 +46,7 @@ router.post(
 router.post(
   '/:roomId/finish-phase',
   authenticate,
+  validate(transcriptBodySchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await finishPhase(req.params.roomId, req.user!.userId, req.body.transcript || '');
     sendSuccess(res, result, 'Phase finished');
@@ -43,6 +57,7 @@ router.post(
 router.post(
   '/:roomId/ce/pass-turn',
   authenticate,
+  validate(cePassTurnSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await passCeTurn(req.params.roomId, req.user!.userId, req.body.content || '');
     sendSuccess(res, result, 'Cross-exam turn passed');
@@ -53,6 +68,7 @@ router.post(
 router.post(
   '/:roomId/ce/finish',
   authenticate,
+  validate(transcriptBodySchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await finishCe(req.params.roomId, req.user!.userId, req.body.transcript || '');
     sendSuccess(res, result, 'Cross-exam finished');
@@ -63,6 +79,7 @@ router.post(
 router.post(
   '/:roomId/end',
   authenticate,
+  validate(endDebateSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await endDebate(req.params.roomId, req.user!.userId, req.body.summary || '');
     sendSuccess(res, result, 'Debate completed');
@@ -131,6 +148,7 @@ router.post(
 router.post(
   '/:roomId/host/issue-card',
   authenticate,
+  validate(issueCardSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, reason } = req.body;
     const room = await DebateRoom.findById(req.params.roomId);
@@ -160,6 +178,7 @@ router.post(
 router.post(
   '/:roomId/host/kick',
   authenticate,
+  validate(participantActionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
     const room = await DebateRoom.findById(req.params.roomId);
@@ -182,6 +201,7 @@ router.post(
 router.post(
   '/:roomId/host/next-turn',
   authenticate,
+  validate(hostNextTurnSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker, phase, timeLimit } = req.body;
     const room = await DebateRoom.findById(req.params.roomId);
@@ -225,6 +245,7 @@ router.post(
 router.post(
   '/:roomId/host/mute',
   authenticate,
+  validate(muteParticipantSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, action } = req.body;
     const room = await DebateRoom.findById(req.params.roomId);
@@ -248,6 +269,7 @@ router.post(
 router.post(
   '/:roomId/judge/submit-score',
   authenticate,
+  validate(judgeSubmitScoreSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { speaker, score, notes } = req.body;
     const room = await DebateRoom.findById(req.params.roomId).select('participants');
@@ -319,6 +341,7 @@ router.get(
 router.post(
   '/:roomId/cross-exam/pass-turn',
   authenticate,
+  validate(legacyCrossExamPassSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker } = req.body;
     const session = await DebateSession.findOne({ roomId: req.params.roomId });

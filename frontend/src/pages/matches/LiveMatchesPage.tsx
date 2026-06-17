@@ -27,8 +27,9 @@ export default function LiveMatchesPage() {
   const joinMutation = useMutation({
     mutationFn: () => roomService.join(selectedRoom!._id, password),
     onSuccess: () => {
-      toast.success('Joined room');
-      navigate(`/rooms/${selectedRoom!._id}/lobby`);
+      const room = selectedRoom!;
+      toast.success(room.status === 'active' || room.status === 'paused' ? 'Joined as viewer' : 'Joined room');
+      navigate(room.status === 'active' || room.status === 'paused' ? `/debate/${room._id}` : `/rooms/${room._id}/lobby`);
     },
     onError: () => toast.error('Could not join room'),
   });
@@ -104,8 +105,8 @@ export default function LiveMatchesPage() {
                   </div>
                   <div className="d-flex justify-content-between align-items-center">
                     <span className="text-muted small">{room.participants.length} participants</span>
-                    {room.status === 'active' ? (
-                      <Button size="sm" variant="outline-primary" onClick={() => navigate(`/debate/${room._id}`)}>
+                    {room.status === 'active' || room.status === 'paused' ? (
+                      <Button size="sm" variant="outline-primary" onClick={() => openJoin(room)}>
                         Watch
                       </Button>
                     ) : (
@@ -132,11 +133,18 @@ export default function LiveMatchesPage() {
               <Form.Control value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
             </Form.Group>
           )}
-          {!selectedRoom?.isPrivate && <p className="mb-0">Join {selectedRoom?.title || 'this room'}?</p>}
+          {!selectedRoom?.isPrivate && (
+            <p className="mb-0">
+              {selectedRoom?.status === 'active' || selectedRoom?.status === 'paused' ? 'Watch' : 'Join'}{' '}
+              {selectedRoom?.title || 'this room'}?
+            </p>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setSelectedRoom(null)}>Cancel</Button>
-          <Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>Join</Button>
+          <Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>
+            {selectedRoom?.status === 'active' || selectedRoom?.status === 'paused' ? 'Watch' : 'Join'}
+          </Button>
         </Modal.Footer>
       </Modal>
     </Container>

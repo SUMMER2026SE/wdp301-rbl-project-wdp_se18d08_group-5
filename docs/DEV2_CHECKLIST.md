@@ -11,7 +11,7 @@ This is the current source-of-truth summary for what has been implemented in thi
 - Lobby roles: owner assigns `debater`, `host`, `judge`, or `viewer`; owner can place debaters into team/speaker slots.
 - Debater flow: only assigned debaters can choose their own team and speaker slot.
 - Lock/start: lock applies to debaters only; start validates filled/locked debater slots and requires assigned human host for human-host rooms.
-- Debate engine: current session, next turn, finish phase, CE pass, CE finish, end debate, replay/result payloads, final scores, and rank updates when eligible.
+- Debate engine: current session, next turn, finish phase, CE pass, CE finish, end debate, replay/result payloads, final scores, and rank-apply endpoint when eligible (not auto-triggered on debate end).
 - Permissions: assigned host controls only for `hostId`; judge scoring only for assigned judges, enforced by backend.
 - Player actions: debaters can `surrender` to forfeit or `request draw`; draw completes when both teams request it.
 
@@ -31,6 +31,28 @@ This is the current source-of-truth summary for what has been implemented in thi
 - `frontend npm run build` passes.
 
 Older progress tables below are historical checklist material and may not reflect the latest completed implementation as accurately as this section.
+
+---
+
+## Implementation Update - Dev 2, June 17 2026
+
+Added Dev 2 backend validation and guard polish:
+
+- Added `backend/src/features/room/room.schema.ts` with Zod schemas for room create/update, assign role, join, position selection, host controls, viewer chat control, judge scoring, and cross-exam REST payloads.
+- Added `backend/src/features/debate/debate.schema.ts` with Zod schemas for debate next-turn, finish-phase, CE, end, host action, mute, and judge scoring payloads.
+- Wired `validate(...)` middleware into the main room/debate REST routes so invalid request bodies fail before route business logic.
+- Added reusable `roomParticipantGuard` and `roleGuard` middleware for future route-level room participation and role checks.
+- Added active/paused room viewer spectate join through `POST /api/v1/rooms/:id/join`.
+- Added `GET /api/v1/rooms/:id/result` for reading final result payloads without applying rank changes.
+
+Verification:
+
+- `npm run build` passes on June 17 2026.
+- There is no dedicated Jest/Cypress/Postman automated test script configured in the current package files; verification is currently build smoke testing.
+
+Scope note:
+
+- Socket.IO realtime behavior remains Dev 3 scope and was not changed in this update.
 
 ---
 
