@@ -315,6 +315,7 @@ export default function DebateRoomPage() {
   const currentParticipant = room?.participants.find((p) => p.userId === user?._id);
   const canUseDebaterActions =
     currentParticipant?.roomRole === 'debater' && ['active', 'paused'].includes(room?.status || '');
+  const canUseVoiceMic = Boolean(isController || canUseDebaterActions);
   const isJudge = currentParticipant?.roomRole === 'judge';
   const isViewer = currentParticipant?.roomRole === 'viewer';
   const debaters: RoomParticipant[] = room?.participants.filter((p) => p.roomRole === 'debater') || [];
@@ -613,21 +614,19 @@ export default function DebateRoomPage() {
                     </div>
                     
                     <div className="d-flex align-items-center gap-3">
-                      {(isController || isMyTurnToSpeak || currentParticipant?.roomRole === 'debater') && (
-                        <div className="d-flex align-items-center gap-1">
-                          {isMyTurnToSpeak && (
-                            <Button
-                              size="sm"
-                              variant={isListening ? 'danger' : 'success'}
-                              onClick={isListening ? stopMic : startMic}
-                              style={{ fontSize: '9px', padding: '0.2rem 0.4rem' }}
-                            >
-                              {isListening ? 'Mute' : 'Speak'}
-                            </Button>
-                          )}
-                          <MicToggle roomId={roomId} />
-                        </div>
-                      )}
+                      <div className="d-flex align-items-center gap-1">
+                        {isMyTurnToSpeak && (
+                          <Button
+                            size="sm"
+                            variant={isListening ? 'danger' : 'success'}
+                            onClick={isListening ? stopMic : startMic}
+                            style={{ fontSize: '9px', padding: '0.2rem 0.4rem' }}
+                          >
+                            {isListening ? 'Mute' : 'Speak'}
+                          </Button>
+                        )}
+                        <MicToggle roomId={roomId} disabled={!canUseVoiceMic} />
+                      </div>
                       <div className="text-white text-end font-weight-bold" style={{ fontFamily: 'Orbitron, monospace', fontSize: '1.8rem', letterSpacing: '-0.02em', lineHeight: 1 }}>
                         <CountdownTimer
                           timeRemaining={displayTime}
