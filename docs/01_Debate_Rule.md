@@ -109,12 +109,11 @@ Mỗi lượt chỉ bắt đầu tính giờ khi:
 
 | Loại | Quy định |
 |------|----------|
-| **Speech** | 4 phút / speaker |
-| **Cross Examination** | Sau mỗi lượt S1 & S2: 3 phút / đội, tối đa **2 câu hỏi** / đội |
-| **Judge feedback** | Sau mỗi lượt speaker: BGK nhận xét **3–5 phút** |
-| **Prep giữa lượt** | Sau BGK: hai đội **1 phút** chuẩn bị |
+| **Speech** | **3 phút** / speaker (mỗi lượt S1, S2, S3) |
+| **Cross Examination** | Sau lượt S1 & S2: **2 phút** / đội, tối đa **2 câu hỏi** / đội |
+| **Prep giữa Round** | Sau khi kết thúc mỗi Round và Closing Round: hai đội **1 phút** chuẩn bị |
 
-Nếu còn dư thời gian, Host có thể: tương tác khán giả · tổng hợp diễn biến · tạo không khí tranh biện.
+**Lưu ý:** trong luồng chuẩn hiện tại, **không có BGK nhận xét giữa các lượt speaker** — BGK chỉ chấm và nhận xét **cuối trận** ở bước Final Judging. Host có thể phản hồi nhanh giữa các lượt nếu cần nhưng không tính thời gian chính thức.
 
 ---
 
@@ -122,15 +121,19 @@ Nếu còn dư thời gian, Host có thể: tương tác khán giả · tổng h
 
 ### 7.1 Proposition Speaker 1
 
+**Thời lượng:** 3 phút.
+
 **Nhiệm vụ:** bối cảnh · định nghĩa · giới hạn phạm vi · lập trường đội Ủng hộ · lập luận chính đầu tiên.
 
-→ Sau phần trình bày: **Cross Examination Phase**.
+→ Sau phần trình bày: **Cross Examination Phase (2 phút / đội)**.
 
 ### 7.2 Opposition Speaker 1
 
+**Thời lượng:** 3 phút.
+
 **Nhiệm vụ:** phản biện định nghĩa/phạm vi (nếu cần) · lập trường đội Phản đối · phản biện đội Ủng hộ · lập luận chính đầu tiên.
 
-→ Sau phần trình bày: **Cross Examination Phase**.
+→ Sau phần trình bày: **Cross Examination Phase (2 phút / đội)**.
 
 ---
 
@@ -138,15 +141,19 @@ Nếu còn dư thời gian, Host có thể: tương tác khán giả · tổng h
 
 ### 8.1 Proposition Speaker 2
 
+**Thời lượng:** 3 phút.
+
 Phản biện đối phương · bảo vệ luận điểm đội mình · bổ sung luận điểm mới · mở rộng phân tích và ví dụ.
 
-→ **Cross Examination Phase**.
+→ **Cross Examination Phase (2 phút / đội)**.
 
 ### 8.2 Opposition Speaker 2
 
+**Thời lượng:** 3 phút.
+
 Phản biện sâu đội Ủng hộ · bảo vệ luận điểm đội mình · bổ sung luận điểm mới · mở rộng phân tích và ví dụ.
 
-→ **Cross Examination Phase**.
+→ **Cross Examination Phase (2 phút / đội)**.
 
 ---
 
@@ -154,12 +161,16 @@ Phản biện sâu đội Ủng hộ · bảo vệ luận điểm đội mình �
 
 ### 9.1 Proposition Speaker 3
 
+**Thời lượng:** 3 phút.
+
 - **Không** được đưa luận điểm mới
 - Tổng hợp mâu thuẫn chính · so sánh hai bên · chỉ điểm yếu đối phương · chứng minh đội Ủng hộ vượt trội
 
 **Không có chất vấn** ở vòng tổng kết.
 
 ### 9.2 Opposition Speaker 3
+
+**Thời lượng:** 3 phút.
 
 Tương tự 9.1 cho đội Phản đối. **Không có chất vấn.**
 
@@ -172,7 +183,7 @@ Tương tự 9.1 cho đội Phản đối. **Không có chất vấn.**
 ### 10.1 Giới hạn
 
 - Tối đa **2 câu hỏi** / đội
-- **3 phút** thời gian riêng / đội
+- **2 phút** thời gian riêng / đội
 - Thời gian chỉ trừ khi đội đó **đang hỏi** hoặc **đang trả lời**
 
 ### 10.2 Luồng chuẩn
@@ -223,9 +234,13 @@ Nếu hết giờ mà thiếu hỏi hoặc thiếu trả lời:
 
 ## 12. Vai trò BGK (AI Judge / Human Judge)
 
-**Sau mỗi lượt speaker:** nhận xét lập luận · phản biện · chất vấn · khả năng phản hồi · chấm điểm tạm.
+**Trong luồng chuẩn hiện tại:** BGK **không** nhận xét giữa các lượt speaker. BGK chỉ hoạt động ở giai đoạn **Final Judging** (sau Closing Round):
 
-**Sau trận:** kết quả cuối · công bố đội thắng · giải thích lý do.
+- Đánh giá & chấm điểm tổng hợp toàn trận
+- Công bố đội thắng
+- Giải thích lý do
+
+**Trước trận (Motion Announcement):** Host và BGK có thể mở đầu, khuấy động, nhận định mở đầu.
 
 ---
 
@@ -249,30 +264,57 @@ Nếu hết giờ mà thiếu hỏi hoặc thiếu trả lời:
 
 ---
 
-## 15. Luồng thời gian tổng thể (25 bước)
+## 15. Luồng thời gian tổng thể (Debate Lifecycle)
 
-1. Motion được công bố  
-2. Host và BGK mở đầu  
-3. Hai đội chuẩn bị **7 phút**  
-4. Proposition Speaker 1 trình bày  
-5. Cross Examination  
-6. BGK nhận xét (3–5 phút)  
-7. Hai đội prep **1 phút**  
-8. Opposition Speaker 1 trình bày  
-9. Cross Examination  
-10. BGK nhận xét  
-11. Prep 1 phút  
-12. Proposition Speaker 2  
-13. Cross Examination  
-14. BGK nhận xét  
-15. Prep 1 phút  
-16. Opposition Speaker 2  
-17. Cross Examination  
-18. BGK nhận xét  
-19. Prep 1 phút  
-20. Proposition Speaker 3 tổng kết  
-21. BGK nhận xét  
-22. Prep 1 phút  
-23. Opposition Speaker 3 tổng kết  
-24. BGK đánh giá cuối  
-25. Công bố kết quả  
+```
+Motion Announcement
+        ↓
+Preparation Phase (7 min)
+        ↓
+Round 1
+   - Proposition S1 (3m)
+   - Opposition S1 (3m)
+        ↓
+   - Cross Examination (2m / đội)
+   - Prep giữa Round (1m)
+        ↓
+Round 2
+   - Proposition S2 (3m)
+   - Opposition S2 (3m)
+        ↓
+   - Cross Examination (2m / đội)
+   - Prep giữa Round (1m)
+        ↓
+Closing Round
+   - Proposition S3 (3m)
+   - Opposition S3 (3m)
+        ↓
+Final Judging
+        ↓
+Result Announcement
+```
+
+**Tóm tắt theo 25 bước vận hành (cho engineering):**
+
+1. Motion được công bố
+2. Host và BGK mở đầu
+3. Hai đội chuẩn bị **7 phút**
+4. Proposition Speaker 1 trình bày (3 phút)
+5. Cross Examination sau S1 (2 phút / đội)
+6. Hai đội prep **1 phút**
+7. Opposition Speaker 1 trình bày (3 phút)
+8. Cross Examination sau S1 (2 phút / đội)
+9. Hai đội prep **1 phút**
+10. Proposition Speaker 2 trình bày (3 phút)
+11. Cross Examination sau S2 (2 phút / đội)
+12. Hai đội prep **1 phút**
+13. Opposition Speaker 2 trình bày (3 phút)
+14. Cross Examination sau S2 (2 phút / đội)
+15. Hai đội prep **1 phút**
+16. Proposition Speaker 3 tổng kết (3 phút) — không chất vấn
+17. Hai đội prep **1 phút**
+18. Opposition Speaker 3 tổng kết (3 phút) — không chất vấn
+19. Final Judging — BGK chấm điểm & nhận xét cuối trận
+20. Công bố kết quả
+
+> Lưu ý: BGK **không** nhận xét giữa các lượt speaker trong luồng chuẩn. Mọi phản hồi của BGK trong quá trình diễn ra trận (nếu có) do Host điều phối và không tính vào thời gian chính thức.  

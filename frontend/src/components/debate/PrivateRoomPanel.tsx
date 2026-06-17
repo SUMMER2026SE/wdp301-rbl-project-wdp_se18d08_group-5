@@ -107,11 +107,11 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
       ) : (
         <>
           <div
-            className="flex-grow-1 overflow-auto px-2 py-2 bg-body-tertiary rounded-3 mb-2"
-            style={{ maxHeight: 260 }}
+            className="flex-grow-1 overflow-auto px-2 py-2 rounded-3 mb-2"
+            style={{ maxHeight: 260, background: '#ffffff', color: '#1c1c1c' }}
           >
             {messages.length === 0 ? (
-              <div className="text-muted small text-center py-3">
+              <div className="small text-center py-3" style={{ color: '#888888' }}>
                 No messages in this private room.
               </div>
             ) : (
@@ -120,20 +120,20 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
                 const isSystem = msg.senderId === 'system';
                 if (isSystem) {
                   return (
-                    <div key={msg._id} className="text-muted small fst-italic text-center py-1">
+                    <div key={msg._id} className="small fst-italic text-center py-1" style={{ color: '#666666' }}>
                       {msg.content}
                     </div>
                   );
                 }
                 return (
-                  <div key={msg._id} className={`my-1 px-2 py-1 rounded-2 ${isOwn ? 'bg-primary bg-opacity-10' : ''}`}>
+                  <div key={msg._id} className={`my-1 px-2 py-1 rounded-2`} style={{ background: isOwn ? 'rgba(13, 110, 253, 0.08)' : 'rgba(0, 0, 0, 0.03)' }}>
                     <div className="d-flex align-items-baseline gap-2">
-                      <strong className="small">{msg.senderName}</strong>
+                      <strong className="small" style={{ color: isOwn ? '#0d6efd' : '#333333' }}>{msg.senderName}</strong>
                       <span className="text-muted" style={{ fontSize: '0.65rem' }}>
                         {formatTime(msg.timestamp)}
                       </span>
                     </div>
-                    <div className="small">{msg.content}</div>
+                    <div className="small" style={{ color: '#1c1c1c' }}>{msg.content}</div>
                   </div>
                 );
               })
@@ -145,6 +145,7 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
               placeholder="Private message..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              style={{ background: '#ffffff', color: '#1c1c1c', border: '1px solid #ced4da' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();

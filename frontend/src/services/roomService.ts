@@ -129,4 +129,24 @@ export const roomService = {
   applyRankResult(roomId: string) {
     return api.post<ApiResponse<RankingApplicationResult>>(`/rooms/${roomId}/result`);
   },
+
+  startPhase(roomId: string) {
+    return api.post(`/rooms/${roomId}/host/start-phase`);
+  },
+
+  grantSpeaking(roomId: string, userId: string) {
+    return api.post(`/rooms/${roomId}/host/grant-speaking`, { userId });
+  },
+
+  revokeSpeaking(roomId: string, userId: string) {
+    return api.post(`/rooms/${roomId}/host/revoke-speaking`, { userId });
+  },
+
+  muteParticipant(roomId: string, userId: string, action: 'mute' | 'unmute') {
+    return api.post(`/rooms/${roomId}/host/mute`, { userId, action });
+  },
+
+  muteChat(roomId: string, userId: string, action: 'mute' | 'unmute') {
+    return api.post(`/rooms/${roomId}/host/mute-chat`, { userId, action });
+  },
 };

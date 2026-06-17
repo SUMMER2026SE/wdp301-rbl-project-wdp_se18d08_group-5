@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Alert,
   Badge,
   Button,
+  Card,
   Col,
   Container,
   Form,
@@ -27,6 +28,7 @@ import { CrossExamPanel } from '@components/debate/CrossExamPanel';
 import { MicToggle } from '@components/debate/MicToggle';
 import { PrivateRoomPanel } from '@components/debate/PrivateRoomPanel';
 import { MainRoomChat } from '@components/chat/MainRoomChat';
+import { ViewerChat } from '@components/chat/ViewerChat';
 import { ReconnectOverlay } from '@components/common/ReconnectOverlay';
 import { PauseOverlay } from '@components/debate/PauseOverlay';
 import type {
@@ -87,7 +89,9 @@ export default function DebateRoomPage() {
   const user = useAuthStore((s) => s.user);
 
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [cardReason, setCardReason] = useState('');
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [joinPassword, setJoinPassword] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
   const [scoreSpeaker, setScoreSpeaker] = useState<SpeakerTurn>('PRO_S1');
   const [scoreWinner, setScoreWinner] = useState<Team | 'draw'>('proposition');
   const [notes, setNotes] = useState('');
@@ -95,6 +99,20 @@ export default function DebateRoomPage() {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const lastNotifiedDrawRequestRef = useRef<string | null>(null);
+
+  const [activeReactions, setActiveReactions] = useState<Array<{ id: number; username: string; type: 'agree' | 'disagree' }>>([]);
+  useEffect(() => {
+    const handleReaction = (e: Event) => {
+      const data = (e as CustomEvent).detail;
+      const reactionId = Date.now() + Math.random();
+      setActiveReactions((prev) => [...prev, { id: reactionId, username: data.username, type: data.type }]);
+      setTimeout(() => {
+        setActiveReactions((prev) => prev.filter((r) => r.id !== reactionId));
+      }, 3000);
+    };
+    window.addEventListener('judge:reaction-received', handleReaction);
+    return () => window.removeEventListener('judge:reaction-received', handleReaction);
+  }, []);
 
   // Snapshot the time remaining at the moment the host pauses the debate.
   // We capture it locally so the pause overlay shows a frozen clock that
@@ -185,6 +203,12 @@ export default function DebateRoomPage() {
   const totalTime = useDebateStore((s) => s.totalTime);
   const isPaused = useDebateStore((s) => s.isPaused);
   const messages = useDebateStore((s) => s.messages);
+  const isTransitioning = useDebateStore((s) => s.isTransitioning);
+  const transitionTime = useDebateStore((s) => s.transitionTime);
+  const turnStatus = useDebateStore((s) => s.turnStatus);
+  const speakingAllowed = useDebateStore((s) => s.speakingAllowed);
+  const prepConsensusReadyUserIds = useDebateStore((s) => s.prepConsensusReadyUserIds);
+  const prepConsensusTotalDebaters = useDebateStore((s) => s.prepConsensusTotalDebaters);
 
   // Local loading state (not used — socketReady is derived from store above)
   // Kept for backwards compatibility; intentionally unused now.
@@ -226,23 +250,51 @@ export default function DebateRoomPage() {
     onError: () => toast.error('Action failed'),
   });
 
-  const cardMutation = useMutation({
-    mutationFn: () => debateService.issueCard(roomId, selectedUserId, cardReason),
+  const startPhaseMutation = useMutation({
+    mutationFn: () => roomService.startPhase(roomId),
     onSuccess: () => {
-      toast.success('Yellow card issued');
-      setCardReason('');
+      toast.success('Phase started');
       invalidate();
     },
-    onError: () => toast.error('Could not issue card'),
+    onError: () => toast.error('Could not start phase'),
   });
 
-  const kickMutation = useMutation({
-    mutationFn: () => debateService.kick(roomId, selectedUserId),
+  const grantSpeakingMutation = useMutation({
+    mutationFn: (userId: string) => roomService.grantSpeaking(roomId, userId),
     onSuccess: () => {
-      toast.success('Participant kicked');
+      toast.success('Granted speaking permission');
       invalidate();
     },
-    onError: () => toast.error('Could not kick participant'),
+    onError: () => toast.error('Failed to grant permission'),
+  });
+
+  const revokeSpeakingMutation = useMutation({
+    mutationFn: (userId: string) => roomService.revokeSpeaking(roomId, userId),
+    onSuccess: () => {
+      toast.success('Revoked speaking permission');
+      invalidate();
+    },
+    onError: () => toast.error('Failed to revoke permission'),
+  });
+
+  const toggleMicMutation = useMutation({
+    mutationFn: ({ userId, action }: { userId: string; action: 'mute' | 'unmute' }) =>
+      roomService.muteParticipant(roomId, userId, action),
+    onSuccess: (_, variables) => {
+      toast.success(variables.action === 'mute' ? 'Microphone muted' : 'Microphone unmuted');
+      invalidate();
+    },
+    onError: () => toast.error('Failed to change microphone state'),
+  });
+
+  const toggleChatMutation = useMutation({
+    mutationFn: ({ userId, action }: { userId: string; action: 'mute' | 'unmute' }) =>
+      roomService.muteChat(roomId, userId, action),
+    onSuccess: (_, variables) => {
+      toast.success(variables.action === 'mute' ? 'Chat banned' : 'Chat allowed');
+      invalidate();
+    },
+    onError: () => toast.error('Failed to change chat state'),
   });
 
   const scoreMutation = useMutation({
@@ -310,6 +362,51 @@ export default function DebateRoomPage() {
   const room = roomQuery.data;
   const session = sessionQuery.data;
 
+  const isParticipant = useMemo(() => {
+    return Boolean(room?.participants.some((p) => p.userId === user?._id));
+  }, [room?.participants, user?._id]);
+
+  useEffect(() => {
+    if (!room || !user || isParticipant || isJoining) return;
+
+    if (room.isPrivate) {
+      setShowPasswordPrompt(true);
+    } else {
+      setIsJoining(true);
+      const loadId = toast.loading('Joining debate as spectator...');
+      roomService.join(room._id)
+        .then(() => {
+          toast.success('Joined as spectator', { id: loadId });
+          invalidate();
+        })
+        .catch(() => {
+          toast.error('Could not join debate room', { id: loadId });
+        })
+        .finally(() => {
+          setIsJoining(false);
+        });
+    }
+  }, [room, user, isParticipant, isJoining, roomId]);
+
+  const handlePrivateJoin = (e: FormEvent) => {
+    e.preventDefault();
+    if (!roomId) return;
+    setIsJoining(true);
+    const loadId = toast.loading('Verifying password...');
+    roomService.join(roomId, joinPassword)
+      .then(() => {
+        toast.success('Joined as spectator', { id: loadId });
+        setShowPasswordPrompt(false);
+        invalidate();
+      })
+      .catch(() => {
+        toast.error('Incorrect password', { id: loadId });
+      })
+      .finally(() => {
+        setIsJoining(false);
+      });
+  };
+
   const isController = Boolean(user && room?.hostId === user._id);
 
   const currentParticipant = room?.participants.find((p) => p.userId === user?._id);
@@ -317,7 +414,7 @@ export default function DebateRoomPage() {
     currentParticipant?.roomRole === 'debater' && ['active', 'paused'].includes(room?.status || '');
   const canUseVoiceMic = Boolean(isController || canUseDebaterActions);
   const isJudge = currentParticipant?.roomRole === 'judge';
-  const isViewer = currentParticipant?.roomRole === 'viewer';
+  const isViewer = currentParticipant?.roomRole === 'viewer' || !isParticipant;
   const debaters: RoomParticipant[] = room?.participants.filter((p) => p.roomRole === 'debater') || [];
   const judges: RoomParticipant[] = room?.participants.filter((p) => p.roomRole === 'judge') || [];
   const selectedParticipant = room?.participants.find((p) => p.userId === selectedUserId);
@@ -394,7 +491,13 @@ export default function DebateRoomPage() {
   }, [opponentPendingDraw, pendingDrawRequest]);
   
   // Sidebar Tab State
-  const [sidebarTab, setSidebarTab] = useState<'scoring' | 'ai' | 'private'>('scoring');
+  const [sidebarTab, setSidebarTab] = useState<'scoring' | 'ai' | 'private' | 'viewer-chat'>('scoring');
+
+  useEffect(() => {
+    if (isViewer) {
+      setSidebarTab('viewer-chat');
+    }
+  }, [isViewer]);
 
   // Derived speaker and slot structures
   const speakerLabel = currentSpeaker || session?.currentTurn?.speaker || '—';
@@ -458,8 +561,12 @@ export default function DebateRoomPage() {
     return list;
   }, [messages, session]);
 
-  // Show loading spinner until we have BOTH REST data AND socket state
-  const isLoading = roomQuery.isLoading || sessionQuery.isLoading || !socketReady;
+  // Show loading spinner until we have BOTH REST data AND socket state, or if we are actively joining
+  const isLoading =
+    roomQuery.isLoading ||
+    sessionQuery.isLoading ||
+    (isParticipant && !socketReady) ||
+    isJoining;
 
   if (isLoading) {
     return (
@@ -467,6 +574,41 @@ export default function DebateRoomPage() {
         <Spinner animation="border" />
         <div className="mt-2 text-muted small">Connecting to debate...</div>
       </Container>
+    );
+  }
+
+  if (showPasswordPrompt) {
+    return (
+      <div className="vh-100 w-100 d-flex flex-column align-items-center justify-content-center text-white" style={{ background: '#0a0a0f', fontFamily: 'Rajdhani, sans-serif' }}>
+        <Card style={{ width: '400px', background: 'rgba(15, 15, 25, 0.65)', border: '1px solid rgba(0, 245, 255, 0.25)', boxShadow: '0 0 40px rgba(0,245,255,0.1)', backdropFilter: 'blur(10px)' }} className="p-4 rounded-4 text-center">
+          <h3 className="mb-3 text-neon-cyan" style={{ fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>
+            <i className="bi bi-shield-lock me-2"></i>
+            PRIVATE ARENA
+          </h3>
+          <p className="text-muted small mb-4">This debate is private. Please enter the password to watch as a spectator.</p>
+          <Form onSubmit={handlePrivateJoin}>
+            <Form.Group className="mb-3">
+              <Form.Control
+                type="password"
+                placeholder="Enter password..."
+                value={joinPassword}
+                onChange={(e) => setJoinPassword(e.target.value)}
+                required
+                autoFocus
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', textAlign: 'center' }}
+              />
+            </Form.Group>
+            <div className="d-grid gap-2">
+              <Button type="submit" variant="primary" disabled={isJoining || !joinPassword.trim()}>
+                {isJoining ? 'Connecting...' : 'Enter Arena'}
+              </Button>
+              <Button variant="outline-light" onClick={() => navigate('/matches')} disabled={isJoining}>
+                Back to Matches
+              </Button>
+            </div>
+          </Form>
+        </Card>
+      </div>
     );
   }
 
@@ -484,8 +626,62 @@ export default function DebateRoomPage() {
 
   return (
     <>
+      <style>{`
+        @keyframes floatUp {
+          0% {
+            transform: translateY(0) scale(0.8);
+            opacity: 0;
+          }
+          15% {
+            transform: translateY(-20px) scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-120px) scale(0.9);
+            opacity: 0;
+          }
+        }
+      `}</style>
       <ReconnectOverlay />
       <PauseOverlay isPaused={isPaused} pausedAtRemaining={pausedAtRemaining} />
+
+      {isTransitioning && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white animate-fade-in"
+          style={{
+            zIndex: 9999,
+            background: 'rgba(5, 5, 10, 0.95)',
+            fontFamily: 'Orbitron, sans-serif',
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          <div className="text-center p-5 rounded-4 border border-info border-opacity-25" style={{ background: 'rgba(15, 15, 25, 0.65)', boxShadow: '0 0 40px rgba(0,245,255,0.1)' }}>
+            <h2 className="text-neon-pink mb-3 speaking-pulse" style={{ letterSpacing: '0.1em' }}>AUTO MUTE TRANSITION</h2>
+            <div className="fs-1 fw-bold text-neon-cyan mb-2" style={{ textShadow: '0 0 10px #00f5ff' }}>{transitionTime}s</div>
+            <div className="text-muted small text-uppercase" style={{ letterSpacing: '0.1em' }}>Muting microphones & locking chat</div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Judge Reactions */}
+      <div className="position-absolute" style={{ bottom: '80px', right: '340px', zIndex: 1050, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {activeReactions.map((react) => (
+          <div
+            key={react.id}
+            className="d-flex align-items-center gap-2 p-2 px-3 rounded-pill text-white shadow-lg"
+            style={{
+              background: 'rgba(10, 10, 20, 0.85)',
+              border: react.type === 'agree' ? '1px solid #00f5ff' : '1px solid #ff006e',
+              boxShadow: react.type === 'agree' ? '0 0 10px rgba(0, 245, 255, 0.3)' : '0 0 10px rgba(255, 0, 110, 0.3)',
+              backdropFilter: 'blur(5px)',
+              animation: 'floatUp 3s ease-out forwards',
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>{react.type === 'agree' ? '👍' : '👎'}</span>
+            <span className="small fw-bold">{react.username}</span>
+          </div>
+        ))}
+      </div>
 
       <div className="vh-100 d-flex flex-column text-white" style={{ background: '#0a0a0f', fontFamily: 'Rajdhani, sans-serif', overflow: 'hidden' }}>
         
@@ -593,39 +789,67 @@ export default function DebateRoomPage() {
                     <h2 className="m-0 text-muted text-start" style={{ fontFamily: 'Orbitron', fontSize: '13px', lineHeight: '1.4' }}>
                       &ldquo;{room.motion}&rdquo;
                     </h2>
-                    <Button
-                      size="sm"
-                      variant="outline-info"
-                      onClick={() => setShowRules(true)}
-                      style={{ fontSize: '10px', fontFamily: 'Orbitron', flexShrink: 0, padding: '0.15rem 0.4rem' }}
-                    >
-                      Rules
-                    </Button>
+                    <div className="d-flex align-items-center gap-1.5 flex-shrink-0">
+                      {canAccessPrivateRooms && (
+                        <Button
+                          size="sm"
+                          variant="outline-warning"
+                          onClick={() => setSidebarTab('private')}
+                          style={{ fontSize: '10px', fontFamily: 'Orbitron', padding: '0.15rem 0.4rem' }}
+                        >
+                          Private Prep
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline-info"
+                        onClick={() => setShowRules(true)}
+                        style={{ fontSize: '10px', fontFamily: 'Orbitron', padding: '0.15rem 0.4rem' }}
+                      >
+                        Rules
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="mt-2 w-100 d-flex align-items-center justify-content-between border-top border-secondary border-opacity-20 pt-2">
                     <div className="text-start">
-                      <span className="text-neon-cyan text-uppercase fw-bold d-block" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                        {phaseLabel}
-                      </span>
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="text-neon-cyan text-uppercase fw-bold d-block" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
+                          {phaseLabel}
+                        </span>
+                        {isViewer && (
+                          <Badge bg="info" className="px-2 py-0.5 text-uppercase" style={{ fontSize: '9px', fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>
+                            <i className="bi bi-eye-fill me-1"></i> Spectator View
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-white small" style={{ fontSize: '11px' }}>
                         Active: {activeSpeakerName} ({speakerLabel})
                       </span>
                     </div>
                     
                     <div className="d-flex align-items-center gap-3">
-                      <div className="d-flex align-items-center gap-1">
-                        {isMyTurnToSpeak && (
-                          <Button
-                            size="sm"
-                            variant={isListening ? 'danger' : 'success'}
-                            onClick={isListening ? stopMic : startMic}
-                            style={{ fontSize: '9px', padding: '0.2rem 0.4rem' }}
-                          >
-                            {isListening ? 'Mute' : 'Speak'}
-                          </Button>
-                        )}
-                        <MicToggle roomId={roomId} disabled={!canUseVoiceMic} />
+                      {(isController || isMyTurnToSpeak || currentParticipant?.roomRole === 'debater' || (isViewer && speakingAllowed)) && (
+                        <div className="d-flex align-items-center gap-1">
+                          {isMyTurnToSpeak && (
+                            <Button
+                              size="sm"
+                              variant={isListening ? 'danger' : 'success'}
+                              onClick={isListening ? stopMic : startMic}
+                              disabled={isTransitioning || turnStatus === 'waiting_to_start'}
+                              style={{ fontSize: '9px', padding: '0.2rem 0.4rem' }}
+                            >
+                              {isListening ? 'Mute' : 'Speak'}
+                            </Button>
+                          )}
+                          <MicToggle roomId={roomId} disabled={isTransitioning || turnStatus === 'waiting_to_start'} />
+                        </div>
+                      )}
+                      <div className="d-flex align-items-center gap-1.5 text-muted px-2 py-1 rounded bg-dark bg-opacity-35 border border-secondary border-opacity-15 me-2" title="Viewer Count" style={{ height: 'fit-content' }}>
+                        <i className="bi bi-eye-fill text-neon-cyan"></i>
+                        <span className="small fw-bold text-white" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
+                          {(room?.participants || []).filter((p: any) => p.roomRole === 'viewer').length}
+                        </span>
                       </div>
                       <div className="text-white text-end font-weight-bold" style={{ fontFamily: 'Orbitron, monospace', fontSize: '1.8rem', letterSpacing: '-0.02em', lineHeight: 1 }}>
                         <CountdownTimer
@@ -859,12 +1083,28 @@ export default function DebateRoomPage() {
                 <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
                   <div className="d-flex align-items-center gap-1.5 flex-wrap">
                     <span className="text-neon-purple font-weight-bold me-2" style={{ fontSize: '11px', fontFamily: 'Orbitron' }}>HOST ACTIONS:</span>
-                    <Button size="sm" className="btn-primary py-1 px-2.5" onClick={() => controlMutation.mutate('next')} disabled={controlMutation.isPending} style={{ fontSize: '11px' }}>
-                      Next Turn
-                    </Button>
-                    <Button size="sm" variant="outline-primary" className="py-1 px-2" onClick={() => controlMutation.mutate('finish')} disabled={controlMutation.isPending} style={{ fontSize: '11px' }}>
-                      Finish Phase
-                    </Button>
+                    {turnStatus === 'waiting_to_start' ? (
+                      <Button
+                        size="sm"
+                        className="py-1 px-3 me-2"
+                        style={{
+                          background: '#00ff66',
+                          color: '#000',
+                          border: 'none',
+                          boxShadow: '0 0 12px #00ff66',
+                          fontWeight: 'bold',
+                          fontSize: '11px',
+                        }}
+                        onClick={() => startPhaseMutation.mutate()}
+                        disabled={startPhaseMutation.isPending}
+                      >
+                        Start Phase
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline-primary" className="py-1 px-3 me-2" onClick={() => controlMutation.mutate('finish')} disabled={controlMutation.isPending} style={{ fontSize: '11px' }}>
+                        Finish Phase
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline-warning"
@@ -880,26 +1120,68 @@ export default function DebateRoomPage() {
                     </Button>
                   </div>
 
-                  <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ maxWidth: '400px' }}>
-                    <Form.Select size="sm" style={{ width: '110px', fontSize: '11px', padding: '0.25rem 0.5rem' }} value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
-                      <option value="">User...</option>
+                  <div className="d-flex align-items-center gap-2">
+                    <Form.Select size="sm" style={{ width: '130px', fontSize: '11px', padding: '0.25rem 0.5rem' }} value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
+                      <option value="">Select User...</option>
                       {room.participants.map((p) => (
-                        <option key={p.userId} value={p.userId}>{p.username}</option>
+                        <option key={p.userId} value={p.userId}>{p.username} ({p.roomRole})</option>
                       ))}
                     </Form.Select>
-                    <Form.Control
-                      size="sm"
-                      placeholder="Reason for warning..."
-                      value={cardReason}
-                      onChange={(e) => setCardReason(e.target.value)}
-                      style={{ fontSize: '11px', padding: '0.25rem 0.5rem' }}
-                    />
-                    <Button size="sm" variant="warning" className="py-1 px-2" disabled={!selectedParticipant || cardMutation.isPending} onClick={() => cardMutation.mutate()} style={{ fontSize: '10px' }}>
-                      Card
-                    </Button>
-                    <Button size="sm" variant="outline-danger" className="py-1 px-2" disabled={!selectedParticipant || kickMutation.isPending} onClick={() => kickMutation.mutate()} style={{ fontSize: '10px' }}>
-                      Kick
-                    </Button>
+                    {selectedParticipant && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant={selectedParticipant.chatMuted ? 'success' : 'outline-danger'}
+                          className="py-1 px-2 text-nowrap"
+                          style={{ fontSize: '10px' }}
+                          disabled={toggleChatMutation.isPending}
+                          onClick={() => toggleChatMutation.mutate({
+                            userId: selectedUserId,
+                            action: selectedParticipant.chatMuted ? 'unmute' : 'mute',
+                          })}
+                        >
+                          {selectedParticipant.chatMuted ? 'Allow Chat' : 'Ban Chat'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={selectedParticipant.muted ? 'success' : 'outline-danger'}
+                          className="py-1 px-2 text-nowrap"
+                          style={{ fontSize: '10px' }}
+                          disabled={toggleMicMutation.isPending}
+                          onClick={() => toggleMicMutation.mutate({
+                            userId: selectedUserId,
+                            action: selectedParticipant.muted ? 'unmute' : 'mute',
+                          })}
+                        >
+                          {selectedParticipant.muted ? 'Unmute Mic' : 'Mute Mic'}
+                        </Button>
+                        {selectedParticipant.roomRole === 'viewer' && (
+                          selectedParticipant.speakingAllowed ? (
+                            <Button
+                              size="sm"
+                              variant="outline-danger"
+                              className="py-1 px-2 text-nowrap"
+                              style={{ fontSize: '10px' }}
+                              onClick={() => revokeSpeakingMutation.mutate(selectedUserId)}
+                              disabled={revokeSpeakingMutation.isPending}
+                            >
+                              Mute Viewer
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline-success"
+                              className="py-1 px-2 text-nowrap"
+                              style={{ fontSize: '10px' }}
+                              onClick={() => grantSpeakingMutation.mutate(selectedUserId)}
+                              disabled={grantSpeakingMutation.isPending}
+                            >
+                              Allow Speak
+                            </Button>
+                          )
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -909,6 +1191,39 @@ export default function DebateRoomPage() {
             {canUseDebaterActions && (
               <div className="flex-shrink-0 bg-dark bg-opacity-30 border border-secondary border-opacity-20 rounded-3 p-2 mt-1 text-center">
                 <span className="text-muted small me-2" style={{ fontFamily: 'Orbitron', fontSize: '11px' }}>MATCH ACTIONS:</span>
+                
+                {currentPhase === 'prep_7' && (
+                  <Button
+                    size="sm"
+                    variant="success"
+                    className="py-1 px-3 me-2"
+                    style={{ fontSize: '11px', boxShadow: '0 0 8px rgba(40, 167, 69, 0.4)' }}
+                    onClick={() => {
+                      import('@hooks/useSocket').then(({ getSocket }) => {
+                        getSocket()?.emit('debate:end-prep-early', { roomId });
+                      });
+                    }}
+                    disabled={prepConsensusReadyUserIds.includes(user?._id || '')}
+                  >
+                    {prepConsensusReadyUserIds.includes(user?._id || '') 
+                      ? `Ready (${prepConsensusReadyUserIds.length}/${prepConsensusTotalDebaters || debaters.length})`
+                      : `End Prep early (${prepConsensusReadyUserIds.length}/${prepConsensusTotalDebaters || debaters.length})`}
+                  </Button>
+                )}
+
+                {turnStatus === 'active' && currentPhase === 'speech' && isMyTurnToSpeak && (
+                  <Button
+                    size="sm"
+                    variant="neon-pink"
+                    className="py-1 px-3 me-2"
+                    style={{ fontSize: '11px', background: '#ff006e', color: '#fff', border: 'none', boxShadow: '0 0 10px #ff006e' }}
+                    onClick={() => controlMutation.mutate('finish')}
+                    disabled={controlMutation.isPending || isTransitioning}
+                  >
+                    End Phase
+                  </Button>
+                )}
+
                 <Button
                   size="sm"
                   variant="outline-danger"
@@ -995,6 +1310,21 @@ export default function DebateRoomPage() {
                   Private Prep
                 </button>
               )}
+              {(isViewer || myRole === 'host' || myRole === 'owner') && (
+                <button
+                  className={`flex-1 py-2.5 text-center border-0 text-uppercase ${sidebarTab === 'viewer-chat' ? 'text-neon-cyan font-weight-bold' : 'text-muted'}`}
+                  style={{
+                    fontSize: '10px',
+                    letterSpacing: '0.05em',
+                    fontFamily: 'Orbitron',
+                    background: sidebarTab === 'viewer-chat' ? 'rgba(0, 245, 255, 0.05)' : 'transparent',
+                    borderBottom: sidebarTab === 'viewer-chat' ? '2px solid #00f5ff' : 'none',
+                  }}
+                  onClick={() => setSidebarTab('viewer-chat')}
+                >
+                  Viewer Chat
+                </button>
+              )}
             </div>
 
             {/* Tab Contents */}
@@ -1043,6 +1373,38 @@ export default function DebateRoomPage() {
                   {/* Judge Rating Form */}
                   {isJudge && (
                     <div className="border-top border-secondary border-opacity-20 pt-3">
+                      <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
+                        Quick Reactions
+                      </h6>
+                      <div className="d-flex gap-2 mb-4">
+                        <Button
+                          size="sm"
+                          variant="outline-info"
+                          className="flex-fill d-flex align-items-center justify-content-center gap-1"
+                          style={{ borderColor: 'rgba(0, 245, 255, 0.4)', color: '#00f5ff' }}
+                          onClick={() => {
+                            import('@hooks/useSocket').then(({ getSocket }) => {
+                              getSocket()?.emit('judge:reaction', { roomId, type: 'agree' });
+                            });
+                          }}
+                        >
+                          👍 Agree
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          className="flex-fill d-flex align-items-center justify-content-center gap-1"
+                          style={{ borderColor: 'rgba(255, 0, 110, 0.4)', color: '#ff006e' }}
+                          onClick={() => {
+                            import('@hooks/useSocket').then(({ getSocket }) => {
+                              getSocket()?.emit('judge:reaction', { roomId, type: 'disagree' });
+                            });
+                          }}
+                        >
+                          👎 Disagree
+                        </Button>
+                      </div>
+
                       <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
                         Submit Ratings
                       </h6>
@@ -1143,6 +1505,13 @@ export default function DebateRoomPage() {
               {sidebarTab === 'private' && canAccessPrivateRooms && (
                 <div className="p-3">
                   <PrivateRoomPanel roomId={roomId} />
+                </div>
+              )}
+
+              {/* VIEWER CHAT TAB PANEL */}
+              {sidebarTab === 'viewer-chat' && (isViewer || myRole === 'host' || myRole === 'owner') && (
+                <div className="p-3">
+                  <ViewerChat roomId={roomId} />
                 </div>
               )}
 

@@ -4,7 +4,7 @@ import { DebateSession } from '../models/DebateSession.js';
 import { Message } from '../models/Message.js';
 import { getIO } from './index.js';
 
-const CE_SECONDS = 3 * 60;
+const CE_SECONDS = 2 * 60;
 const CE_QUOTA_PER_TEAM = 2;
 
 type Team = 'proposition' | 'opposition';
@@ -116,8 +116,10 @@ class CETimerService {
       this.broadcastState(roomId);
 
       if (state.proRemaining <= 0 || state.oppRemaining <= 0) {
-        // Out of time on this team → caller will finalize via cross-exam:finish
         this.stopTicking(roomId);
+        import('../features/debate/debate.service.js').then(({ triggerTransition }) => {
+          triggerTransition(roomId).catch(console.error);
+        });
       }
     }, 1000);
   }

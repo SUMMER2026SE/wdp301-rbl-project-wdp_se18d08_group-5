@@ -6,6 +6,7 @@ import { DebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/AppError.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
+import { getIO } from '../../socket/index.js';
 import {
   advanceTurn,
   endDebate,
@@ -14,6 +15,8 @@ import {
   passCeTurn,
   requestDraw,
   surrenderDebate,
+  triggerTransition,
+  aggregateScores,
 } from './debate.service.js';
 import type { AuthRequest } from '../../types/index.js';
 
@@ -183,7 +186,6 @@ router.post(
   '/:roomId/host/next-turn',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { nextSpeaker, phase, timeLimit } = req.body;
     const room = await DebateRoom.findById(req.params.roomId);
     if (!room) throw new NotFoundError('Room not found');
 
@@ -191,33 +193,8 @@ router.post(
     const isOwner = room.createdBy.toString() === req.user!.userId;
     if (!isHost && !isOwner) throw new ForbiddenError('Only host can advance turns');
 
-    const session = await DebateSession.findOne({ roomId: room._id });
-    if (!session) throw new NotFoundError('Session not found');
-
-    const currentTurn = session.currentTurn;
-    const now = new Date();
-    const duration = now.getTime() - currentTurn.startTime.getTime();
-    session.turnHistory.push({
-      speaker: currentTurn.speaker,
-      startTime: currentTurn.startTime,
-      endTime: now,
-      duration,
-      transcript: req.body.transcript || '',
-      crossExamination: null,
-      aiAnalysis: null,
-    });
-
-    session.currentTurn = {
-      speaker: nextSpeaker || currentTurn.speaker,
-      phase: phase || currentTurn.phase,
-      startTime: new Date(),
-      timeLimit: timeLimit ?? currentTurn.timeLimit,
-      timeRemaining: timeLimit ?? currentTurn.timeRemaining,
-      status: 'active',
-    };
-
-    await session.save();
-    sendSuccess(res, session.currentTurn, 'Turn advanced');
+    await triggerTransition(req.params.roomId, req.body.transcript || '');
+    sendSuccess(res, { transitioning: true }, 'Turn advanced transition started');
   }),
 );
 
@@ -250,7 +227,7 @@ router.post(
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { speaker, score, notes } = req.body;
-    const room = await DebateRoom.findById(req.params.roomId).select('participants');
+    const room = await DebateRoom.findById(req.params.roomId);
     if (!room) throw new NotFoundError('Room not found');
 
     const judge = room.participants.find(
@@ -275,10 +252,14 @@ router.post(
       };
     }
 
-    const finalScores = session.finalScores as {
-      judgeVerdicts: any[];
-    };
+    const finalScores = session.finalScores as any;
     finalScores.judgeVerdicts = finalScores.judgeVerdicts || [];
+    
+    // Remove duplicate entry for this judge & speaker if exists (upsert behavior)
+    finalScores.judgeVerdicts = finalScores.judgeVerdicts.filter(
+      (v: any) => !(v.judgeId.toString() === req.user!.userId && v.speaker === speaker)
+    );
+
     finalScores.judgeVerdicts.push({
       judgeId: req.user!.userId as any,
       speaker,
@@ -287,8 +268,66 @@ router.post(
       submittedAt: new Date(),
     });
 
+    // Determine if we should automatically complete the debate
+    const assignedJudges = room.participants.filter((p) => p.roomRole === 'judge');
+    const isOPPS3 = speaker === 'OPP_S3';
+    
+    const OPP_S3_verdicts = finalScores.judgeVerdicts.filter((v: any) => v.speaker === 'OPP_S3');
+    const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId.toString()));
+    const allJudgesSubmitted = assignedJudges.every((j) => uniqueJudgesSubmitted.has(j.userId.toString()));
+
+    let autoCompleted = false;
+    let winnerInfo = null;
+
+    if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0) {
+      const aggregate = aggregateScores(finalScores.judgeVerdicts);
+      
+      finalScores.teamProposition = aggregate.teamProposition;
+      finalScores.teamOpposition = aggregate.teamOpposition;
+      finalScores.winner = aggregate.winner;
+      finalScores.winnerTeam = aggregate.winner;
+
+      session.currentTurn.status = 'completed';
+      session.currentTurn.phase = 'completed';
+
+      room.status = 'completed';
+      room.currentPhase = 'completed';
+      room.endedAt = new Date();
+
+      await room.save();
+      autoCompleted = true;
+
+      winnerInfo = {
+        roomId: req.params.roomId,
+        winnerTeam: aggregate.winner,
+        propositionTotal: aggregate.teamProposition.total,
+        oppositionTotal: aggregate.teamOpposition.total,
+        finalScores: session.finalScores,
+      };
+    }
+
     await session.save();
-    sendSuccess(res, { speaker, score, notes }, 'Score submitted');
+
+    if (autoCompleted && winnerInfo) {
+      // Apply Elo/rankings result
+      await applyDebateResult(req.params.roomId).catch((err) => {
+        console.error('Failed to apply debate Elo result:', err);
+      });
+
+      const io = getIO();
+      // Broadcast winner determined & ended
+      io.to(req.params.roomId).emit('score:winner-determined', winnerInfo);
+      io.to(req.params.roomId).emit('debate:ended', { roomId: req.params.roomId, result: winnerInfo });
+
+      // Build and broadcast room state restore
+      const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+      const state = await buildRoomStatePayload(req.params.roomId, req.user!.userId);
+      if (state) {
+        io.to(req.params.roomId).emit('room:state-restore', state);
+      }
+    }
+
+    sendSuccess(res, { speaker, score, notes, autoCompleted }, 'Score submitted');
   }),
 );
 

@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { Message } from '../models/Message.js';
 import { DebateRoom } from '../models/DebateRoom.js';
+import { DebateSession } from '../models/DebateSession.js';
 
 function isPrivilegedRole(role: string): boolean {
   return ['owner', 'host', 'debater', 'judge'].includes(role);
@@ -28,8 +29,14 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      if (participant.muted) {
-        socket.emit('chat:error', { message: 'You are muted in this room' });
+      if (participant.chatMuted) {
+        socket.emit('chat:error', { message: 'You are muted from chat in this room' });
+        return;
+      }
+
+      const session = await DebateSession.findOne({ roomId: room._id });
+      if (session && session.currentTurn && session.currentTurn.status === 'waiting_to_start') {
+        socket.emit('chat:error', { message: 'Chat is locked until the phase is started by the host' });
         return;
       }
 
@@ -90,8 +97,8 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      if (participant.muted) {
-        socket.emit('viewer-chat:error', { message: 'You are muted in this room' });
+      if (participant.chatMuted) {
+        socket.emit('viewer-chat:error', { message: 'You are muted from chat in this room' });
         return;
       }
 

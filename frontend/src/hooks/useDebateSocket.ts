@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import { getSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
+import { useAuthStore } from '@stores/authStore';
 import type {
   AIAnalysis,
   ChatMessage,
@@ -33,6 +35,7 @@ interface RoomStateRestore {
  */
 export function useDebateSocket(roomId: string | undefined) {
   const { t } = useTranslation('errors');
+  const user = useAuthStore((s) => s.user);
   const {
     setRoom,
     setPhase,
@@ -52,6 +55,10 @@ export function useDebateSocket(roomId: string | undefined) {
     setFinalScores,
     setWinnerResult,
     addPrivateRoomMessage,
+    setTransitionState,
+    setTurnStatus,
+    setSpeakingAllowed,
+    setPrepConsensus,
   } = useDebateStore();
 
   useEffect(() => {
@@ -75,6 +82,17 @@ export function useDebateSocket(roomId: string | undefined) {
       if (data.finalScores) {
         setFinalScores(data.finalScores);
       }
+
+      // Sync turnStatus
+      if (data.currentTurn?.status) {
+        setTurnStatus(data.currentTurn.status as any);
+      } else {
+        setTurnStatus('active');
+      }
+
+      // Sync speakingAllowed
+      const me = data.participants.find((p) => p.userId === user?._id);
+      setSpeakingAllowed(Boolean(me?.speakingAllowed));
     };
 
     // Core room state events
@@ -82,6 +100,45 @@ export function useDebateSocket(roomId: string | undefined) {
     socket.on('room:state-restore', restoreState);
     socket.on('chat:history', (messages: ChatMessage[]) => {
       setMessages(messages);
+    });
+
+    // Auto Mute Transition Countdown Overlay
+    socket.on('debate:transition-start', (data: { duration: number }) => {
+      setTransitionState(true, data.duration);
+      window.dispatchEvent(new CustomEvent('debate:force-mute'));
+      let remaining = data.duration;
+      const interval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(interval);
+          setTransitionState(false, 0);
+        } else {
+          setTransitionState(true, remaining);
+        }
+      }, 1000);
+    });
+
+    // Phase Started from Waiting state
+    socket.on('debate:phase-started', (data: { phase: DebatePhase; speaker: SpeakerTurn; timeLimit: number }) => {
+      setTurnStatus('active');
+      setPhase(data.phase);
+      setSpeaker(data.speaker);
+      setTimeRemaining(data.timeLimit);
+      setTotalTime(data.timeLimit);
+    });
+
+    // Judge Reactions
+    socket.on('judge:reaction', (data: { username: string; type: 'agree' | 'disagree' }) => {
+      toast(`${data.username} reacted: ${data.type === 'agree' ? 'Agree' : 'Disagree'}`, {
+        icon: data.type === 'agree' ? '👍' : '👎',
+      });
+      const event = new CustomEvent('judge:reaction-received', { detail: data });
+      window.dispatchEvent(event);
+    });
+
+    // Prep Phase Consensus
+    socket.on('debate:prep-consensus-update', (data: { readyUserIds: string[]; totalDebaters: number }) => {
+      setPrepConsensus(data.readyUserIds, data.totalDebaters);
     });
 
     // Phase change
@@ -243,6 +300,10 @@ export function useDebateSocket(roomId: string | undefined) {
       socket.off('room:joined');
       socket.off('room:state-restore');
       socket.off('chat:history');
+      socket.off('debate:transition-start');
+      socket.off('debate:phase-started');
+      socket.off('judge:reaction');
+      socket.off('debate:prep-consensus-update');
       socket.off('debate:phase-change');
       socket.off('debate:turn-change');
       socket.off('debate:timer-update');

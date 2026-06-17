@@ -82,7 +82,7 @@ const debateSessionSchema = new Schema<IDebateSession>(
       startTime: { type: Date, default: Date.now },
       timeLimit: { type: Number, default: 0 },
       timeRemaining: { type: Number, default: 0 },
-      status: { type: String, enum: ['active', 'paused', 'completed'], default: 'active' },
+      status: { type: String, enum: ['active', 'paused', 'completed', 'waiting_to_start'], default: 'waiting_to_start' },
       ceState: {
         type: Schema.Types.Mixed,
         default: null,

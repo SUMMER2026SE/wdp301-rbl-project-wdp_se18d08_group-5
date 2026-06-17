@@ -3,9 +3,9 @@ import { DebateSession } from '../../models/DebateSession.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/AppError.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 
-const SPEECH_SECONDS = 4 * 60;
-const CE_SECONDS = 3 * 60;
-const PREP_SECONDS = 60;
+const SPEECH_SECONDS = 3 * 60;
+const CE_SECONDS = 2 * 60;
+const PREP_SECONDS = 7 * 60;
 const JUDGING_SECONDS = 10 * 60;
 
 type DebateStep = {
@@ -22,11 +22,12 @@ type DebateStep = {
 };
 
 const DEBATE_FLOW: DebateStep[] = [
-  { speaker: 'HOST', phase: 'motion', timeLimit: PREP_SECONDS },
+  { speaker: 'HOST', phase: 'motion', timeLimit: 0 },
+  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS },
   { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS },
   { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS },
   {
-    speaker: 'PRO_CE_1',
+    speaker: 'CE_ROUND_1',
     phase: 'cross_exam',
     timeLimit: CE_SECONDS,
     ce: {
@@ -37,10 +38,11 @@ const DEBATE_FLOW: DebateStep[] = [
       currentRole: 'asker',
     },
   },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 5 * 60 },
   { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS },
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS },
   {
-    speaker: 'OPP_CE_1',
+    speaker: 'CE_ROUND_2',
     phase: 'cross_exam',
     timeLimit: CE_SECONDS,
     ce: {
@@ -51,24 +53,9 @@ const DEBATE_FLOW: DebateStep[] = [
       currentRole: 'asker',
     },
   },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 5 * 60 },
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS },
   { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS },
-  {
-    speaker: 'PRO_CE_2',
-    phase: 'cross_exam',
-    timeLimit: CE_SECONDS,
-    ce: {
-      askingTeam: 'proposition',
-      answeringTeam: 'opposition',
-      quotaPerTeam: 2,
-      questionsAsked: 0,
-      currentRole: 'asker',
-    },
-  },
-  { speaker: 'JUDGES', phase: 'judge_feedback', timeLimit: 5 * 60 },
-  { speaker: 'BOTH_TEAMS', phase: 'prep_1', timeLimit: PREP_SECONDS },
-  { speaker: 'PRO_CLOSE', phase: 'closing', timeLimit: 2 * 60 },
-  { speaker: 'OPP_CLOSE', phase: 'closing', timeLimit: 2 * 60 },
   { speaker: 'JUDGES', phase: 'final_judging', timeLimit: JUDGING_SECONDS },
   { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0 },
 ];
@@ -149,12 +136,12 @@ function applyStep(session: any, step: DebateStep) {
     startTime: new Date(),
     timeLimit: step.timeLimit,
     timeRemaining: step.timeLimit,
-    status: step.phase === 'completed' ? 'completed' : 'active',
+    status: step.phase === 'completed' ? 'completed' : 'waiting_to_start',
     ...(ceState ? { ceState } : {}),
   };
 }
 
-function aggregateScores(verdicts: any[]) {
+export function aggregateScores(verdicts: any[]) {
   const totals = {
     proposition: { total: 0, count: 0 },
     opposition: { total: 0, count: 0 },
@@ -222,13 +209,7 @@ export async function startDebate(roomId: string, userId: string) {
   return { room, session };
 }
 
-export async function advanceTurn(roomId: string, userId: string, transcript = '') {
-  const room = await DebateRoom.findById(roomId);
-  if (!room) throw new NotFoundError('Room not found');
-  assertHost(room, userId);
-
-  const session = await DebateSession.findOne({ roomId: room._id });
-  if (!session) throw new NotFoundError('Session not found');
+export async function advanceTurnInternal(room: any, session: any, transcript = '') {
   if (session.currentTurn.status === 'completed') {
     throw new BadRequestError('Debate is already completed');
   }
@@ -246,6 +227,59 @@ export async function advanceTurn(roomId: string, userId: string, transcript = '
 
   await Promise.all([session.save(), room.save()]);
   return { room, session, currentTurn: session.currentTurn };
+}
+
+export async function triggerTransition(roomId: string, transcript = '') {
+  const { getIO } = await import('../../socket/index.js');
+  const { timerService } = await import('../../socket/timer.service.js');
+  const { ceTimerService } = await import('../../socket/ce.socket.js');
+
+  const io = getIO();
+
+  // Stop existing timers
+  timerService.stop(roomId);
+  ceTimerService.stop(roomId);
+
+  // Broadcast transition start
+  io?.to(roomId).emit('debate:transition-start', { duration: 3 });
+
+  // Wait 3 seconds
+  setTimeout(async () => {
+    try {
+      const room = await DebateRoom.findById(roomId);
+      if (!room) return;
+
+      const session = await DebateSession.findOne({ roomId: room._id });
+      if (!session) return;
+
+      await advanceTurnInternal(room, session, transcript);
+
+      const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+      const state = await buildRoomStatePayload(roomId, room.hostId ? room.hostId.toString() : room.createdBy.toString());
+      if (state) {
+        io?.to(roomId).emit('room:state-restore', state);
+      }
+    } catch (err) {
+      console.error('Error in transition timeout:', err);
+    }
+  }, 3000);
+}
+
+export async function advanceTurn(roomId: string, userId: string, transcript = '') {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) throw new NotFoundError('Room not found');
+  assertHost(room, userId);
+
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session) throw new NotFoundError('Session not found');
+  if (session.currentTurn.status === 'completed') {
+    throw new BadRequestError('Debate is already completed');
+  }
+
+  // Trigger transition asynchronously
+  triggerTransition(roomId, transcript).catch(console.error);
+
+  return { transitioning: true };
 }
 
 export async function finishPhase(roomId: string, userId: string, transcript = '') {
@@ -301,7 +335,10 @@ export async function finishCe(roomId: string, userId: string, transcript = '') 
     throw new ForbiddenError('Only the asking team or host can finish CE');
   }
 
-  return finishPhase(roomId, room.createdBy.toString(), transcript);
+  // Trigger transition asynchronously
+  triggerTransition(roomId, transcript).catch(console.error);
+
+  return { transitioning: true };
 }
 
 export async function endDebate(roomId: string, userId: string, summary = ''): Promise<any> {

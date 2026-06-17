@@ -36,6 +36,8 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
   const { user } = useAuthStore();
   const messages = useDebateStore((state) => state.messages);
   const viewerChatEnabled = useDebateStore((state) => state.viewerChatEnabled);
+  const isTransitioning = useDebateStore((state) => state.isTransitioning);
+  const turnStatus = useDebateStore((state) => state.turnStatus);
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -57,6 +59,8 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
   const canSend =
     isPrivateRoom ||
     (myRole === 'host' || myRole === 'judge' || myRole === 'debater');
+
+  const isLocked = !isPrivateRoom && (isTransitioning || turnStatus === 'waiting_to_start');
 
   useEffect(() => {
     if (listRef.current) {
@@ -91,34 +95,34 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
 
       <div
         ref={listRef}
-        className="flex-grow-1 overflow-auto px-2 py-2 bg-body-tertiary rounded-3"
-        style={{ maxHeight: 320 }}
+        className="flex-grow-1 overflow-auto px-2 py-2 rounded-3"
+        style={{ maxHeight: 320, background: '#ffffff', color: '#1c1c1c' }}
       >
         {messages.length === 0 ? (
-          <div className="text-muted small text-center py-3">
+          <div className="small text-center py-3" style={{ color: '#888888' }}>
             {isPrivateRoom ? 'No private messages yet.' : 'No messages yet.'}
           </div>
         ) : (
           messages.map((message) => {
             if (isSystemMessage(message)) {
               return (
-                <div key={message._id} className="text-muted small fst-italic my-1 px-2">
+                <div key={message._id} className="small fst-italic my-1 px-2" style={{ color: '#666666' }}>
                   {message.content}
                 </div>
               );
             }
             if (isCrossExamMessage(message)) {
               return (
-                <div key={message._id} className="small my-1 px-2 text-info fst-italic border-start border-info ps-2">
+                <div key={message._id} className="small my-1 px-2 fst-italic border-start ps-2" style={{ color: '#0d6efd', borderColor: '#0d6efd' }}>
                   {message.content}
                 </div>
               );
             }
             const isOwn = message.senderId === user?._id;
             return (
-              <div key={message._id} className={`my-1 px-2 py-1 rounded-2 ${isOwn ? 'bg-primary bg-opacity-10' : ''}`}>
+              <div key={message._id} className={`my-1 px-2 py-1 rounded-2`} style={{ background: isOwn ? 'rgba(13, 110, 253, 0.08)' : 'rgba(0, 0, 0, 0.03)' }}>
                 <div className="d-flex align-items-baseline gap-2">
-                  <strong className="small text-capitalize" style={{ color: isOwn ? 'var(--bs-primary)' : undefined }}>
+                  <strong className="small text-capitalize" style={{ color: isOwn ? '#0d6efd' : '#333333' }}>
                     {message.senderName}
                   </strong>
                   <Badge bg="secondary" pill className="text-uppercase" style={{ fontSize: '0.6rem' }}>
@@ -128,7 +132,7 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
                     {formatTime(message.timestamp)}
                   </span>
                 </div>
-                <div className="small">{message.content}</div>
+                <div className="small" style={{ color: '#1c1c1c' }}>{message.content}</div>
               </div>
             );
           })
@@ -138,10 +142,11 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
       {canSend ? (
         <InputGroup className="mt-2">
           <Form.Control
-            placeholder={isPrivateRoom ? 'Team message...' : 'Type a message...'}
+            placeholder={isLocked ? 'Chat is locked...' : (isPrivateRoom ? 'Team message...' : 'Type a message...')}
             value={content}
-            disabled={sending}
+            disabled={sending || isLocked}
             onChange={(event) => setContent(event.target.value)}
+            style={{ background: '#ffffff', color: '#1c1c1c', border: '1px solid #ced4da' }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
@@ -149,7 +154,7 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
               }
             }}
           />
-          <Button onClick={handleSend} disabled={!content.trim() || sending}>
+          <Button onClick={handleSend} disabled={!content.trim() || sending || isLocked}>
             <i className="bi bi-send" />
           </Button>
         </InputGroup>
