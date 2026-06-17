@@ -9,6 +9,7 @@ import { getIO } from '../../socket/index.js';
 import { aiService } from '../ai/ai.service.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { startDebate } from '../debate/debate.service.js';
+import { timerService } from '../../socket/timer.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
 
@@ -877,6 +878,16 @@ router.post(
     room.status = 'paused';
     await room.save();
 
+    // Pause the server-authoritative timer
+    timerService.pause(req.params.id);
+
+    // Broadcast pause to every client so they show a synchronized overlay.
+    const io = getIO();
+    io.to(req.params.id).emit('debate:paused', {
+      pausedAt: Date.now(),
+      timeRemaining: timerService.getTimeRemaining(req.params.id),
+    });
+
     sendSuccess(res, { status: room.status }, 'Debate paused');
   }),
 );
@@ -898,6 +909,15 @@ router.post(
 
     room.status = 'active';
     await room.save();
+
+    // Resume the server-authoritative timer
+    timerService.resume(req.params.id);
+
+    // Broadcast resume to every client
+    const io = getIO();
+    io.to(req.params.id).emit('debate:resumed', {
+      resumedAt: Date.now(),
+    });
 
     sendSuccess(res, { status: room.status }, 'Debate resumed');
   }),
@@ -936,16 +956,44 @@ router.post(
       await judgeTurnWithAI(room, session, session.turnHistory.length - 1, transcript || '');
     }
 
+    const newTimeLimit = timeLimit ?? currentTurn.timeLimit ?? 240;
     session.currentTurn = {
       speaker: nextSpeaker || currentTurn.speaker,
       phase: phase || currentTurn.phase,
       startTime: new Date(),
-      timeLimit: timeLimit ?? currentTurn.timeLimit,
-      timeRemaining: timeLimit ?? currentTurn.timeRemaining,
+      timeLimit: newTimeLimit,
+      timeRemaining: newTimeLimit,
       status: 'active',
     };
 
-    await session.save();
+    // Update room phase if it changed
+    if (phase && phase !== room.currentPhase) {
+      room.currentPhase = phase;
+    }
+    // Make sure room is in active state when advancing
+    if (room.status === 'paused') {
+      room.status = 'active';
+    }
+
+    await Promise.all([session.save(), room.save()]);
+
+    // Broadcast the new turn + phase to all clients in the room
+    const io = getIO();
+    const roomIdStr = req.params.id;
+    io.to(roomIdStr).emit('debate:turn-change', {
+      speaker: session.currentTurn.speaker,
+      phase: session.currentTurn.phase,
+    });
+    if (phase && phase !== currentTurn.phase) {
+      io.to(roomIdStr).emit('debate:phase-change', { phase });
+    }
+    // Kick the server-authoritative timer
+    timerService.start(roomIdStr, newTimeLimit, session.currentTurn.phase, () => {
+      io.to(roomIdStr).emit('debate:timer-complete', {
+        phase: session.currentTurn.phase,
+      });
+    });
+
     sendSuccess(res, session.currentTurn, 'Turn advanced');
   }),
 );

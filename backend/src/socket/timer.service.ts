@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 interface TimerState {
   roomId: string;
   timeRemaining: number;
+  totalSeconds: number;
   phase: string;
   isPaused: boolean;
   interval: NodeJS.Timeout | null;
@@ -29,21 +30,23 @@ class TimerService {
     const state: TimerState = {
       roomId,
       timeRemaining: durationSeconds,
+      totalSeconds: durationSeconds,
       phase,
       isPaused: false,
       interval: null,
     };
 
-    state.interval = setInterval(() => {
-      if (state.isPaused) return;
+      state.interval = setInterval(() => {
+        if (state.isPaused) return;
 
-      state.timeRemaining--;
+        state.timeRemaining--;
 
-      // Broadcast every second
-      this.io?.to(roomId).emit('debate:timer-update', {
-        timeRemaining: state.timeRemaining,
-        phase: state.phase,
-      });
+        // Broadcast every second
+        this.io?.to(roomId).emit('debate:timer-update', {
+          timeRemaining: state.timeRemaining,
+          totalTime: state.totalSeconds,
+          phase: state.phase,
+        });
 
       // 1-minute warning
       if (state.timeRemaining === 60) {

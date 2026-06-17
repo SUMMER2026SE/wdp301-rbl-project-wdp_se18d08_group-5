@@ -4,6 +4,7 @@ import { ENV } from '@/config/env';
 import { useAuthStore } from '@stores/authStore';
 
 let socket: Socket | null = null;
+let socketToken: string | null = null;
 
 /**
  * Singleton socket connection.
@@ -15,10 +16,25 @@ export function getSocket(): Socket | null {
 
 /**
  * Internal helper used by `useSocket` and the global initializer.
- * Creates the singleton if it doesn't exist, otherwise reuses it.
+ * Creates the singleton if it doesn't exist OR if the auth token has changed
+ * (token rotation on login/logout in the same tab).
  */
 function ensureSocket(accessToken: string): Socket {
-  if (socket) return socket;
+  // If we already have a socket for the same token, reuse it.
+  if (socket && socketToken === accessToken && socket.connected) {
+    return socket;
+  }
+  // If token changed or socket is stale, tear down the old socket.
+  if (socket) {
+    try {
+      socket.removeAllListeners();
+      socket.disconnect();
+    } catch {
+      /* ignore */
+    }
+    socket = null;
+    socketToken = null;
+  }
   socket = io(ENV.SOCKET_URL, {
     auth: { token: accessToken },
     transports: ['websocket', 'polling'],
@@ -26,6 +42,7 @@ function ensureSocket(accessToken: string): Socket {
     reconnectionAttempts: 10,
     reconnectionDelay: 1000,
   });
+  socketToken = accessToken;
   return socket;
 }
 
