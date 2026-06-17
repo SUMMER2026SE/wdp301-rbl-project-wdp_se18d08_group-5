@@ -37,6 +37,31 @@ async function broadcastRoomState(roomId: string) {
   }
 }
 
+function getLockableParticipantStats(room: any) {
+  let lockedCount = 0;
+
+  room.participants.forEach((participant: any) => {
+    if (participant.roomRole === 'owner' || participant.roomRole === 'viewer') return;
+    if (participant.roomRole === 'debater' && (!participant.team || !participant.speakerSlot)) return;
+
+    participant.positionLocked = true;
+    lockedCount += 1;
+  });
+
+  return {
+    lockedCount,
+    participantCount: room.participants.length,
+  };
+}
+
+function getLockPositionsMessage(stats: { lockedCount: number; participantCount: number }) {
+  if (stats.lockedCount === 0) {
+    return `No assigned positions to lock (${stats.participantCount} participants in room)`;
+  }
+
+  return `All assigned positions locked (${stats.lockedCount}/${stats.participantCount} participants)`;
+}
+
 const SCORE_LIMITS = {
   logic: 30,
   rebuttal: 20,
@@ -704,8 +729,8 @@ router.post(
 );
 
 // POST /api/v1/rooms/:id/position/lock — Lock positions (UC-19, Owner only)
-// Locks ALL assigned participants: debaters, human host, and judges. The owner
-// is not part of the lock list because they are the operator, not a debater.
+// Locks assigned participants: debaters, human host, and judges. A room owner
+// is lockable only after being explicitly assigned one of those roles.
 router.post(
   '/:id/position/lock',
   authenticate,
@@ -716,18 +741,11 @@ router.post(
       throw new ForbiddenError('Only owner can lock positions');
     }
 
-    let lockedCount = 0;
-    room.participants.forEach((p) => {
-      if (p.userId.toString() === room.createdBy.toString()) return;
-      if (p.roomRole === 'viewer') return;
-      if (p.roomRole === 'debater' && (!p.team || !p.speakerSlot)) return;
-      p.positionLocked = true;
-      lockedCount += 1;
-    });
+    const stats = getLockableParticipantStats(room);
     room.status = room.status === 'waiting' ? 'ready' : room.status;
     await room.save();
     await broadcastRoomState(room._id.toString());
-    sendSuccess(res, { room, lockedCount }, `All positions locked (${lockedCount} participants)`);
+    sendSuccess(res, { room, ...stats }, getLockPositionsMessage(stats));
   }),
 );
 
@@ -742,18 +760,11 @@ router.post(
       throw new ForbiddenError('Only owner can lock positions');
     }
 
-    let lockedCount = 0;
-    room.participants.forEach((p) => {
-      if (p.userId.toString() === room.createdBy.toString()) return;
-      if (p.roomRole === 'viewer') return;
-      if (p.roomRole === 'debater' && (!p.team || !p.speakerSlot)) return;
-      p.positionLocked = true;
-      lockedCount += 1;
-    });
+    const stats = getLockableParticipantStats(room);
     room.status = room.status === 'waiting' ? 'ready' : room.status;
     await room.save();
     await broadcastRoomState(room._id.toString());
-    sendSuccess(res, { room, lockedCount }, `All positions locked (${lockedCount} participants)`);
+    sendSuccess(res, { room, ...stats }, getLockPositionsMessage(stats));
   }),
 );
 
