@@ -8,7 +8,7 @@ import { User } from '../../models/User.js';
 import { getIO } from '../../socket/index.js';
 import { aiService } from '../ai/ai.service.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
-import { startDebate } from '../debate/debate.service.js';
+import { startDebate, triggerTransition } from '../debate/debate.service.js';
 import { timerService } from '../../socket/timer.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
@@ -668,7 +668,7 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = await DebateRoom.findById(req.params.id).select('+password');
     if (!room) throw new NotFoundError('Room not found');
-    if (room.status !== 'waiting' && room.status !== 'ready') {
+    if (!['waiting', 'ready', 'active', 'paused'].includes(room.status)) {
       throw new BadRequestError('Room is not accepting participants');
     }
 
@@ -931,7 +931,6 @@ router.post(
   '/:id/host/next-turn',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { nextSpeaker, phase, timeLimit, transcript } = req.body;
     const room = await DebateRoom.findById(req.params.id);
     if (!room) throw new NotFoundError('Room not found');
 
@@ -939,65 +938,8 @@ router.post(
     const isOwner = room.createdBy.toString() === req.user!.userId;
     if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can advance turns');
 
-    const session = await DebateSession.findOne({ roomId: room._id });
-    if (!session) throw new NotFoundError('Session not found');
-
-    const currentTurn = session.currentTurn;
-    const now = new Date();
-
-    if (currentTurn.startTime) {
-      const duration = now.getTime() - currentTurn.startTime.getTime();
-      session.turnHistory.push({
-        speaker: currentTurn.speaker,
-        startTime: currentTurn.startTime,
-        endTime: now,
-        duration,
-        transcript: transcript || '',
-        crossExamination: currentTurn.phase === 'cross_exam' ? { questionsAsked: 0, questionsAnswered: 0, timeRemainingPro: 0, timeRemainingOpp: 0, transcript: [] } : null,
-        aiAnalysis: null,
-      });
-      await judgeTurnWithAI(room, session, session.turnHistory.length - 1, transcript || '');
-    }
-
-    const newTimeLimit = timeLimit ?? currentTurn.timeLimit ?? 240;
-    session.currentTurn = {
-      speaker: nextSpeaker || currentTurn.speaker,
-      phase: phase || currentTurn.phase,
-      startTime: new Date(),
-      timeLimit: newTimeLimit,
-      timeRemaining: newTimeLimit,
-      status: 'active',
-    };
-
-    // Update room phase if it changed
-    if (phase && phase !== room.currentPhase) {
-      room.currentPhase = phase;
-    }
-    // Make sure room is in active state when advancing
-    if (room.status === 'paused') {
-      room.status = 'active';
-    }
-
-    await Promise.all([session.save(), room.save()]);
-
-    // Broadcast the new turn + phase to all clients in the room
-    const io = getIO();
-    const roomIdStr = req.params.id;
-    io.to(roomIdStr).emit('debate:turn-change', {
-      speaker: session.currentTurn.speaker,
-      phase: session.currentTurn.phase,
-    });
-    if (phase && phase !== currentTurn.phase) {
-      io.to(roomIdStr).emit('debate:phase-change', { phase });
-    }
-    // Kick the server-authoritative timer
-    timerService.start(roomIdStr, newTimeLimit, session.currentTurn.phase, () => {
-      io.to(roomIdStr).emit('debate:timer-complete', {
-        phase: session.currentTurn.phase,
-      });
-    });
-
-    sendSuccess(res, session.currentTurn, 'Turn advanced');
+    await triggerTransition(req.params.id, req.body.transcript || '');
+    sendSuccess(res, { transitioning: true }, 'Turn advanced transition started');
   }),
 );
 
@@ -1076,7 +1018,49 @@ router.post(
     participant.muted = muteAction === 'mute';
     await room.save();
 
+    const io = getIO();
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+    if (state) {
+      io.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
     sendSuccess(res, { userId, muted: participant.muted }, `Participant ${participant.muted ? 'muted' : 'unmuted'}`);
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/mute-chat — Mute/unmute participant chat
+router.post(
+  '/:id/host/mute-chat',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { userId, action, type } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can mute participant chat');
+
+    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    if (!participant) throw new NotFoundError('Participant not found');
+
+    const muteAction = type || action;
+    if (!['mute', 'unmute'].includes(muteAction)) {
+      throw new BadRequestError('Mute action must be mute or unmute');
+    }
+
+    participant.chatMuted = muteAction === 'mute';
+    await room.save();
+
+    const io = getIO();
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+    if (state) {
+      io.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
+    sendSuccess(res, { userId, chatMuted: participant.chatMuted }, `Participant chat ${participant.chatMuted ? 'muted' : 'unmuted'}`);
   }),
 );
 
@@ -1250,6 +1234,36 @@ router.post(
     }
     const aggregatedScores = aggregateFinalScores(session);
 
+    // Determine if we should automatically complete the debate
+    const assignedJudges = room.participants.filter((p) => p.roomRole === 'judge');
+    const isOPPS3 = speaker === 'OPP_S3';
+    
+    const OPP_S3_verdicts = finalScores.judgeVerdicts.filter((v) => v.speaker === 'OPP_S3');
+    const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v) => v.judgeId?.toString()));
+    const allJudgesSubmitted = assignedJudges.every((j) => uniqueJudgesSubmitted.has(j.userId.toString()));
+
+    let autoCompleted = false;
+    let winnerInfo = null;
+
+    if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0) {
+      session.currentTurn.status = 'completed';
+      session.currentTurn.phase = 'completed';
+
+      room.status = 'completed';
+      room.currentPhase = 'completed';
+      room.endedAt = new Date();
+      await room.save();
+
+      autoCompleted = true;
+      winnerInfo = {
+        roomId: room._id.toString(),
+        winnerTeam: aggregatedScores.winner,
+        propositionTotal: aggregatedScores.teamProposition.total,
+        oppositionTotal: aggregatedScores.teamOpposition.total,
+        finalScores: aggregatedScores,
+      };
+    }
+
     await session.save();
 
     getIO().to(req.params.id).emit('score:updated', {
@@ -1265,6 +1279,25 @@ router.post(
       roomId: req.params.id,
       finalScores: aggregatedScores,
     });
+
+    if (autoCompleted && winnerInfo) {
+      // Apply Elo/rankings result
+      await applyDebateResult(room._id.toString()).catch((err) => {
+        console.error('Failed to apply debate Elo result:', err);
+      });
+
+      const io = getIO();
+      // Broadcast winner determined & ended
+      io.to(room._id.toString()).emit('score:winner-determined', winnerInfo);
+      io.to(room._id.toString()).emit('debate:ended', { roomId: room._id.toString(), result: winnerInfo });
+
+      // Build and broadcast room state restore
+      const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+      const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+      if (state) {
+        io.to(room._id.toString()).emit('room:state-restore', state);
+      }
+    }
 
     sendSuccess(
       res,
@@ -1503,6 +1536,123 @@ router.post(
 
     const rankingResult = await applyDebateResult(req.params.id);
     sendSuccess(res, rankingResult, rankingResult.applied ? 'Result applied' : 'Result not applied');
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/start-phase — Start the waiting phase
+router.post(
+  '/:id/host/start-phase',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can start the phase');
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    if (session.currentTurn.status !== 'waiting_to_start') {
+      throw new BadRequestError('Current phase is already started or active');
+    }
+
+    session.currentTurn.status = 'active';
+    session.currentTurn.startTime = new Date();
+    await session.save();
+
+    // Start timer ticking
+    const io = getIO();
+    const phase = session.currentTurn.phase;
+    const timeLimit = session.currentTurn.timeRemaining;
+
+    if (phase === 'cross_exam') {
+      const ceConfig = session.currentTurn.ceState;
+      const { initCEForRoom } = await import('../../socket/ce.socket.js');
+      initCEForRoom(room._id.toString(), ceConfig?.askingTeam as any || 'proposition');
+    } else {
+      timerService.start(room._id.toString(), timeLimit, phase, () => {
+        triggerTransition(room._id.toString()).catch(console.error);
+      });
+    }
+
+    // Broadcast debate:phase-started
+    io.to(room._id.toString()).emit('debate:phase-started', {
+      phase,
+      speaker: session.currentTurn.speaker,
+      timeLimit,
+    });
+
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+    if (state) {
+      io.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
+    sendSuccess(res, session.currentTurn, 'Phase started successfully');
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/grant-speaking — Grant speaking permission to a viewer
+router.post(
+  '/:id/host/grant-speaking',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { userId } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can grant speaking permissions');
+
+    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    if (!participant) throw new NotFoundError('Participant not found');
+
+    participant.speakingAllowed = true;
+    participant.muted = false;
+    await room.save();
+
+    const io = getIO();
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+    if (state) {
+      io.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
+    sendSuccess(res, { userId, speakingAllowed: true }, 'Granted speaking permission to viewer');
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/revoke-speaking — Revoke speaking permission from a viewer
+router.post(
+  '/:id/host/revoke-speaking',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { userId } = req.body;
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const isHost = room.hostId?.toString() === req.user!.userId;
+    const isOwner = room.createdBy.toString() === req.user!.userId;
+    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can revoke speaking permissions');
+
+    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    if (!participant) throw new NotFoundError('Participant not found');
+
+    participant.speakingAllowed = false;
+    participant.muted = true;
+    await room.save();
+
+    const io = getIO();
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+    if (state) {
+      io.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
+    sendSuccess(res, { userId, speakingAllowed: false }, 'Revoked speaking permission from viewer');
   }),
 );
 

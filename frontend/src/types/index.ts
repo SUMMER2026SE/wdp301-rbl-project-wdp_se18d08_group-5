@@ -138,6 +138,8 @@ export interface RoomParticipant {
   speakerSlot: SpeakerSlot | null;
   positionLocked: boolean;
   muted?: boolean;
+  speakingAllowed?: boolean;
+  chatMuted?: boolean;
 }
 
 export interface DebateRoom {

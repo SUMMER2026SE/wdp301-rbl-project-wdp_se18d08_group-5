@@ -84,26 +84,26 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
       <div
         ref={listRef}
         className="flex-grow-1 overflow-auto px-2 py-2 rounded-3"
-        style={{ maxHeight: 280, background: 'rgba(30,40,60,0.4)' }}
+        style={{ maxHeight: 280, background: '#ffffff', color: '#1c1c1c' }}
       >
         {viewerChatMessages.length === 0 ? (
-          <div className="text-muted small text-center py-3">
+          <div className="small text-center py-3" style={{ color: '#888888' }}>
             No viewer messages yet.
           </div>
         ) : (
           viewerChatMessages.map((message) => {
             if (isSystemMessage(message)) {
               return (
-                <div key={message._id} className="text-muted small fst-italic my-1 px-2">
+                <div key={message._id} className="small fst-italic my-1 px-2" style={{ color: '#666666' }}>
                   {message.content}
                 </div>
               );
             }
             const isOwn = message.senderId === user?._id;
             return (
-              <div key={message._id} className={`my-1 px-2 py-1 rounded-2 ${isOwn ? 'bg-info bg-opacity-10' : ''}`}>
+              <div key={message._id} className={`my-1 px-2 py-1 rounded-2`} style={{ background: isOwn ? 'rgba(13, 202, 240, 0.08)' : 'rgba(0, 0, 0, 0.03)' }}>
                 <div className="d-flex align-items-baseline gap-2">
-                  <strong className="small text-capitalize" style={{ color: isOwn ? '#0dcaf0' : undefined }}>
+                  <strong className="small text-capitalize" style={{ color: isOwn ? '#0dcaf0' : '#333333' }}>
                     {message.senderName}
                   </strong>
                   <Badge bg="dark" pill style={{ fontSize: '0.6rem' }}>
@@ -113,7 +113,7 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
                     {formatTime(message.timestamp)}
                   </span>
                 </div>
-                <div className="small text-light">{message.content}</div>
+                <div className="small" style={{ color: '#1c1c1c' }}>{message.content}</div>
               </div>
             );
           })
@@ -127,6 +127,7 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
             value={content}
             disabled={sending}
             onChange={(event) => setContent(event.target.value)}
+            style={{ background: '#ffffff', color: '#1c1c1c', border: '1px solid #ced4da' }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();

@@ -105,8 +105,8 @@ export default function CreateRoomPage() {
                     <Form.Group>
                       <Form.Label>Host</Form.Label>
                       <Form.Select value={form.hostType} onChange={(event) => updateField('hostType', event.target.value as HostType)}>
-                        <option value="human">Human</option>
-                        <option value="ai">AI</option>
+                        <option value="human">With Host</option>
+                        <option value="ai">No Host</option>
                       </Form.Select>
                     </Form.Group>
                   </Col>

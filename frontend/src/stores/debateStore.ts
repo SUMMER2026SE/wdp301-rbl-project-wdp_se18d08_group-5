@@ -22,6 +22,12 @@ interface DebateState {
   timeRemaining: number;
   totalTime: number;
   isPaused: boolean;
+  isTransitioning: boolean;
+  transitionTime: number;
+  turnStatus: 'waiting_to_start' | 'active' | 'paused';
+  speakingAllowed: boolean;
+  prepConsensusReadyUserIds: string[];
+  prepConsensusTotalDebaters: number;
 
   // Mic state (per role)
   micActive: boolean;
@@ -62,6 +68,10 @@ interface DebateState {
   setTimeRemaining: (time: number) => void;
   setTotalTime: (time: number) => void;
   setPaused: (paused: boolean) => void;
+  setTransitionState: (isTransitioning: boolean, time?: number) => void;
+  setTurnStatus: (status: 'waiting_to_start' | 'active' | 'paused') => void;
+  setSpeakingAllowed: (allowed: boolean) => void;
+  setPrepConsensus: (readyUserIds: string[], totalDebaters: number) => void;
   setMicActive: (active: boolean) => void;
   setIsSpeaking: (speaking: boolean) => void;
   setCEState: (state: Partial<DebateState['ceState']>) => void;
@@ -83,8 +93,8 @@ const initialCEState = {
   activeTeam: null as 'proposition' | 'opposition' | null,
   proQuestionsUsed: 0,
   oppQuestionsUsed: 0,
-  proTimeRemaining: 180, // 3 minutes
-  oppTimeRemaining: 180,
+  proTimeRemaining: 120, // 2 minutes
+  oppTimeRemaining: 120,
 };
 
 export const useDebateStore = create<DebateState>((set) => ({
@@ -95,6 +105,12 @@ export const useDebateStore = create<DebateState>((set) => ({
   timeRemaining: 0,
   totalTime: 0,
   isPaused: false,
+  isTransitioning: false,
+  transitionTime: 0,
+  turnStatus: 'waiting_to_start',
+  speakingAllowed: false,
+  prepConsensusReadyUserIds: [],
+  prepConsensusTotalDebaters: 0,
   micActive: false,
   isSpeaking: false,
   ceState: initialCEState,
@@ -133,6 +149,11 @@ export const useDebateStore = create<DebateState>((set) => ({
   setTimeRemaining: (timeRemaining) => set({ timeRemaining }),
   setTotalTime: (totalTime) => set({ totalTime }),
   setPaused: (isPaused) => set({ isPaused }),
+  setTransitionState: (isTransitioning, transitionTime = 3) => set({ isTransitioning, transitionTime }),
+  setTurnStatus: (turnStatus) => set({ turnStatus }),
+  setSpeakingAllowed: (speakingAllowed) => set({ speakingAllowed }),
+  setPrepConsensus: (prepConsensusReadyUserIds, prepConsensusTotalDebaters) =>
+    set({ prepConsensusReadyUserIds, prepConsensusTotalDebaters }),
   setMicActive: (micActive) => set({ micActive }),
   setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
   setCEState: (ceState) =>
@@ -174,6 +195,12 @@ export const useDebateStore = create<DebateState>((set) => ({
       timeRemaining: 0,
       totalTime: 0,
       isPaused: false,
+      isTransitioning: false,
+      transitionTime: 0,
+      turnStatus: 'waiting_to_start',
+      speakingAllowed: false,
+      prepConsensusReadyUserIds: [],
+      prepConsensusTotalDebaters: 0,
       micActive: false,
       isSpeaking: false,
       ceState: initialCEState,

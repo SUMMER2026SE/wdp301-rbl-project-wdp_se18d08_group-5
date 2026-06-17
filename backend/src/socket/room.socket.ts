@@ -30,7 +30,7 @@ function getSocketRooms(socketId: string): string[] {
   return Array.from(socketRooms.get(socketId) || []);
 }
 
-async function buildRoomStatePayload(roomId: string, userId: string) {
+export async function buildRoomStatePayload(roomId: string, userId: string) {
   const room = await DebateRoom.findById(roomId).select('-password');
   if (!room) return null;
 
