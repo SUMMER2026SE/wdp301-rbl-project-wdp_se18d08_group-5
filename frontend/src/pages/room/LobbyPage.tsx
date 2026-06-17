@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Alert, Badge, Button, ButtonGroup, Card, Col, Container, Form, Row, Spinner, Table } from 'react-bootstrap';
 import toast from 'react-hot-toast';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { TopicPicker, getTopicValue, type TopicInputMode } from '@components/room/TopicPicker';
 import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
@@ -14,7 +14,6 @@ type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
 
 export default function LobbyPage() {
   const { roomId = '' } = useParams();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const [team, setTeam] = useState<Team>('proposition');
@@ -86,8 +85,9 @@ export default function LobbyPage() {
   const startMutation = useMutation({
     mutationFn: () => roomService.start(roomId),
     onSuccess: () => {
-      toast.success('Debate started');
-      navigate(`/debate/${roomId}`);
+      toast.success('Debate is starting...');
+      // Do NOT navigate here. Wait for the socket's 'debate:started' event
+      // which useLobbySocket listens for and will navigate all participants.
     },
     onError: () => toast.error('Assign host, choose topic, fill debaters, then lock positions first'),
   });

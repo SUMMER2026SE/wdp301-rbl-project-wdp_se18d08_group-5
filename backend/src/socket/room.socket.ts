@@ -114,11 +114,17 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       socket.emit('room:state-restore', { ...state, found: true });
       socket.emit('chat:history', state.messages);
 
+      // Broadcast to OTHER clients in the room (NOT the joiner — they already got state)
+      // so they can keep their participant list in sync.
       socket.to(roomId).emit('room:participant-update', {
         type: 'joined',
         userId,
         participants: state.participants,
       });
+
+      // Also broadcast the full room state so any client that joined earlier
+      // can re-sync phase / timer / session if they missed an event.
+      socket.to(roomId).emit('room:state-restore', { ...state, found: true });
 
       ack?.({ success: true, data: state });
     } catch (error) {
@@ -128,7 +134,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     }
   }
 
-  function leaveRoom({ roomId }: RoomEventPayload, ack?: RoomAck) {
+  async function leaveRoom({ roomId }: RoomEventPayload, ack?: RoomAck) {
     if (!roomId) {
       socket.emit('room:error', { message: 'roomId is required' });
       ack?.({ success: false, message: 'roomId is required' });
@@ -139,10 +145,21 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     trackLeave(socketId, roomId);
     console.log(`User ${userId} left room ${roomId}`);
 
+    // Re-fetch authoritative participant list so remaining clients stay in sync.
+    const room = await DebateRoom.findById(roomId).select('participants');
+    const participants = room?.participants || [];
+
     socket.to(roomId).emit('room:participant-update', {
       type: 'left',
       userId,
+      participants,
     });
+    // Also broadcast the full room state so other clients can resync
+    // any field they may have missed.
+    const fullState = await buildRoomStatePayload(roomId, userId);
+    if (fullState) {
+      socket.to(roomId).emit('room:state-restore', { ...fullState, found: true });
+    }
 
     socket.emit('room:left', { roomId });
     ack?.({ success: true });
@@ -183,15 +200,19 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
   socket.on('room:rejoin', rejoinRoom);
 
   // Cleanup on disconnect
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', async (reason) => {
     const rooms = getSocketRooms(socketId);
-    rooms.forEach((roomId) => {
+    for (const roomId of rooms) {
+      // Re-fetch authoritative participant list so remaining clients stay in sync.
+      const room = await DebateRoom.findById(roomId).select('participants');
+      const participants = room?.participants || [];
       io.to(roomId).emit('room:participant-update', {
         type: 'left',
         userId,
         reason,
+        participants,
       });
-    });
+    }
     socketRooms.delete(socketId);
     console.log(`User ${userId} disconnected from rooms: ${rooms.join(', ') || 'none'} (${reason})`);
   });

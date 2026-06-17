@@ -5,6 +5,9 @@ import { verifyAccessToken } from '../utils/jwt.js';
 import { registerRoomHandlers } from './room.socket.js';
 import { registerChatHandlers } from './chat.socket.js';
 import { registerDebateHandlers } from './debate.socket.js';
+import { registerCEHandlers } from './ce.socket.js';
+import { registerPrivateRoomHandlers } from './privateRoom.socket.js';
+import { timerService } from './timer.service.js';
 
 let io: Server;
 
@@ -44,10 +47,15 @@ export function initSocket(server: HttpServer) {
     console.log(`🔌 User connected: ${userId} [${socket.id}]`);
     socket.join(`user:${userId}`);
 
+    // Initialize timer service with io so it can broadcast
+    timerService.setIO(io);
+
     // Register event handlers
     registerRoomHandlers(io, socket);
     registerChatHandlers(io, socket);
     registerDebateHandlers(io, socket);
+    registerCEHandlers(io, socket);
+    registerPrivateRoomHandlers(io, socket);
 
     socket.on('disconnect', (reason) => {
       console.log(`🔌 User disconnected: ${userId} [${reason}]`);

@@ -20,7 +20,12 @@ interface DebateState {
   currentPhase: DebatePhase | null;
   currentSpeaker: SpeakerTurn | null;
   timeRemaining: number;
+  totalTime: number;
   isPaused: boolean;
+
+  // Mic state (per role)
+  micActive: boolean;
+  isSpeaking: boolean;
 
   // Cross Examination
   ceState: {
@@ -35,12 +40,18 @@ interface DebateState {
   // Chat
   messages: ChatMessage[];
   viewerChatEnabled: boolean;
+  viewerChatMessages: ChatMessage[];
 
   // Scores
   scores: Record<string, ScoreBreakdown>;
   aiAnalyses: Record<string, AIAnalysis>;
   finalScores: FinalScores | null;
   winnerResult: WinnerResult | null;
+
+  // Private room state
+  currentPrivateRoom: 'proposition' | 'opposition' | 'judge' | null;
+  privateRoomMessages: Record<string, ChatMessage[]>;
+  privateRoomParticipants: Record<string, string[]>;
 
   // Actions
   setRoom: (room: DebateRoom) => void;
@@ -49,15 +60,22 @@ interface DebateState {
   setPhase: (phase: DebatePhase) => void;
   setSpeaker: (speaker: SpeakerTurn) => void;
   setTimeRemaining: (time: number) => void;
+  setTotalTime: (time: number) => void;
   setPaused: (paused: boolean) => void;
+  setMicActive: (active: boolean) => void;
+  setIsSpeaking: (speaking: boolean) => void;
   setCEState: (state: Partial<DebateState['ceState']>) => void;
   addMessage: (message: ChatMessage) => void;
+  addViewerChatMessage: (message: ChatMessage) => void;
   setMessages: (messages: ChatMessage[]) => void;
   setViewerChatEnabled: (enabled: boolean) => void;
   setScore: (speaker: string, score: ScoreBreakdown) => void;
   setAIAnalysis: (speaker: string, analysis: AIAnalysis) => void;
   setFinalScores: (finalScores: FinalScores) => void;
   setWinnerResult: (winnerResult: WinnerResult) => void;
+  setCurrentPrivateRoom: (room: DebateState['currentPrivateRoom']) => void;
+  addPrivateRoomMessage: (room: string, message: ChatMessage) => void;
+  setPrivateRoomParticipants: (room: string, participants: string[]) => void;
   reset: () => void;
 }
 
@@ -75,14 +93,21 @@ export const useDebateStore = create<DebateState>((set) => ({
   currentPhase: null,
   currentSpeaker: null,
   timeRemaining: 0,
+  totalTime: 0,
   isPaused: false,
+  micActive: false,
+  isSpeaking: false,
   ceState: initialCEState,
   messages: [],
   viewerChatEnabled: true,
+  viewerChatMessages: [],
   scores: {},
   aiAnalyses: {},
   finalScores: null,
   winnerResult: null,
+  currentPrivateRoom: null,
+  privateRoomMessages: {},
+  privateRoomParticipants: {},
 
   setRoom: (room) =>
     set({
@@ -106,11 +131,16 @@ export const useDebateStore = create<DebateState>((set) => ({
   setPhase: (currentPhase) => set({ currentPhase }),
   setSpeaker: (currentSpeaker) => set({ currentSpeaker }),
   setTimeRemaining: (timeRemaining) => set({ timeRemaining }),
+  setTotalTime: (totalTime) => set({ totalTime }),
   setPaused: (isPaused) => set({ isPaused }),
+  setMicActive: (micActive) => set({ micActive }),
+  setIsSpeaking: (isSpeaking) => set({ isSpeaking }),
   setCEState: (ceState) =>
     set((state) => ({ ceState: { ...state.ceState, ...ceState } })),
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
+  addViewerChatMessage: (message) =>
+    set((state) => ({ viewerChatMessages: [...state.viewerChatMessages, message] })),
   setMessages: (messages) => set({ messages }),
   setViewerChatEnabled: (viewerChatEnabled) => set({ viewerChatEnabled }),
   setScore: (speaker, score) =>
@@ -120,6 +150,21 @@ export const useDebateStore = create<DebateState>((set) => ({
   setFinalScores: (finalScores) => set({ finalScores }),
   setWinnerResult: (winnerResult) =>
     set({ winnerResult, finalScores: winnerResult.finalScores }),
+  setCurrentPrivateRoom: (currentPrivateRoom) => set({ currentPrivateRoom }),
+  addPrivateRoomMessage: (room, message) =>
+    set((state) => ({
+      privateRoomMessages: {
+        ...state.privateRoomMessages,
+        [room]: [...(state.privateRoomMessages[room] || []), message],
+      },
+    })),
+  setPrivateRoomParticipants: (room, participants) =>
+    set((state) => ({
+      privateRoomParticipants: {
+        ...state.privateRoomParticipants,
+        [room]: participants,
+      },
+    })),
   reset: () =>
     set({
       room: null,
@@ -127,13 +172,20 @@ export const useDebateStore = create<DebateState>((set) => ({
       currentPhase: null,
       currentSpeaker: null,
       timeRemaining: 0,
+      totalTime: 0,
       isPaused: false,
+      micActive: false,
+      isSpeaking: false,
       ceState: initialCEState,
       messages: [],
       viewerChatEnabled: true,
+      viewerChatMessages: [],
       scores: {},
       aiAnalyses: {},
       finalScores: null,
       winnerResult: null,
+      currentPrivateRoom: null,
+      privateRoomMessages: {},
+      privateRoomParticipants: {},
     }),
 }));
