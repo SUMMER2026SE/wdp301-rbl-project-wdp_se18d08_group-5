@@ -14,6 +14,29 @@ import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
 
+/**
+ * Broadcast a compact room snapshot to every connected client in the room.
+ * Used by routes that mutate the room (assign-role, position, lock, start…)
+ * so the lobby stays in sync without forcing every client to poll REST.
+ */
+async function broadcastRoomState(roomId: string) {
+  try {
+    const io = getIO();
+    if (!io) return;
+    const room = await DebateRoom.findById(roomId).select('-password');
+    if (!room) return;
+    io.to(roomId.toString()).emit('room:state-updated', {
+      roomId: room._id,
+      room: await buildRoomPayload(room),
+      status: room.status,
+      currentPhase: room.currentPhase,
+      participants: room.participants,
+    });
+  } catch (error) {
+    console.error('broadcastRoomState error:', error);
+  }
+}
+
 const SCORE_LIMITS = {
   logic: 30,
   rebuttal: 20,
@@ -498,6 +521,7 @@ router.put(
     }
 
     await room.save();
+    await broadcastRoomState(room._id.toString());
     sendSuccess(res, room, 'Room updated');
   }),
 );
@@ -603,6 +627,7 @@ router.post(
     }
 
     await room.save();
+    await broadcastRoomState(room._id.toString());
     sendSuccess(res, room, 'Participant assignment updated');
   }),
 );
@@ -646,6 +671,7 @@ router.post(
     });
 
     await room.save();
+    await broadcastRoomState(room._id.toString());
     sendSuccess(res, room, 'Joined room');
   }),
 );
@@ -672,11 +698,14 @@ router.post(
     if (speakerSlot) participant.speakerSlot = speakerSlot;
 
     await room.save();
+    await broadcastRoomState(room._id.toString());
     sendSuccess(res, room, 'Position updated');
   }),
 );
 
 // POST /api/v1/rooms/:id/position/lock — Lock positions (UC-19, Owner only)
+// Locks ALL assigned participants: debaters, human host, and judges. The owner
+// is not part of the lock list because they are the operator, not a debater.
 router.post(
   '/:id/position/lock',
   authenticate,
@@ -687,13 +716,18 @@ router.post(
       throw new ForbiddenError('Only owner can lock positions');
     }
 
+    let lockedCount = 0;
     room.participants.forEach((p) => {
-      if (p.roomRole === 'debater') {
-        p.positionLocked = true;
-      }
+      if (p.userId.toString() === room.createdBy.toString()) return;
+      if (p.roomRole === 'viewer') return;
+      if (p.roomRole === 'debater' && (!p.team || !p.speakerSlot)) return;
+      p.positionLocked = true;
+      lockedCount += 1;
     });
+    room.status = room.status === 'waiting' ? 'ready' : room.status;
     await room.save();
-    sendSuccess(res, room, 'Positions locked');
+    await broadcastRoomState(room._id.toString());
+    sendSuccess(res, { room, lockedCount }, `All positions locked (${lockedCount} participants)`);
   }),
 );
 
@@ -708,13 +742,18 @@ router.post(
       throw new ForbiddenError('Only owner can lock positions');
     }
 
+    let lockedCount = 0;
     room.participants.forEach((p) => {
-      if (p.roomRole === 'debater') {
-        p.positionLocked = true;
-      }
+      if (p.userId.toString() === room.createdBy.toString()) return;
+      if (p.roomRole === 'viewer') return;
+      if (p.roomRole === 'debater' && (!p.team || !p.speakerSlot)) return;
+      p.positionLocked = true;
+      lockedCount += 1;
     });
+    room.status = room.status === 'waiting' ? 'ready' : room.status;
     await room.save();
-    sendSuccess(res, room, 'Positions locked');
+    await broadcastRoomState(room._id.toString());
+    sendSuccess(res, { room, lockedCount }, `All positions locked (${lockedCount} participants)`);
   }),
 );
 
@@ -724,6 +763,18 @@ router.post(
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await startDebate(req.params.id, req.user!.userId);
+
+    // Notify every client in the room so participants auto-navigate from
+    // the lobby to the live debate screen.
+    const io = getIO();
+    const roomIdStr = req.params.id;
+    io.to(roomIdStr).emit('debate:started', {
+      roomId: roomIdStr,
+      session: result.session,
+      room: result.room,
+    });
+    await broadcastRoomState(roomIdStr);
+
     sendSuccess(res, result, 'Debate started');
   }),
 );
@@ -769,6 +820,7 @@ router.post(
       (p) => p.userId.toString() !== req.user!.userId,
     ) as any;
     await room.save();
+    await broadcastRoomState(room._id.toString());
 
     sendSuccess(res, null, 'Left room');
   }),
@@ -790,6 +842,7 @@ router.post(
       (p) => p.userId.toString() !== userId,
     ) as any;
     await room.save();
+    await broadcastRoomState(room._id.toString());
 
     sendSuccess(res, room, 'Participant kicked');
   }),

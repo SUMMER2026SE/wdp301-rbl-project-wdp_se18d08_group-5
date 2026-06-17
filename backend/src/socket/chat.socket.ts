@@ -3,7 +3,7 @@ import { Message } from '../models/Message.js';
 import { DebateRoom } from '../models/DebateRoom.js';
 
 export function registerChatHandlers(io: Server, socket: Socket) {
-  const userId = (socket as any).userId;
+  const userId = (socket as unknown as { userId: string }).userId;
 
   // Send chat message
   socket.on('chat:send', async ({ roomId, content }: { roomId: string; content: string }) => {

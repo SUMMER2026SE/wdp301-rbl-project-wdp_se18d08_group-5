@@ -29,6 +29,7 @@ interface DebateState {
     oppQuestionsUsed: number;
     proTimeRemaining: number;
     oppTimeRemaining: number;
+    isPaused?: boolean;
   };
 
   // Chat
