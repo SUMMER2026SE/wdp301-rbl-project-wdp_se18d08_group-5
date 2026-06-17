@@ -8,9 +8,17 @@ import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
 import { useLobbySocket } from '@hooks/useLobbySocket';
 import { isSeededDebateTopic } from '@utils/debateTopics';
-import type { SpeakerSlot, Team } from '@/types';
+import type { RoomParticipant, SpeakerSlot, Team } from '@/types';
 
 type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
+
+function getLockState(participant: RoomParticipant) {
+  if (participant.roomRole === 'owner' || participant.roomRole === 'viewer') {
+    return <Badge bg="secondary">Not required</Badge>;
+  }
+
+  return participant.positionLocked ? <i className="bi bi-lock-fill" /> : <i className="bi bi-unlock" />;
+}
 
 export default function LobbyPage() {
   const { roomId = '' } = useParams();
@@ -67,12 +75,16 @@ export default function LobbyPage() {
   const lockMutation = useMutation({
     mutationFn: () => roomService.lockPositions(roomId),
     onSuccess: (response) => {
-      const data = response?.data?.data as { lockedCount?: number; participantCount?: number } | undefined;
-      if (data?.lockedCount !== undefined && data?.participantCount !== undefined) {
+      const data = response?.data?.data as {
+        lockedCount?: number;
+        lockableCount?: number;
+        participantCount?: number;
+      } | undefined;
+      if (data?.lockedCount !== undefined && data?.lockableCount !== undefined) {
         toast.success(
           data.lockedCount === 0
-            ? `No assigned positions to lock (${data.participantCount} participants in room)`
-            : `All assigned positions locked (${data.lockedCount}/${data.participantCount} participants)`,
+            ? `No assigned positions to lock (${data.participantCount ?? 0} participants in room)`
+            : `All assigned positions locked (${data.lockedCount}/${data.lockableCount} required)`,
         );
       } else {
         toast.success('All assigned positions locked');
@@ -184,7 +196,7 @@ export default function LobbyPage() {
                       <td>{participant.roomRole}</td>
                       <td>{participant.team || '-'}</td>
                       <td>{participant.speakerSlot || '-'}</td>
-                      <td>{participant.positionLocked ? <i className="bi bi-lock-fill" /> : <i className="bi bi-unlock" />}</td>
+                      <td>{getLockState(participant)}</td>
                     </tr>
                   ))}
                 </tbody>

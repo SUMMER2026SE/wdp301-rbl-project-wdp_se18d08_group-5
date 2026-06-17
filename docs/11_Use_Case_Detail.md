@@ -240,7 +240,7 @@
 |------------|----------|
 | **Miền** | Xác thực |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Middleware xác thực JWT và kiểm tra role/route trên mọi API bảo vệ. |
 | **Mục tiêu** | Chỉ actor hợp lệ thực hiện hành động (debater không gọi API Host). |
 
@@ -410,7 +410,7 @@
 |------------|----------|
 | **Miền** | Hồ sơ |
 | **Ưu tiên** | P2 |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Hệ thống tự trao badge khi đạt ngưỡng khách quan (Logic Master, Fallacy Resistant, …). |
 | **Mục tiêu** | Gamification không phụ thuộc vote — [10 §3.2](./10_Idea_Build_Community.md). |
 
@@ -480,7 +480,7 @@
 |------------|----------|
 | **Miền** | Matchmaking |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Khi đủ người trong queue, hệ thống ghép cặp ELO và tạo room. |
 | **Mục tiêu** | Bắt đầu trận rank không cần Owner người. |
 
@@ -727,7 +727,7 @@
 |------------|----------|
 | **Miền** | Phòng |
 | **Ưu tiên** | MVP-M |
-| **Actor** | Host / Owner / System |
+| **Actor** | Host / Owner |
 | **Mô tả** | Xác nhận đủ người/slot để sẵn sàng bắt đầu. |
 | **Mục tiêu** | Chỉ Start khi điều kiện lobby thỏa. |
 
@@ -807,7 +807,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | Host / System |
+| **Actor** | Host |
 | **Mô tả** | Công bố chủ đề tranh biện (motion) mở đầu trận. |
 | **Mục tiêu** | Hai đội biết đề bài trước prep 7 phút — [01 §3](./01_Debate_Rule.md). |
 
@@ -905,7 +905,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Engine enforce thứ tự: Pro S1 → Opp S1 → Pro S2 → Opp S2 → Pro S3 → Opp S3. |
 | **Mục tiêu** | Không nhảy lượt trái luật. |
 
@@ -946,7 +946,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Áp dụng hình phạt khi đội không dùng hết quota CE theo §10.3. |
 | **Mục tiêu** | Công bằng thời gian hỏi đáp. |
 
@@ -980,7 +980,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | Debator, System |
+| **Actor** | Debator |
 | **Mô tả** | Khoảng chuẩn bị ngắn trước speaker tiếp theo. |
 | **Mục tiêu** | Đội huddle nhanh — [01 §8](./01_Debate_Rule.md). |
 
@@ -994,7 +994,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | Debator, System |
+| **Actor** | Debator |
 | **Mô tả** | Pro S3 và Opp S3 tổng kết; **không** CE; **không** luận điểm mới. |
 | **Mục tiêu** | Closing đúng luật — [01 §9](./01_Debate_Rule.md). |
 
@@ -1036,7 +1036,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Persist session, speeches, scores, transcript khi trận kết thúc. |
 | **Mục tiêu** | Replay, lịch sử, AI phân tích sau trận. |
 
@@ -1054,7 +1054,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-S |
-| **Actor** | System, Host |
+| **Actor** | Host |
 | **Mô tả** | Phát hiện claim/framework/impact mới ở Speaker 3 — cảnh báo hoặc log. |
 | **Mục tiêu** | Enforce §11 — [01_Debate_Rule.md](./01_Debate_Rule.md). |
 
@@ -1094,7 +1094,7 @@
 |------------|----------|
 | **Miền** | Debate Engine |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | State machine điều phối toàn bộ trận theo [01 §15](./01_Debate_Rule.md). |
 | **Mục tiêu** | Một nguồn sự thật phase/timer trên server. |
 
@@ -1232,7 +1232,7 @@
 |------------|----------|
 | **Miền** | Chấm điểm |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | AI Judge phát nhận xét + điểm tạm sau speech/CE. |
 | **Mục tiêu** | Rank mode mặc định — UC-72. |
 
@@ -1246,7 +1246,7 @@
 |------------|----------|
 | **Miền** | Chấm điểm |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Aggregate khi có 3 judge human hoặc AI+human. |
 | **Mục tiêu** | Một verdict thống nhất (trung bình có trọng số — policy). |
 
@@ -1260,7 +1260,7 @@
 |------------|----------|
 | **Miền** | Chấm điểm |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System, BGK |
+| **Actor** | BGK |
 | **Mô tả** | So sánh tổng điểm Proposition vs Opposition. |
 | **Mục tiêu** | `winnerTeam`: proposition | opposition | draw |
 
@@ -1274,7 +1274,7 @@
 |------------|----------|
 | **Miền** | Chấm điểm |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Tính ELO mới cho participant sau trận `type: rank`. |
 | **Mục tiêu** | Xếp hạng công bằng — công thức TRD. |
 
@@ -1306,7 +1306,7 @@
 |------------|----------|
 | **Miền** | Realtime |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Server là nguồn thời gian; broadcast `phase:changed`, `timer:tick`. |
 | **Mục tiêu** | Client không tự đếm ngược độc lập. |
 
@@ -1345,7 +1345,7 @@
 |------------|----------|
 | **Miền** | Realtime |
 | **Ưu tiên** | MVP-S |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Trạng thái online/offline participant trong lobby/phòng. |
 
 ---
@@ -1356,7 +1356,7 @@
 |------------|----------|
 | **Miền** | Realtime |
 | **Ưu tiên** | MVP-M |
-| **Actor** | User, System |
+| **Actor** | User |
 | **Mô tả** | Sau mất kết nối, client nhận lại phase, timer, CE state. |
 | **Mục tiêu** | Không phá trận khi mạng chập chờn. |
 
@@ -1374,7 +1374,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | AI thực hiện vai Host: motion, prep, signal speech, chuyển CE/BGK. |
 | **Mục tiêu** | Rank mode không cần Host người — [07_AI](./07_AI_Integration_Guide.md). |
 
@@ -1388,7 +1388,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | AI Judge sau mỗi lượt và cuối trận. |
 | **Mục tiêu** | Thay BGK human trong rank. |
 
@@ -1402,7 +1402,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | Trích claims, điểm mạnh/yếu từ transcript speech. |
 | **Mục tiêu** | Hỗ trợ BGK và debater (ẩn hoặc hiện tùy mode). |
 
@@ -1416,7 +1416,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-S |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | Gắn nhãn fallacy cho đoạn lập luận. |
 | **Mục tiêu** | Giáo dục + UC-17 badge. |
 
@@ -1430,7 +1430,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | Kiểm tra câu hỏi CE là câu hỏi thật, không phải speech dài. |
 | **Mục tiêu** | Enforce §10 — không POI-style monologue. |
 
@@ -1446,7 +1446,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | Tóm tắt toàn trận sau `completed`. |
 | **Mục tiêu** | Replay, thread, portfolio. |
 
@@ -1462,7 +1462,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | So sánh hai đội, đưa verdict khi AI là BGK chính. |
 | **Mục tiêu** | UC-63 trong rank mode. |
 
@@ -1476,7 +1476,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System (AI) |
+| **Actor** | AI Service |
 | **Mô tả** | Lọc nội dung chat toxic trước khi broadcast. |
 | **Mục tiêu** | An toàn cộng đồng. |
 
@@ -1490,7 +1490,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-S |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Rate limit + heuristic lặp tin nhắn. |
 
 **UC liên quan:** UC-78
@@ -1530,7 +1530,7 @@
 |------------|----------|
 | **Miền** | AI |
 | **Ưu tiên** | MVP-M |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Retry, queue, hoặc thông báo tạm dừng AI Host/BGK. |
 | **Mục tiêu** | Trận không crash im lặng. |
 
@@ -1574,7 +1574,7 @@
 |------------|----------|
 | **Miền** | Xếp hạng |
 | **Ưu tiên** | P2 |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Trao danh hiệu cuối weekly/monthly/yearly. |
 
 **UC liên quan:** UC-17, UC-84
@@ -1587,7 +1587,7 @@
 |------------|----------|
 | **Miền** | Credibility |
 | **Ưu tiên** | P2 |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Điểm uy tín từ chất lượng argument, evidence, vote. |
 | **Mục tiêu** | [10 §3.3](./10_Idea_Build_Community.md). |
 
@@ -1601,7 +1601,7 @@
 |------------|----------|
 | **Miền** | Credibility |
 | **Ưu tiên** | P2 |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Vote Agree/Disagree có trọng số theo credibility người vote. |
 
 **UC liên quan:** UC-90, UC-99
@@ -1719,7 +1719,7 @@
 |------------|----------|
 | **Miền** | Arena |
 | **Ưu tiên** | MVP-S |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Sinh thread: motion, verdict, timeline, transcript. |
 | **Mục tiêu** | [10 §2.2](./10_Idea_Build_Community.md). |
 
@@ -1831,7 +1831,7 @@
 |------------|----------|
 | **Miền** | Tournament |
 | **Ưu tiên** | P2 |
-| **Actor** | System, Organizer |
+| **Actor** | Organizer |
 | **Mô tả** | Single/double elimination hoặc round robin. |
 
 **Kỹ thuật:** `GET /api/v1/tournaments/:id/brackets`
@@ -1844,7 +1844,7 @@
 |------------|----------|
 | **Miền** | Tournament |
 | **Ưu tiên** | P2 |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Đến giờ thi đấu → tạo room theo [01](./01_Debate_Rule.md), gán debater/judge/host. |
 
 **UC liên quan:** UC-21, UC-32, UC-52
@@ -1857,7 +1857,7 @@
 |------------|----------|
 | **Miền** | Tournament |
 | **Ưu tiên** | P2 |
-| **Actor** | System |
+| **Actor** | Internal Process |
 | **Mô tả** | Sau mỗi trận: advance bracket, ghi thành tích giải vào portfolio. |
 
 **Kỹ thuật:** `POST /api/v1/tournaments/:id/advance`

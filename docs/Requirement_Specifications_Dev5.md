@@ -23,7 +23,7 @@
 | Created By | Dev 5 |
 | Date Created | 16/06/2026 |
 | Primary Actor | Guest / User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | Actor opens the Live Matches page. |
 | Description | As a guest or user, I want to browse live debate matches so that I can find active rooms to watch. |
 | Preconditions | The system has active or waiting debate rooms. |
@@ -57,7 +57,7 @@
 | Created By | Dev 5 |
 | Date Created | 16/06/2026 |
 | Primary Actor | Viewer |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | Actor clicks Spectate from Live Matches or opens a spectate room URL. |
 | Description | As a viewer, I want to spectate an active debate so that I can watch the match without participating. |
 | Preconditions | Target room exists and allows viewing. |
@@ -94,7 +94,7 @@
 | Created By | Dev 5 |
 | Date Created | 16/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | System |
+| Secondary Actors | None |
 | Trigger | User clicks Replay from debate history, completed room, or shared replay link. |
 | Description | As a user, I want to view a replay of a completed debate so that I can review transcript, timeline, scores, and key match events. |
 | Preconditions | Debate session is completed and replay data exists. |
@@ -133,7 +133,7 @@
 | Created By | Dev 5 |
 | Date Created | 16/06/2026 |
 | Primary Actor | User |
-| Secondary Actors | Dev 2, Dev 3, System |
+| Secondary Actors | Dev 2, Dev 3 |
 | Trigger | Debate, lobby, live match, or replay pages need reusable UI components. |
 | Description | As the product team, we need shared UI components so that room, live match, debate, and replay screens remain consistent and responsive. |
 | Preconditions | Frontend project and design conventions are available. |

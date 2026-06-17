@@ -40,27 +40,30 @@ async function broadcastRoomState(roomId: string) {
 
 function getLockableParticipantStats(room: any) {
   let lockedCount = 0;
+  let lockableCount = 0;
 
   room.participants.forEach((participant: any) => {
     if (participant.roomRole === 'owner' || participant.roomRole === 'viewer') return;
     if (participant.roomRole === 'debater' && (!participant.team || !participant.speakerSlot)) return;
 
+    lockableCount += 1;
     participant.positionLocked = true;
     lockedCount += 1;
   });
 
   return {
     lockedCount,
+    lockableCount,
     participantCount: room.participants.length,
   };
 }
 
-function getLockPositionsMessage(stats: { lockedCount: number; participantCount: number }) {
+function getLockPositionsMessage(stats: { lockedCount: number; lockableCount: number; participantCount: number }) {
   if (stats.lockedCount === 0) {
     return `No assigned positions to lock (${stats.participantCount} participants in room)`;
   }
 
-  return `All assigned positions locked (${stats.lockedCount}/${stats.participantCount} participants)`;
+  return `All assigned positions locked (${stats.lockedCount}/${stats.lockableCount} required)`;
 }
 
 const SCORE_LIMITS = {
