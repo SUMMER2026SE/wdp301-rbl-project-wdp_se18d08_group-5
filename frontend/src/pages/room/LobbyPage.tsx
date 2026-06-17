@@ -68,12 +68,16 @@ export default function LobbyPage() {
   const lockMutation = useMutation({
     mutationFn: () => roomService.lockPositions(roomId),
     onSuccess: (response) => {
-      const data = response?.data?.data as { lockedCount?: number } | undefined;
-      toast.success(
-        data?.lockedCount !== undefined
-          ? `All positions locked (${data.lockedCount} participants)`
-          : 'All positions locked',
-      );
+      const data = response?.data?.data as { lockedCount?: number; participantCount?: number } | undefined;
+      if (data?.lockedCount !== undefined && data?.participantCount !== undefined) {
+        toast.success(
+          data.lockedCount === 0
+            ? `No assigned positions to lock (${data.participantCount} participants in room)`
+            : `All assigned positions locked (${data.lockedCount}/${data.participantCount} participants)`,
+        );
+      } else {
+        toast.success('All assigned positions locked');
+      }
       invalidateRoom();
     },
     onError: () => toast.error('Only owner can lock positions'),
