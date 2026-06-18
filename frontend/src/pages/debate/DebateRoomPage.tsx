@@ -412,7 +412,6 @@ export default function DebateRoomPage() {
   const currentParticipant = room?.participants.find((p) => p.userId === user?._id);
   const canUseDebaterActions =
     currentParticipant?.roomRole === 'debater' && ['active', 'paused'].includes(room?.status || '');
-  const canUseVoiceMic = Boolean(isController || canUseDebaterActions);
   const isJudge = currentParticipant?.roomRole === 'judge';
   const isViewer = currentParticipant?.roomRole === 'viewer' || !isParticipant;
   const debaters: RoomParticipant[] = room?.participants.filter((p) => p.roomRole === 'debater') || [];
@@ -920,9 +919,9 @@ export default function DebateRoomPage() {
             </div>
 
             {/* Row 2: Debate workflow + Host/Judge announcements */}
-            <Row className="g-3 flex-grow-1 overflow-hidden" style={{ minHeight: '180px' }}>
-              <Col lg={6} className="d-flex overflow-hidden">
-                <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3">
+            <Row className="g-3 flex-shrink-0 overflow-hidden" style={{ height: 'clamp(260px, 34vh, 340px)', minHeight: 0 }}>
+              <Col xs={6} className="d-flex h-100 overflow-hidden" style={{ minHeight: 0 }}>
+                <div className="flex-grow-1 h-100 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3" style={{ minHeight: 0 }}>
                   <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
                     <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.08em', fontFamily: 'Orbitron' }}>
                       <i className="bi bi-diagram-3-fill me-1"></i> Debate Workflow
@@ -945,7 +944,19 @@ export default function DebateRoomPage() {
                     </div>
                   </div>
 
-                  <div className="flex-grow-1 overflow-y-auto pe-1" style={{ minHeight: 0 }}>
+                  <div
+                    className="flex-grow-1 pe-2"
+                    style={{
+                      minHeight: 0,
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
+                      overscrollBehavior: 'contain',
+                      pointerEvents: 'auto',
+                      touchAction: 'pan-y',
+                      scrollbarColor: 'rgba(0, 245, 255, 0.65) rgba(255, 255, 255, 0.08)',
+                      scrollbarWidth: 'thin',
+                    }}
+                  >
                     {debateWorkflow.map((step, idx) => {
                       const isDone = currentWorkflowIndex > idx;
                       const isActive = currentWorkflowIndex === idx;
@@ -1012,8 +1023,8 @@ export default function DebateRoomPage() {
                 </div>
               </Col>
 
-              <Col lg={6} className="d-flex overflow-hidden">
-                <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3">
+              <Col xs={6} className="d-flex h-100 overflow-hidden" style={{ minHeight: 0 }}>
+                <div className="flex-grow-1 h-100 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-3 border border-secondary border-opacity-10 p-3" style={{ minHeight: 0 }}>
                   <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
                     <span className="text-neon-yellow text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.08em', fontFamily: 'Orbitron' }}>
                       <i className="bi bi-bell-fill me-1"></i> Host & Judge Feed
@@ -1021,7 +1032,19 @@ export default function DebateRoomPage() {
                     <Badge bg="secondary" className="small" style={{ fontSize: '9px' }}>Announcements</Badge>
                   </div>
 
-                  <div className="flex-grow-1 overflow-y-auto space-y-2 pr-1" style={{ minHeight: 0 }}>
+                  <div
+                    className="flex-grow-1 space-y-2 pe-2"
+                    style={{
+                      minHeight: 0,
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
+                      overscrollBehavior: 'contain',
+                      pointerEvents: 'auto',
+                      touchAction: 'pan-y',
+                      scrollbarColor: 'rgba(255, 214, 10, 0.65) rgba(255, 255, 255, 0.08)',
+                      scrollbarWidth: 'thin',
+                    }}
+                  >
                     {announcements.length === 0 ? (
                       <p className="text-muted small italic text-center py-3">No system notifications yet.</p>
                     ) : (
