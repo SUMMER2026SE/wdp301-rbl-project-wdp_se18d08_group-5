@@ -370,6 +370,69 @@ export interface DebateHistoryItem {
   result: 'win' | 'loss' | 'draw' | null;
 }
 
+// --- Forum ---
+
+export type ForumStance = 'agree' | 'disagree';
+
+export interface ForumAuthor {
+  _id: string;
+  username: string;
+  displayName: string;
+  avatar: string;
+}
+
+export interface ForumTopic {
+  _id: string;
+  title: string;
+  description: string;
+  createdBy: ForumAuthor;
+  agreeCount: number;
+  disagreeCount: number;
+  postCount: number;
+  lastActivityAt: string;
+  createdAt: string;
+}
+
+export interface ForumPost {
+  _id: string;
+  topic: string;
+  stance: ForumStance;
+  opinion: string;
+  evidenceText: string;
+  evidenceImageUrl: string;
+  author: ForumAuthor;
+  likeCount: number;
+  isLiked: boolean;
+  commentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateForumPostRequest {
+  opinion: string;
+  evidenceText?: string;
+  evidenceImageUrl?: string;
+}
+
+export interface ForumComment {
+  _id: string;
+  content: string;
+  author: ForumAuthor;
+  stance: ForumStance | null;
+  createdAt: string;
+}
+
+export interface ForumTopicDetail {
+  topic: ForumTopic;
+  userStance: ForumStance | null;
+  posts: Record<ForumStance, ForumPost[]>;
+}
+
+export interface CreateForumTopicRequest {
+  title: string;
+  description?: string;
+}
+
 export interface AdminUser {
   _id: string;
   username: string;

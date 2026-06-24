@@ -23,6 +23,8 @@ const LobbyPage = lazy(() => import('@pages/room/LobbyPage'));
 const DebateRoomPage = lazy(() => import('@pages/debate/DebateRoomPage'));
 const RankQueuePage = lazy(() => import('@pages/matchmaking/RankQueuePage'));
 const ReplayPage = lazy(() => import('@pages/replay/ReplayPage'));
+const ForumPage = lazy(() => import('@pages/forum/ForumPage'));
+const ForumTopicPage = lazy(() => import('@pages/forum/ForumTopicPage'));
 const NotFoundPage = lazy(() => import('@pages/NotFoundPage'));
 
 function withSuspense(Component: React.LazyExoticComponent<() => JSX.Element>) {
@@ -59,6 +61,14 @@ export const routes: RouteObject[] = [
       {
         path: 'matches',
         element: withSuspense(LiveMatchesPage),
+      },
+      {
+        path: 'forum',
+        element: withSuspense(ForumPage),
+      },
+      {
+        path: 'forum/:topicId',
+        element: withSuspense(ForumTopicPage),
       },
       {
         element: <ProtectedRoute />,

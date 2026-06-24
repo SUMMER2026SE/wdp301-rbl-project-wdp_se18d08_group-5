@@ -53,6 +53,10 @@ export function AppNavbar() {
               <i className="bi bi-trophy me-1" />
               {t('links.leaderboard')}
             </Nav.Link>
+            <Nav.Link as={Link} to="/forum">
+              <i className="bi bi-chat-square-text me-1" />
+              Forum
+            </Nav.Link>
             {isAuthenticated && (
               <>
                 <Nav.Link as={Link} to="/matchmaking">
