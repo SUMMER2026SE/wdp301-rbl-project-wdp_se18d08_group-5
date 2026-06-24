@@ -20,6 +20,7 @@ import rankingRoutes from './features/ranking/ranking.routes.js';
 import adminRoutes from './features/admin/admin.routes.js';
 import uploadRoutes from './features/upload/upload.routes.js';
 import reportRoutes from './features/report/report.routes.js';
+import forumRoutes from './features/forum/forum.routes.js';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/v1/rankings', rankingRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/forum', forumRoutes);
 
 // --- Error Handling ---
 app.use(notFoundHandler);

@@ -38,6 +38,19 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
 }
 
 /**
+ * Attach the current user when a valid access token is present, while keeping
+ * public endpoints accessible to visitors who are not signed in.
+ */
+export async function optionalAuthenticate(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.headers.authorization) {
+    next();
+    return;
+  }
+
+  return authenticate(req, res, next);
+}
+
+/**
  * Check if user has one of the allowed roles.
  */
 export function authorize(...roles: string[]) {
