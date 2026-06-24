@@ -11,6 +11,25 @@ const REQUIRED_PLAYERS_BY_FORMAT: Record<string, number> = {
 };
 
 const SPEAKER_SLOTS = ['S1', 'S2', 'S3'];
+const MAX_ELO_TOLERANCE = 50;
+
+type QueueLike = Pick<IMatchQueue, 'createdAt' | 'eloAtQueue'>;
+
+export function getQueueWaitTimeSeconds(entry: Pick<IMatchQueue, 'createdAt'>, now = new Date()) {
+  return Math.max(0, Math.floor((now.getTime() - entry.createdAt.getTime()) / 1000));
+}
+
+export function getQueueEloTolerance(entry: Pick<IMatchQueue, 'createdAt'>, now = new Date()) {
+  const waitTime = getQueueWaitTimeSeconds(entry, now);
+  if (waitTime < 120) return 20;
+  if (waitTime < 300) return 30;
+  return 50;
+}
+
+function canMatchByElo(entry: QueueLike, candidate: QueueLike, now: Date) {
+  const eloDiff = Math.abs(entry.eloAtQueue - candidate.eloAtQueue);
+  return eloDiff <= getQueueEloTolerance(entry, now) && eloDiff <= getQueueEloTolerance(candidate, now);
+}
 
 function buildRankParticipants(users: Array<{ _id: Types.ObjectId; username: string; profile?: { avatar?: string } }>) {
   return users.map((user, index) => {
@@ -47,20 +66,28 @@ type MatchResult =
 
 export async function tryCreateRankMatch(entry: IMatchQueue): Promise<MatchResult> {
   const requiredPlayers = REQUIRED_PLAYERS_BY_FORMAT[entry.format] || 2;
+  const now = new Date();
 
   const queueEntries = await MatchQueue.find({
     _id: { $ne: entry._id },
     format: entry.format,
     status: 'waiting',
+    eloAtQueue: {
+      $gte: entry.eloAtQueue - MAX_ELO_TOLERANCE,
+      $lte: entry.eloAtQueue + MAX_ELO_TOLERANCE,
+    },
   })
-    .sort({ createdAt: 1 })
-    .limit(requiredPlayers - 1);
+    .sort({ createdAt: 1 });
 
-  if (queueEntries.length < requiredPlayers - 1) {
+  const compatibleEntries = queueEntries
+    .filter((queueEntry) => canMatchByElo(entry, queueEntry, now))
+    .slice(0, requiredPlayers - 1);
+
+  if (compatibleEntries.length < requiredPlayers - 1) {
     return { matched: false };
   }
 
-  const matchedEntries = [entry, ...queueEntries];
+  const matchedEntries = [entry, ...compatibleEntries];
   const userIds = matchedEntries.map((queueEntry) => queueEntry.userId);
   const users = await User.find({ _id: { $in: userIds } }).select('username profile.avatar');
 

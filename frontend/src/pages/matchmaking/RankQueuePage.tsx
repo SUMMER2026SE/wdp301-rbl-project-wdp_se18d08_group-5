@@ -97,6 +97,7 @@ export default function RankQueuePage() {
               ) : (
                 <Alert variant={status === 'matched' ? 'success' : 'info'}>
                   Wait time: {statusQuery.data?.waitTime || 0}s
+                  {statusQuery.data?.eloRange ? ` - ELO +/-${statusQuery.data.eloRange}` : ''}
                   {statusQuery.data?.format ? ` • ${statusQuery.data.format}` : ''}
                 </Alert>
               )}

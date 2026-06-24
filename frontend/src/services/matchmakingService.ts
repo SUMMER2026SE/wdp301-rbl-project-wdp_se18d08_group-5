@@ -3,7 +3,7 @@ import type { ApiResponse, DebateFormat } from '@/types';
 
 export const matchmakingService = {
   joinQueue(format: DebateFormat) {
-    return api.post<ApiResponse<{ queueId: string; status: string; format: DebateFormat; roomId: string | null }>>('/matchmaking/queue', { format });
+    return api.post<ApiResponse<{ queueId: string; status: string; format: DebateFormat; elo: number; eloRange: number; waitTime: number; roomId: string | null }>>('/matchmaking/queue', { format });
   },
 
   leaveQueue() {
@@ -11,6 +11,6 @@ export const matchmakingService = {
   },
 
   getStatus() {
-    return api.get<ApiResponse<{ status: string; format?: string; waitTime?: number; roomId?: string | null }>>('/matchmaking/status');
+    return api.get<ApiResponse<{ status: string; format?: string; waitTime?: number; eloRange?: number; roomId?: string | null }>>('/matchmaking/status');
   },
 };

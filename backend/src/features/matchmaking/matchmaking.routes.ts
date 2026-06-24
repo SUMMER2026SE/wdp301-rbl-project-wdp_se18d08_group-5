@@ -7,7 +7,7 @@ import { DebateRoom } from '../../models/DebateRoom.js';
 import { User } from '../../models/User.js';
 import { BadRequestError, NotFoundError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
-import { tryCreateRankMatch } from './matchmaking.service.js';
+import { getQueueEloTolerance, getQueueWaitTimeSeconds, tryCreateRankMatch } from './matchmaking.service.js';
 
 const router = Router();
 
@@ -45,6 +45,7 @@ router.post(
     });
 
     const match = await tryCreateRankMatch(entry);
+    const now = new Date();
 
     sendSuccess(
       res,
@@ -52,6 +53,8 @@ router.post(
         queueId: entry._id,
         format,
         elo: user.ranking.elo,
+        eloRange: getQueueEloTolerance(entry, now),
+        waitTime: getQueueWaitTimeSeconds(entry, now),
         status: match.matched ? 'matched' : 'waiting',
         roomId: match.matched ? match.room._id : null,
       },
@@ -101,8 +104,22 @@ router.get(
         roomId: entry.matchedRoomId,
       });
     }
-    const waitTime = Math.floor((Date.now() - entry.createdAt.getTime()) / 1000);
-    sendSuccess(res, { status: 'waiting', format: entry.format, waitTime });
+    const match = await tryCreateRankMatch(entry);
+    const now = new Date();
+    const waitTime = getQueueWaitTimeSeconds(entry, now);
+    const eloRange = getQueueEloTolerance(entry, now);
+
+    if (match.matched) {
+      return sendSuccess(res, {
+        status: 'matched',
+        format: entry.format,
+        waitTime,
+        eloRange,
+        roomId: match.room._id,
+      });
+    }
+
+    sendSuccess(res, { status: 'waiting', format: entry.format, waitTime, eloRange });
   }),
 );
 
