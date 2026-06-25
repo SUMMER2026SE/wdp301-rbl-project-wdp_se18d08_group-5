@@ -9,6 +9,7 @@ export const ENV = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+  GEMINI_LIVE_MODEL: process.env.GEMINI_LIVE_MODEL || 'gemini-3.5-live-translate-preview',
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
   SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
