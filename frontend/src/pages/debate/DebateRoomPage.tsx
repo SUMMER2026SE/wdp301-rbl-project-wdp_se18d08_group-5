@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Alert,
   Badge,
@@ -26,6 +26,7 @@ import { useSocket } from '@hooks/useSocket';
 import { CountdownTimer } from '@components/debate/CountdownTimer';
 import { CrossExamPanel } from '@components/debate/CrossExamPanel';
 import { MicToggle } from '@components/debate/MicToggle';
+import { LiveTranslationCaptions, type CaptionMode } from '@components/debate/LiveTranslationCaptions';
 import { PrivateRoomPanel } from '@components/debate/PrivateRoomPanel';
 import { MainRoomChat } from '@components/chat/MainRoomChat';
 import { ViewerChat } from '@components/chat/ViewerChat';
@@ -96,11 +97,17 @@ export default function DebateRoomPage() {
   const [scoreWinner, setScoreWinner] = useState<Team | 'draw'>('proposition');
   const [notes, setNotes] = useState('');
   const [turnTranscript, setTurnTranscript] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const [captionMode, setCaptionMode] = useState<CaptionMode>(() => {
+    const saved = window.localStorage.getItem('debate-caption-mode');
+    return saved === 'translate' ? 'translate' : 'original';
+  });
   const lastNotifiedDrawRequestRef = useRef<string | null>(null);
 
   const [activeReactions, setActiveReactions] = useState<Array<{ id: number; username: string; type: 'agree' | 'disagree' }>>([]);
+  useEffect(() => {
+    window.localStorage.setItem('debate-caption-mode', captionMode);
+  }, [captionMode]);
+
   useEffect(() => {
     const handleReaction = (e: Event) => {
       const data = (e as CustomEvent).detail;
@@ -442,44 +449,26 @@ export default function DebateRoomPage() {
     currentParticipant?.roomRole === 'debater' &&
     currentParticipant?.team === currentSpeakerTeam &&
     currentPhase === 'speech';
+  const canUseMicrophone = Boolean(
+    currentParticipant &&
+      (
+        isController ||
+        isMyTurnToSpeak ||
+        currentParticipant.roomRole === 'debater' ||
+        (isViewer && (speakingAllowed || currentParticipant.speakingAllowed))
+      ),
+  );
+
+  // Gemini's input transcript replaces the browser-only speech recognition
+  // as the transcript that is persisted for the active speaker's turn.
+  const handleOwnSourceTranscript = useCallback((text: string) => {
+    if (isMyTurnToSpeak) setTurnTranscript(text);
+  }, [isMyTurnToSpeak]);
 
   const progress = useMemo(() => {
     if (!totalTime) return 0;
     return Math.max(0, Math.min(100, (timeRemaining / totalTime) * 100));
   }, [timeRemaining, totalTime]);
-
-  const startMic = () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error('Microphone transcription is not supported in this browser');
-      return;
-    }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.onresult = (event: any) => {
-      let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setTurnTranscript(transcript.trim());
-    };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-  };
-
-  const stopMic = () => {
-    recognitionRef.current?.stop?.();
-    recognitionRef.current = null;
-    setIsListening(false);
-  };
-
-  useEffect(() => () => stopMic(), []);
 
   useEffect(() => {
     if (!opponentPendingDraw || !pendingDrawRequest) return;
@@ -723,6 +712,13 @@ export default function DebateRoomPage() {
                 )}
               </Alert>
             )}
+
+            <LiveTranslationCaptions
+              roomId={roomId}
+              captionMode={captionMode}
+              onCaptionModeChange={setCaptionMode}
+              onOwnSourceTranscript={handleOwnSourceTranscript}
+            />
             {ownTeamPendingDraw && <Alert variant="info" className="py-2 px-3 mb-0 small flex-shrink-0">Draw request sent. Waiting for opposing team to accept.</Alert>}
 
             {/* Row 1: Mirrored Teams & Motion/Timer */}
@@ -828,20 +824,12 @@ export default function DebateRoomPage() {
                     </div>
                     
                     <div className="d-flex align-items-center gap-3">
-                      {(isController || isMyTurnToSpeak || currentParticipant?.roomRole === 'debater' || (isViewer && speakingAllowed)) && (
+                      {canUseMicrophone && (
                         <div className="d-flex align-items-center gap-1">
-                          {isMyTurnToSpeak && (
-                            <Button
-                              size="sm"
-                              variant={isListening ? 'danger' : 'success'}
-                              onClick={isListening ? stopMic : startMic}
-                              disabled={isTransitioning || turnStatus === 'waiting_to_start'}
-                              style={{ fontSize: '9px', padding: '0.2rem 0.4rem' }}
-                            >
-                              {isListening ? 'Mute' : 'Speak'}
-                            </Button>
-                          )}
-                          <MicToggle roomId={roomId} disabled={isTransitioning || turnStatus === 'waiting_to_start'} />
+                          <MicToggle
+                            roomId={roomId}
+                            disabled={isTransitioning || turnStatus === 'waiting_to_start'}
+                          />
                         </div>
                       )}
                       <div className="d-flex align-items-center gap-1.5 text-muted px-2 py-1 rounded bg-dark bg-opacity-35 border border-secondary border-opacity-15 me-2" title="Viewer Count" style={{ height: 'fit-content' }}>

@@ -10,6 +10,8 @@ interface MicToggleProps {
   disabled?: boolean;
 }
 
+type TranslationStatus = 'idle' | 'connecting' | 'ready' | 'capturing' | 'receiving_audio' | 'captioning' | 'error';
+
 type VoicePeer = {
   socketId: string;
   userId: string;
@@ -82,12 +84,36 @@ function getAudioContextCtor() {
   );
 }
 
+function encodePcm16ToBase64(input: Float32Array, inputSampleRate: number) {
+  const targetSampleRate = 16_000;
+  const ratio = inputSampleRate / targetSampleRate;
+  const outputLength = Math.max(1, Math.round(input.length / ratio));
+  const output = new Int16Array(outputLength);
+
+  for (let index = 0; index < outputLength; index += 1) {
+    const sourceIndex = Math.min(Math.floor(index * ratio), input.length - 1);
+    const sample = Math.max(-1, Math.min(1, input[sourceIndex] || 0));
+    output[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+
+  const bytes = new Uint8Array(output.buffer);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+  }
+  return window.btoa(binary);
+}
+
 export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
   const { micActive, setMicActive, setIsSpeaking } = useDebateStore();
   const { user } = useAuthStore();
   const [audioLevel, setAudioLevel] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const translationAudioContextRef = useRef<AudioContext | null>(null);
+  const translationProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const translationSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const translationMuteGainRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -95,6 +121,8 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const joinedVoiceRef = useRef(false);
   const playbackWarningShownRef = useRef(false);
+  const hasCapturedTranslationAudioRef = useRef(false);
+  const [translationStatus, setTranslationStatus] = useState<TranslationStatus>('idle');
 
   const attachRemoteStream = useCallback((peerSocketId: string, stream: MediaStream) => {
     let audio = remoteAudioRefs.current.get(peerSocketId);
@@ -254,6 +282,23 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     setAudioLevel(0);
   }, []);
 
+  const stopTranslationAudio = useCallback(() => {
+    translationProcessorRef.current?.disconnect();
+    translationProcessorRef.current = null;
+    translationSourceRef.current?.disconnect();
+    translationSourceRef.current = null;
+    translationMuteGainRef.current?.disconnect();
+    translationMuteGainRef.current = null;
+
+    if (translationAudioContextRef.current) {
+      translationAudioContextRef.current.close().catch(() => undefined);
+      translationAudioContextRef.current = null;
+    }
+
+    getSocket()?.emit('translation:stop', { roomId });
+    setTranslationStatus('idle');
+  }, [roomId]);
+
   const stopLocalStream = useCallback(() => {
     stopAudioMeter();
 
@@ -289,6 +334,93 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     animationRef.current = requestAnimationFrame(tick);
   }, []);
 
+  const startTranslationAudio = useCallback((stream: MediaStream) => {
+    const socket = getSocket();
+    const AudioContextCtor = getAudioContextCtor();
+    if (!socket || !AudioContextCtor) {
+      toast.error('Live captions are unavailable in this browser');
+      return;
+    }
+
+    socket.emit('translation:start', { roomId }, (result?: { success?: boolean; message?: string }) => {
+      if (result?.success) return;
+      toast.error(result?.message || 'Live translation is unavailable. Voice chat is still active.');
+      setTranslationStatus('error');
+    });
+    setTranslationStatus('connecting');
+    hasCapturedTranslationAudioRef.current = false;
+
+    const ctx = new AudioContextCtor();
+    // getUserMedia may resolve after the original click event, leaving a new
+    // AudioContext suspended in some browsers unless it is resumed explicitly.
+    void ctx.resume().catch(() => {
+      toast.error('Live captions need a browser interaction to start');
+    });
+    const source = ctx.createMediaStreamSource(stream);
+    // 4096 frames is approximately 85 ms at the common 48 kHz microphone
+    // rate, close to Gemini Live's recommended 100 ms audio chunks.
+    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    const muteGain = ctx.createGain();
+    muteGain.gain.value = 0;
+
+    processor.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      const pcmBase64 = encodePcm16ToBase64(input, ctx.sampleRate);
+      socket.emit('translation:audio', { roomId, data: pcmBase64 });
+      if (!hasCapturedTranslationAudioRef.current) {
+        hasCapturedTranslationAudioRef.current = true;
+        setTranslationStatus('capturing');
+      }
+    };
+
+    source.connect(processor);
+    processor.connect(muteGain);
+    muteGain.connect(ctx.destination);
+    translationAudioContextRef.current = ctx;
+    translationSourceRef.current = source;
+    translationProcessorRef.current = processor;
+    translationMuteGainRef.current = muteGain;
+  }, [roomId]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleTranslationStatus = (payload: { roomId?: string; state?: TranslationStatus; message?: string }) => {
+      if (payload.roomId !== roomId || !payload.state) return;
+      setTranslationStatus(payload.state);
+      if (payload.state !== 'error') return;
+      toast.error(payload.message || 'Live translation stopped. Voice chat is still active.');
+      stopTranslationAudio();
+      setTranslationStatus('error');
+    };
+
+    socket.on('translation:status', handleTranslationStatus);
+    return () => {
+      socket.off('translation:status', handleTranslationStatus);
+    };
+  }, [roomId, stopTranslationAudio]);
+
+  const translationStatusLabel: Record<TranslationStatus, string> = {
+    idle: '',
+    connecting: 'CONNECTING',
+    ready: 'GEMINI READY',
+    capturing: 'CAPTURING AUDIO',
+    receiving_audio: 'AUDIO RECEIVED',
+    captioning: 'CAPTIONS LIVE',
+    error: 'CAPTION ERROR',
+  };
+
+  const translationStatusVariant: Record<TranslationStatus, string> = {
+    idle: 'secondary',
+    connecting: 'warning',
+    ready: 'info',
+    capturing: 'primary',
+    receiving_audio: 'success',
+    captioning: 'success',
+    error: 'danger',
+  };
+
   const startMic = useCallback(async () => {
     if (disabled || micActive) return;
 
@@ -310,6 +442,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
 
       streamRef.current = stream;
       startAudioMeter(stream);
+      startTranslationAudio(stream);
 
       peerConnectionsRef.current.forEach((pc) => addLocalTracks(pc, stream));
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
@@ -319,6 +452,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     } catch (error) {
       console.error('Microphone access error:', error);
       toast.error(getMicrophoneErrorMessage(error));
+      stopTranslationAudio();
       stopLocalStream();
     }
   }, [
@@ -329,10 +463,13 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     setIsSpeaking,
     setMicActive,
     startAudioMeter,
+    startTranslationAudio,
+    stopTranslationAudio,
     stopLocalStream,
   ]);
 
   const stopMic = useCallback(() => {
+    stopTranslationAudio();
     stopLocalStream();
     peerConnectionsRef.current.forEach(removeLocalTracks);
     Array.from(peerConnectionsRef.current.keys()).forEach((peerSocketId) => {
@@ -349,6 +486,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     sendOffer,
     setIsSpeaking,
     setMicActive,
+    stopTranslationAudio,
     stopLocalStream,
     user?._id,
   ]);
@@ -484,6 +622,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
 
       cleanupSocket();
       closeAllPeerConnections();
+      stopTranslationAudio();
       stopLocalStream();
       setMicActive(false);
       setIsSpeaking(false);
@@ -497,6 +636,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     sendOffer,
     setIsSpeaking,
     setMicActive,
+    stopTranslationAudio,
     stopLocalStream,
   ]);
 
@@ -524,6 +664,11 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
               ))}
             </div>
             <Badge bg="success" pill style={{ fontSize: '0.6rem' }}>LIVE</Badge>
+            {translationStatus !== 'idle' && (
+              <Badge bg={translationStatusVariant[translationStatus]} pill style={{ fontSize: '0.6rem' }}>
+                {translationStatusLabel[translationStatus]}
+              </Badge>
+            )}
           </div>
           <Button
             size="sm"

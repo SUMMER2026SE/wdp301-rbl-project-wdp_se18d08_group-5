@@ -8,6 +8,7 @@ import { registerDebateHandlers } from './debate.socket.js';
 import { registerCEHandlers } from './ce.socket.js';
 import { registerPrivateRoomHandlers } from './privateRoom.socket.js';
 import { registerVoiceHandlers } from './voice.socket.js';
+import { registerTranslationHandlers } from './translation.socket.js';
 import { timerService } from './timer.service.js';
 
 let io: Server;
@@ -58,6 +59,7 @@ export function initSocket(server: HttpServer) {
     registerCEHandlers(io, socket);
     registerPrivateRoomHandlers(io, socket);
     registerVoiceHandlers(io, socket);
+    registerTranslationHandlers(io, socket);
 
     socket.on('disconnect', (reason) => {
       console.log(`🔌 User disconnected: ${userId} [${reason}]`);
