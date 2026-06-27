@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { getSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
+import { clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
 import type {
   AIAnalysis,
   ChatMessage,
@@ -24,9 +25,16 @@ interface RoomStateRestore {
   currentTurn: DebateSession['currentTurn'] | null;
   timeRemaining: number;
   isPaused: boolean;
+  pauseType?: 'host' | 'proposition' | 'opposition' | null;
+  pausesUsed?: {
+    proposition: number;
+    opposition: number;
+  };
   messages: ChatMessage[];
   finalScores: FinalScores | null;
   viewerChatEnabled: boolean;
+  prepConsensusReadyUserIds?: string[];
+  prepConsensusTotalDebaters?: number;
 }
 
 /**
@@ -43,6 +51,8 @@ export function useDebateSocket(roomId: string | undefined) {
     setTimeRemaining,
     setTotalTime,
     setPaused,
+    setPauseType,
+    setPausesUsed,
     setCEState,
     addMessage,
     setMessages,
@@ -58,7 +68,18 @@ export function useDebateSocket(roomId: string | undefined) {
     setTransitionState,
     setTurnStatus,
     setSpeakingAllowed,
+    setTransitionAnnouncement,
     setPrepConsensus,
+    setPrepConsensusByTeam,
+    setJudgeNextPhaseVotes,
+    setNoHostS1Ready,
+    setAIFeedback,
+    setAIFinalVerdict,
+    setCurrentPrivateRoom,
+    addDisconnectedMember,
+    removeDisconnectedMember,
+    setDisconnectTimerActive,
+    setForfeitTeam,
   } = useDebateStore();
 
   useEffect(() => {
@@ -73,14 +94,25 @@ export function useDebateSocket(roomId: string | undefined) {
       setPhase(data.currentPhase);
       setTimeRemaining(data.timeRemaining);
       setPaused(data.isPaused);
+      if (data.pauseType !== undefined) {
+        setPauseType(data.pauseType);
+      }
+      if (data.pausesUsed !== undefined) {
+        setPausesUsed(data.pausesUsed);
+      }
       setMessages(data.messages);
       setViewerChatEnabled(data.viewerChatEnabled);
+      if (data.prepConsensusReadyUserIds !== undefined) {
+        setPrepConsensus(data.prepConsensusReadyUserIds, data.prepConsensusTotalDebaters || 2);
+      }
 
       if (data.currentTurn?.speaker) {
         setSpeaker(data.currentTurn.speaker);
       }
-      if (data.finalScores) {
-        setFinalScores(data.finalScores);
+      setFinalScores(data.finalScores || null);
+
+      if (data.room?.status === 'completed' || data.room?.status === 'cancelled') {
+        clearDebateRoomFromStorage();
       }
 
       // Sync turnStatus
@@ -103,8 +135,9 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Auto Mute Transition Countdown Overlay
-    socket.on('debate:transition-start', (data: { duration: number }) => {
+    socket.on('debate:transition-start', (data: { duration: number; announcement?: string }) => {
       setTransitionState(true, data.duration);
+      if (data.announcement) setTransitionAnnouncement(data.announcement);
       window.dispatchEvent(new CustomEvent('debate:force-mute'));
       let remaining = data.duration;
       const interval = setInterval(() => {
@@ -137,13 +170,92 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Prep Phase Consensus
-    socket.on('debate:prep-consensus-update', (data: { readyUserIds: string[]; totalDebaters: number }) => {
-      setPrepConsensus(data.readyUserIds, data.totalDebaters);
+    socket.on('debate:prep-consensus-update', (data: { 
+      readyUserIds?: string[]; 
+      totalDebaters?: number;
+      readyCount?: number;
+      propositionReady?: boolean;
+      oppositionReady?: boolean;
+      propositionVotes?: number;
+      oppositionVotes?: number;
+      propositionTotal?: number;
+      oppositionTotal?: number;
+    }) => {
+      // Handle both 1v1 and 3v3 consensus updates
+      if (data.propositionVotes !== undefined && data.oppositionVotes !== undefined) {
+        // 3v3 format - per-team consensus
+        if (data.propositionTotal !== undefined) {
+          setPrepConsensusByTeam('proposition', data.propositionVotes, data.propositionTotal);
+        }
+        if (data.oppositionTotal !== undefined) {
+          setPrepConsensusByTeam('opposition', data.oppositionVotes || 0, data.oppositionTotal || 0);
+        }
+      } else {
+        // 1v1 format - simple consensus
+        setPrepConsensus(data.readyUserIds || [], data.totalDebaters || 0);
+      }
     });
 
-    // Phase change
-    socket.on('debate:phase-change', (data: { phase: DebatePhase }) => {
+    // Judge Next Phase Vote Update (for no-host mode)
+    socket.on('judge:next-phase-vote-update', (data: { 
+      votedUserIds: string[];
+      votedCount: number;
+      totalJudges: number;
+      allVoted: boolean;
+    }) => {
+      setJudgeNextPhaseVotes(data.votedUserIds, data.totalJudges);
+      toast(`Judge votes: ${data.votedCount}/${data.totalJudges}`, {
+        icon: '📋',
+        duration: 2000,
+      });
+    });
+
+    // Phase change with announcement text
+    socket.on('debate:phase-change', (data: { phase: DebatePhase; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean }) => {
       setPhase(data.phase);
+      if (data.announcement) {
+        setTransitionAnnouncement(data.announcement);
+      }
+    });
+
+    socket.on('debate:match-ready-to-end', (data: { announcement?: string }) => {
+      if (data.announcement) {
+        setTransitionAnnouncement(data.announcement);
+      }
+    });
+
+    // No-host S1 consensus update
+    socket.on('debate:s1-start-update', (data: { readyUserIds: string[]; totalS1: number }) => {
+      setNoHostS1Ready(data.readyUserIds);
+    });
+
+    // AI feedback received during judge feedback phase
+    socket.on('debate:ai-feedback', (data: { speaker: string; feedback: AIAnalysis }) => {
+      setAIFeedback({ speaker: data.speaker, feedback: data.feedback });
+      toast(`AI Feedback for ${data.speaker}`, { icon: '🤖', duration: 5000 });
+    });
+
+    // AI feedback display ready (after AI processed)
+    socket.on('debate:ai-feedback-received', () => {
+      toast('AI feedback is ready!', { icon: '🤖', duration: 3000 });
+    });
+
+    // No-host debate ended (auto or manual)
+    socket.on('debate:ended', (data: { roomId: string; isAuto?: boolean; verdict?: { winner: string; summary: string } }) => {
+      if (data.verdict) {
+        setAIFinalVerdict(data.verdict as any);
+      }
+    });
+
+    // Turn status change
+    socket.on('debate:turn-status-change', (data: { turnStatus: string }) => {
+      if (data.turnStatus === 'idle') {
+        setTurnStatus('waiting_to_start');
+      } else if (data.turnStatus === 'active') {
+        setTurnStatus('active');
+      } else if (data.turnStatus === 'paused') {
+        setTurnStatus('paused');
+      }
     });
 
     // Turn change
@@ -160,13 +272,31 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Pause/Resume
-    socket.on('debate:paused', () => setPaused(true));
-    socket.on('debate:resumed', () => setPaused(false));
+    socket.on('debate:paused', (payload?: { pauseType?: 'host' | 'proposition' | 'opposition' | null; pausesUsed?: { proposition: number; opposition: number } }) => {
+      setPaused(true);
+      if (payload?.pauseType !== undefined) {
+        setPauseType(payload.pauseType);
+      }
+      if (payload?.pausesUsed !== undefined) {
+        setPausesUsed(payload.pausesUsed);
+      }
+    });
+    socket.on('debate:resumed', () => {
+      setPaused(false);
+      setPauseType(null);
+    });
 
-    // Cross Examination
+    // Cross Examination — shared timer, both teams tick
     socket.on(
       'cross-exam:update',
-      (data: Partial<ReturnType<typeof useDebateStore.getState>['ceState']>) => {
+      (data: {
+        sharedRemaining: number;
+        totalSeconds: number;
+        questionsPro: number;
+        questionsOpp: number;
+        quotaPerTeam: number;
+        isPaused: boolean;
+      }) => {
         setCEState(data);
       },
     );
@@ -245,6 +375,7 @@ export function useDebateSocket(roomId: string | undefined) {
     // Debate ended
     socket.on('debate:ended', (data: { roomId: string; result?: WinnerResult }) => {
       if (data.result) setWinnerResult(data.result);
+      clearDebateRoomFromStorage();
     });
 
     // Timer events
@@ -280,8 +411,31 @@ export function useDebateSocket(roomId: string | undefined) {
     );
     socket.on(
       'private-room:joined',
-      (data: { roomId: string; team: string; participantCount: number }) => {
+      (data: { roomId: string; team: string; participantCount: number; messageHistory?: ChatMessage[] }) => {
         console.log('Joined private room:', data);
+        // Set current private room
+        setCurrentPrivateRoom(data.team as 'proposition' | 'opposition' | 'judge');
+        // Load message history if available
+        if (data.messageHistory && Array.isArray(data.messageHistory)) {
+          const key = `${data.roomId}::${data.team}`;
+          data.messageHistory.forEach((msg) => {
+            addPrivateRoomMessage(key, { ...msg, team: data.team } as ChatMessage & { team?: string });
+          });
+        }
+      },
+    );
+    socket.on(
+      'private-room:left',
+      (data: { roomId: string; team: string }) => {
+        console.log('Left private room:', data);
+        setCurrentPrivateRoom(null);
+      },
+    );
+    socket.on(
+      'private-room:error',
+      (data: { message: string }) => {
+        console.error('Private room error:', data.message);
+        toast.error(data.message);
       },
     );
 
@@ -305,6 +459,7 @@ export function useDebateSocket(roomId: string | undefined) {
       socket.off('judge:reaction');
       socket.off('debate:prep-consensus-update');
       socket.off('debate:phase-change');
+      socket.off('debate:turn-status-change');
       socket.off('debate:turn-change');
       socket.off('debate:timer-update');
       socket.off('debate:timer-complete');
@@ -325,9 +480,16 @@ export function useDebateSocket(roomId: string | undefined) {
       socket.off('score:winner-determined');
       socket.off('debate:card-issued');
       socket.off('debate:ended');
+      socket.off('debate:participant-disconnected');
+      socket.off('debate:participant-reconnected');
+      socket.off('debate:disconnect-timer-start');
+      socket.off('debate:disconnect-timer-cancelled');
+      socket.off('debate:team-forfeited');
       socket.off('private-chat:message');
       socket.off('private-room:participant-update');
       socket.off('private-room:joined');
+      socket.off('private-room:left');
+      socket.off('private-room:error');
     };
   }, [
     roomId,
@@ -336,6 +498,7 @@ export function useDebateSocket(roomId: string | undefined) {
     addViewerChatMessage,
     setAIAnalysis,
     setCEState,
+    setCurrentPrivateRoom,
     setFinalScores,
     setHost,
     setMessages,
@@ -349,6 +512,14 @@ export function useDebateSocket(roomId: string | undefined) {
     setTotalTime,
     setViewerChatEnabled,
     setWinnerResult,
+    setTransitionAnnouncement,
+    setPrepConsensus,
+    setPrepConsensusByTeam,
+    setJudgeNextPhaseVotes,
     t,
+    addDisconnectedMember,
+    removeDisconnectedMember,
+    setDisconnectTimerActive,
+    setForfeitTeam,
   ]);
 }

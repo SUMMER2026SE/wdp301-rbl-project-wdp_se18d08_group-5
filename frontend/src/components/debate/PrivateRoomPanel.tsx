@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Alert, Button, ListGroup } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
 import { getSocket } from '@hooks/useSocket';
+import toast from 'react-hot-toast';
 import type { Team } from '@/types';
 
 type PrivateRoomTeam = Team | 'judge';
@@ -18,37 +20,70 @@ function formatTime(timestamp: string | Date) {
 }
 
 export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
+  const room = useDebateStore((s) => s.room);
   const currentPrivateRoom = useDebateStore((s) => s.currentPrivateRoom);
   const privateRoomMessages = useDebateStore((s) => s.privateRoomMessages);
   const setCurrentPrivateRoom = useDebateStore((s) => s.setCurrentPrivateRoom);
 
   const [content, setContent] = useState('');
-  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const socket = getSocket();
   const myKey = currentPrivateRoom ? `${roomId}::${currentPrivateRoom}` : null;
   const messages = myKey ? (privateRoomMessages[myKey] || []) : [];
 
-  const handleJoin = async (team: PrivateRoomTeam) => {
+  const participant = room?.participants.find((p) => p.userId === user?._id);
+  const myRole = participant?.roomRole;
+  const myTeam = participant?.team;
+  const isController = Boolean(user && room?.hostId === user._id);
+  const isHost = Boolean(isController || myRole === 'host' || myRole === 'owner');
+
+  const allowedTeams = (() => {
+    if (isHost) return ['proposition', 'opposition', 'judge'] as PrivateRoomTeam[];
+    if (myRole === 'judge') return ['judge'] as PrivateRoomTeam[];
+    if (myRole === 'debater' && myTeam) {
+      return [myTeam as PrivateRoomTeam];
+    }
+    return [] as PrivateRoomTeam[];
+  })();
+
+  // Listen for private room errors from socket
+  useEffect(() => {
     if (!socket) return;
-    setJoining(true);
-    socket.emit('private-room:join', { roomId, team }, (response: { success: boolean; message?: string }) => {
-      setJoining(false);
-      if (response.success) {
-        setCurrentPrivateRoom(team);
-        setContent('');
-      } else {
-        console.error('Failed to join private room:', response.message);
-      }
-    });
+
+    const handleError = (data: { message: string }) => {
+      setError(data.message);
+      toast.error(data.message);
+    };
+
+    socket.on('private-room:error', handleError);
+
+    return () => {
+      socket.off('private-room:error', handleError);
+    };
+  }, [socket]);
+
+  // Clear error when changing rooms
+  useEffect(() => {
+    setError(null);
+  }, [currentPrivateRoom]);
+
+  const handleJoin = (team: PrivateRoomTeam) => {
+    navigate(`/debate/${roomId}/private/${team}`);
   };
 
   const handleLeave = () => {
     if (!socket || !currentPrivateRoom) return;
-    socket.emit('private-room:leave', { roomId, team: currentPrivateRoom });
-    setCurrentPrivateRoom(null);
-    setContent('');
+    socket.emit('private-room:leave', { roomId, team: currentPrivateRoom }, (response: { success: boolean }) => {
+      if (response.success) {
+        setCurrentPrivateRoom(null);
+        setContent('');
+        setError(null);
+        toast.success('Left private room');
+      }
+    });
   };
 
   const handleSend = () => {
@@ -59,8 +94,8 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
   };
 
   return (
-    <div className="d-flex flex-column h-100" style={{ minHeight: 320 }}>
-      <div className="d-flex align-items-center justify-content-between mb-2">
+    <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
+      <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
         <h6 className="mb-0">
           <i className="bi bi-door-open me-2" />
           {currentPrivateRoom
@@ -75,18 +110,23 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
         )}
       </div>
 
+      {error && (
+        <Alert variant="danger" className="mb-2 py-2 small flex-shrink-0" dismissible onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
       {!currentPrivateRoom ? (
         <>
-          <Alert variant="info" className="mb-2 small py-2">
+          <Alert variant="info" className="mb-2 small py-2 flex-shrink-0">
             Select a private room to join. You can only access rooms your role allows.
           </Alert>
-          <ListGroup>
-            {(['proposition', 'opposition', 'judge'] as PrivateRoomTeam[]).map((team) => (
+          <ListGroup className="flex-grow-1 overflow-auto" style={{ minHeight: 0 }}>
+            {allowedTeams.map((team) => (
               <ListGroup.Item
                 key={team}
                 action
                 onClick={() => handleJoin(team)}
-                disabled={joining}
                 className="d-flex justify-content-between align-items-center"
               >
                 <span className="text-capitalize">
@@ -102,13 +142,18 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
                 </small>
               </ListGroup.Item>
             ))}
+            {allowedTeams.length === 0 && (
+              <div className="small text-center text-muted py-3">
+                You do not have access to any private rooms.
+              </div>
+            )}
           </ListGroup>
         </>
       ) : (
         <>
           <div
             className="flex-grow-1 overflow-auto px-2 py-2 rounded-3 mb-2"
-            style={{ maxHeight: 260, background: '#ffffff', color: '#1c1c1c' }}
+            style={{ minHeight: 0, background: '#ffffff', color: '#1c1c1c' }}
           >
             {messages.length === 0 ? (
               <div className="small text-center py-3" style={{ color: '#888888' }}>

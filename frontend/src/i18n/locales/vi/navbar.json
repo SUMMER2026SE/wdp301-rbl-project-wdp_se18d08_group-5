@@ -1,21 +1,22 @@
-{
+﻿{
   "brand": "AI Debate",
   "links": {
-    "liveMatches": "Trận đấu trực tiếp",
-    "leaderboard": "Bảng xếp hạng",
-    "rank": "Xếp hạng",
-    "createRoom": "Tạo phòng",
-    "profile": "Hồ sơ",
+    "liveMatches": "Live Matches",
+    "leaderboard": "Leaderboard",
+    "rank": "Rank",
+    "createRoom": "Create Room",
+    "profile": "Profile",
     "admin": "Admin",
-    "changePassword": "Đổi mật khẩu",
-    "logout": "Đăng xuất",
-    "login": "Đăng nhập",
-    "register": "Đăng ký"
+    "changePassword": "Change password",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register"
   },
   "language": {
-    "label": "Ngôn ngữ",
-    "en": "EN",
-    "vi": "VI",
-    "ja": "日本語"
+    "label": "Language",
+    "en": "English",
+    "vi": "Vietnamese",
+    "ja": "Japanese"
   }
 }
+

@@ -1,7 +1,8 @@
-{
-  "generic": "エラーが発生しました",
-  "noRefreshToken": "リフレッシュトークンがありません",
-  "system": "システム",
-  "yellowCard": "イエローカード",
-  "redCard": "レッドカード"
+﻿{
+  "generic": "Something went wrong",
+  "noRefreshToken": "No refresh token",
+  "system": "System",
+  "yellowCard": "Yellow card",
+  "redCard": "Red card"
 }
+

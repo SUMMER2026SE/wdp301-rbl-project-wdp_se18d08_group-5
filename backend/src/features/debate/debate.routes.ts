@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticate } from '../../middleware/auth.js';
+import { roomParticipantGuard, roomControllerGuard } from '../../middleware/roomGuard.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
@@ -7,6 +8,7 @@ import { DebateSession } from '../../models/DebateSession.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/AppError.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { getIO } from '../../socket/index.js';
+import { timerService } from '../../socket/timer.service.js';
 import {
   advanceTurn,
   endDebate,
@@ -22,10 +24,16 @@ import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
 
+// Param-aware guard for :roomId routes
+const roomParticipantGuardById = (param: string) => roomParticipantGuard(param);
+// Hosts and Judge S1 (in no-host rooms) can advance/end/pause the debate
+const roomDebateControllerGuard = (param: string) => roomControllerGuard(param);
+
 // POST /api/v1/debate/:roomId/next-turn — Advance turn using the debate flow
 router.post(
   '/:roomId/next-turn',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await advanceTurn(req.params.roomId, req.user!.userId, req.body.transcript || '');
     sendSuccess(res, result, 'Turn advanced');
@@ -36,6 +44,7 @@ router.post(
 router.post(
   '/:roomId/finish-phase',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await finishPhase(req.params.roomId, req.user!.userId, req.body.transcript || '');
     sendSuccess(res, result, 'Phase finished');
@@ -46,6 +55,7 @@ router.post(
 router.post(
   '/:roomId/ce/pass-turn',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await passCeTurn(req.params.roomId, req.user!.userId, req.body.content || '');
     sendSuccess(res, result, 'Cross-exam turn passed');
@@ -56,18 +66,48 @@ router.post(
 router.post(
   '/:roomId/ce/finish',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await finishCe(req.params.roomId, req.user!.userId, req.body.transcript || '');
     sendSuccess(res, result, 'Cross-exam finished');
   }),
 );
 
+async function broadcastDebateCompleted(roomId: string, result: any, userId: string) {
+  if (result.room?.status === 'completed') {
+    const io = getIO();
+    const aggregatedScores = result.session?.finalScores || {
+      winner: 'draw',
+      teamProposition: { total: 0 },
+      teamOpposition: { total: 0 },
+    };
+    const winnerInfo = {
+      roomId,
+      winnerTeam: aggregatedScores.winner,
+      propositionTotal: aggregatedScores.teamProposition.total,
+      oppositionTotal: aggregatedScores.teamOpposition.total,
+      finalScores: aggregatedScores,
+    };
+    io.to(roomId).emit('score:winner-determined', winnerInfo);
+    io.to(roomId).emit('debate:ended', { roomId, result: winnerInfo });
+    io.emit('debate:ended', { roomId, result: winnerInfo });
+    io.emit('room:update', { action: 'completed', roomId });
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(roomId, userId);
+    if (state) {
+      io.to(roomId).emit('room:state-restore', state);
+    }
+  }
+}
+
 // POST /api/v1/debate/:roomId/end — Complete debate and apply ranking when eligible
 router.post(
   '/:roomId/end',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await endDebate(req.params.roomId, req.user!.userId, req.body.summary || '');
+    await broadcastDebateCompleted(req.params.roomId, result, req.user!.userId);
     sendSuccess(res, result, 'Debate completed');
   }),
 );
@@ -76,8 +116,10 @@ router.post(
 router.post(
   '/:roomId/surrender',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await surrenderDebate(req.params.roomId, req.user!.userId);
+    await broadcastDebateCompleted(req.params.roomId, result, req.user!.userId);
     sendSuccess(res, result, 'Debate surrendered');
   }),
 );
@@ -86,26 +128,91 @@ router.post(
 router.post(
   '/:roomId/draw/request',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await requestDraw(req.params.roomId, req.user!.userId);
+    await broadcastDebateCompleted(req.params.roomId, result, req.user!.userId);
     sendSuccess(res, result, 'Draw requested');
   }),
 );
+
+const pauseTimeouts = new Map<string, NodeJS.Timeout>();
+
+async function autoResumeDebate(roomId: string) {
+  try {
+    const room = await DebateRoom.findById(roomId);
+    if (!room || room.status !== 'paused') return;
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session || !session.pauseType || session.pauseType === 'host') return;
+
+    room.status = 'active';
+    await room.save();
+
+    session.pauseType = null;
+    session.pausedAt = null;
+    await session.save();
+
+    const isCrossExam = session.currentTurn?.phase === 'cross_exam';
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.resume(roomId);
+    } else {
+      timerService.resume(roomId);
+    }
+
+    const io = getIO();
+    io.to(roomId).emit('debate:resumed', {
+      resumedAt: Date.now(),
+      autoResumed: true,
+    });
+  } catch (error) {
+    console.error('autoResumeDebate error:', error);
+  }
+}
 
 // POST /api/v1/debate/:roomId/host/pause — Pause debate (UC-44)
 router.post(
   '/:roomId/host/pause',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can pause');
+    const room = (req as any).room;
+    if (room.status !== 'active') throw new BadRequestError('Room is not active');
 
     room.status = 'paused';
     await room.save();
+
+    // Determine correct timer based on active phase
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (session) {
+      session.pauseType = 'host';
+      session.pausedAt = new Date();
+      await session.save();
+    }
+
+    const isCrossExam = session?.currentTurn?.phase === 'cross_exam';
+    let timeRemaining = 0;
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.pause(room._id.toString());
+      const ceState = ceTimerService.getState(room._id.toString());
+      if (ceState) {
+        timeRemaining = ceState.sharedRemaining;
+      }
+    } else {
+      timerService.pause(room._id.toString());
+      timeRemaining = timerService.getTimeRemaining(room._id.toString());
+    }
+
+    // Broadcast pause to every client so they show a synchronized overlay.
+    const io = getIO();
+    io.to(room._id.toString()).emit('debate:paused', {
+      pausedAt: Date.now(),
+      timeRemaining,
+      pauseType: 'host',
+      pausesUsed: session?.pausesUsed || { proposition: 0, opposition: 0 },
+    });
 
     sendSuccess(res, { status: 'paused' }, 'Debate paused');
   }),
@@ -115,16 +222,180 @@ router.post(
 router.post(
   '/:roomId/host/resume',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can resume');
+    const room = (req as any).room;
+    if (room.status !== 'paused') throw new BadRequestError('Room is not paused');
 
     room.status = 'active';
     await room.save();
+
+    // Determine correct timer based on active phase
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (session) {
+      session.pauseType = null;
+      session.pausedAt = null;
+      await session.save();
+    }
+
+    // Clear auto-resume timeout
+    const timeoutId = pauseTimeouts.get(room._id.toString());
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      pauseTimeouts.delete(room._id.toString());
+    }
+
+    const isCrossExam = session?.currentTurn?.phase === 'cross_exam';
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.resume(room._id.toString());
+    } else {
+      timerService.resume(room._id.toString());
+    }
+
+    // Broadcast resume to every client
+    const io = getIO();
+    io.to(room._id.toString()).emit('debate:resumed', {
+      resumedAt: Date.now(),
+    });
+
+    sendSuccess(res, { status: 'active' }, 'Debate resumed');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/debater/pause — Debater request pause
+router.post(
+  '/:roomId/debater/pause',
+  authenticate,
+  roomParticipantGuardById('roomId'),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = (req as any).room;
+    if (room.status !== 'active') throw new BadRequestError('Room is not active');
+
+    const participant = room.participants.find((p: any) => p.userId.toString() === req.user!.userId);
+    if (!participant) {
+      throw new ForbiddenError('Not a participant');
+    }
+    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+    if (effectiveRole !== 'debater') {
+      throw new ForbiddenError('Only debaters can request team pause');
+    }
+
+    const team = participant.team as 'proposition' | 'opposition';
+    if (!team) throw new BadRequestError('You are not assigned to a team');
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const currentPausesUsed = session.pausesUsed?.[team] || 0;
+    if (currentPausesUsed >= 3) {
+      throw new BadRequestError('Your team has used all 3 pause turns');
+    }
+
+    room.status = 'paused';
+    await room.save();
+
+    session.pausedAt = new Date();
+    session.pauseType = team;
+    if (!session.pausesUsed) {
+      session.pausesUsed = { proposition: 0, opposition: 0 };
+    }
+    session.pausesUsed[team] = currentPausesUsed + 1;
+    await session.save();
+
+    // Pause timers
+    const isCrossExam = session.currentTurn?.phase === 'cross_exam';
+    let timeRemaining = 0;
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.pause(room._id.toString());
+      const ceState = ceTimerService.getState(room._id.toString());
+      if (ceState) {
+        timeRemaining = ceState.sharedRemaining;
+      }
+    } else {
+      timerService.pause(room._id.toString());
+      timeRemaining = timerService.getTimeRemaining(room._id.toString());
+    }
+
+    // Schedule auto-resume in 3 minutes (180,000 ms)
+    const timeoutId = setTimeout(() => {
+      autoResumeDebate(room._id.toString()).catch(console.error);
+    }, 180000);
+
+    const existingTimeout = pauseTimeouts.get(room._id.toString());
+    if (existingTimeout) clearTimeout(existingTimeout);
+    pauseTimeouts.set(room._id.toString(), timeoutId);
+
+    // Broadcast pause to every client so they show a synchronized overlay.
+    const io = getIO();
+    io.to(room._id.toString()).emit('debate:paused', {
+      pausedAt: Date.now(),
+      timeRemaining,
+      pauseType: team,
+      pausesUsed: session.pausesUsed,
+    });
+
+    sendSuccess(res, {
+      status: 'paused',
+      pauseType: team,
+      pausesUsed: session.pausesUsed
+    }, 'Debate paused by team');
+  }),
+);
+
+// POST /api/v1/debate/:roomId/debater/resume — Debater request resume
+router.post(
+  '/:roomId/debater/resume',
+  authenticate,
+  roomParticipantGuardById('roomId'),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = (req as any).room;
+    if (room.status !== 'paused') throw new BadRequestError('Room is not paused');
+
+    const participant = room.participants.find((p: any) => p.userId.toString() === req.user!.userId);
+    if (!participant) throw new ForbiddenError('Not a participant');
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+    const isJudgeS1 = room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1';
+    const isHost = effectiveRole === 'host' || isJudgeS1;
+    const isPauserTeam = session.pauseType === participant.team;
+
+    if (!isHost && !isPauserTeam) {
+      throw new ForbiddenError('Only the host, Judge S1, or the team that initiated the pause can resume it');
+    }
+
+    room.status = 'active';
+    await room.save();
+
+    session.pauseType = null;
+    session.pausedAt = null;
+    await session.save();
+
+    // Clear auto-resume timeout
+    const timeoutId = pauseTimeouts.get(room._id.toString());
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      pauseTimeouts.delete(room._id.toString());
+    }
+
+    // Resume timers
+    const isCrossExam = session.currentTurn?.phase === 'cross_exam';
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.resume(room._id.toString());
+    } else {
+      timerService.resume(room._id.toString());
+    }
+
+    // Broadcast resume to every client
+    const io = getIO();
+    io.to(room._id.toString()).emit('debate:resumed', {
+      resumedAt: Date.now(),
+    });
 
     sendSuccess(res, { status: 'active' }, 'Debate resumed');
   }),
@@ -134,14 +405,10 @@ router.post(
 router.post(
   '/:roomId/host/issue-card',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, reason } = req.body;
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can issue cards');
+    const room = (req as any).room;
 
     const session = await DebateSession.findOne({ roomId: room._id });
     if (session) {
@@ -163,17 +430,13 @@ router.post(
 router.post(
   '/:roomId/host/kick',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can kick');
+    const room = (req as any).room;
 
     room.participants = room.participants.filter(
-      (p) => p.userId.toString() !== userId,
+      (p: any) => p.userId.toString() !== userId,
     ) as any;
     await room.save();
 
@@ -185,14 +448,8 @@ router.post(
 router.post(
   '/:roomId/host/next-turn',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can advance turns');
-
     await triggerTransition(req.params.roomId, req.body.transcript || '');
     sendSuccess(res, { transitioning: true }, 'Turn advanced transition started');
   }),
@@ -202,16 +459,12 @@ router.post(
 router.post(
   '/:roomId/host/mute',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, action } = req.body;
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
 
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can mute participants');
-
-    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) throw new NotFoundError('Participant not found');
 
     (participant as any).muted = action === 'mute';
@@ -225,17 +478,14 @@ router.post(
 router.post(
   '/:roomId/judge/submit-score',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { speaker, score, notes } = req.body;
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
 
-    const judge = room.participants.find(
-      (participant) =>
-        participant.userId.toString() === req.user!.userId &&
-        participant.roomRole === 'judge',
-    );
-    if (!judge) {
+    const judge = (req as any).participant;
+    const effectiveRole = judge.roomRole === 'owner' ? judge.primaryRole : judge.roomRole;
+    if (effectiveRole !== 'judge') {
       throw new ForbiddenError('Only assigned judges can submit scores');
     }
 
@@ -269,12 +519,15 @@ router.post(
     });
 
     // Determine if we should automatically complete the debate
-    const assignedJudges = room.participants.filter((p) => p.roomRole === 'judge');
+    const assignedJudges = room.participants.filter((p: any) => {
+      const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
+      return role === 'judge';
+    });
     const isOPPS3 = speaker === 'OPP_S3';
     
     const OPP_S3_verdicts = finalScores.judgeVerdicts.filter((v: any) => v.speaker === 'OPP_S3');
     const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId.toString()));
-    const allJudgesSubmitted = assignedJudges.every((j) => uniqueJudgesSubmitted.has(j.userId.toString()));
+    const allJudgesSubmitted = assignedJudges.every((j: any) => uniqueJudgesSubmitted.has(j.userId.toString()));
 
     let autoCompleted = false;
     let winnerInfo = null;
@@ -318,6 +571,8 @@ router.post(
       // Broadcast winner determined & ended
       io.to(req.params.roomId).emit('score:winner-determined', winnerInfo);
       io.to(req.params.roomId).emit('debate:ended', { roomId: req.params.roomId, result: winnerInfo });
+      io.emit('debate:ended', { roomId: req.params.roomId, result: winnerInfo });
+      io.emit('room:update', { action: 'completed', roomId: req.params.roomId });
 
       // Build and broadcast room state restore
       const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
@@ -358,6 +613,7 @@ router.get(
 router.post(
   '/:roomId/cross-exam/pass-turn',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker } = req.body;
     const session = await DebateSession.findOne({ roomId: req.params.roomId });
@@ -396,6 +652,7 @@ router.post(
 router.post(
   '/:roomId/cross-exam/finish',
   authenticate,
+  roomParticipantGuardById('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const session = await DebateSession.findOne({ roomId: req.params.roomId });
     if (!session) throw new NotFoundError('Session not found');
@@ -415,14 +672,8 @@ router.post(
 router.post(
   '/:roomId/result',
   authenticate,
+  roomDebateControllerGuard('roomId'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.roomId);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host can finalize result');
-
     const rankingResult = await applyDebateResult(req.params.roomId);
     sendSuccess(res, rankingResult, rankingResult.applied ? 'Result applied' : 'Result not applied');
   }),

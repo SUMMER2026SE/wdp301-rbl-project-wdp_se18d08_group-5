@@ -1,5 +1,17 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
+import { roomParticipantGuard, roomHostOrOwnerGuard, roomOwnerGuard, roomControllerGuard } from '../../middleware/roomGuard.js';
+
+const roomControllerGuardDefault = roomControllerGuard();
+import { validate } from '../../middleware/validate.js';
+import {
+  assignParticipantSchema,
+  selectPositionSchema,
+  updateMotionSchema,
+  updateRoomSchema,
+  joinRoomSchema,
+} from './room.schema.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { DebateRoom } from '../../models/DebateRoom.js';
@@ -8,7 +20,7 @@ import { User } from '../../models/User.js';
 import { getIO } from '../../socket/index.js';
 import { aiService } from '../ai/ai.service.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
-import { startDebate, triggerTransition } from '../debate/debate.service.js';
+import { startDebate, triggerTransition, endPhaseByHost, endPhaseBySpeaker } from '../debate/debate.service.js';
 import { timerService } from '../../socket/timer.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import type { AuthRequest } from '../../types/index.js';
@@ -42,9 +54,18 @@ function getLockableParticipantStats(room: any) {
   let lockedCount = 0;
   let lockableCount = 0;
 
+  const canLockParticipant = (participant: any) => {
+    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+
+    if (!effectiveRole || effectiveRole === 'viewer') return false;
+    if (!['debater', 'host', 'judge'].includes(effectiveRole)) return false;
+    if (effectiveRole === 'debater' && (!participant.team || !participant.speakerSlot)) return false;
+
+    return true;
+  };
+
   room.participants.forEach((participant: any) => {
-    if (participant.roomRole === 'owner' || participant.roomRole === 'viewer') return;
-    if (participant.roomRole === 'debater' && (!participant.team || !participant.speakerSlot)) return;
+    if (!canLockParticipant(participant)) return;
 
     lockableCount += 1;
     participant.positionLocked = true;
@@ -91,15 +112,6 @@ function normalizeMotion(value: unknown) {
   const motion = value.trim().replace(/\s+/g, ' ');
   if (motion.length > MAX_MOTION_LENGTH) {
     throw new BadRequestError(`motion must be ${MAX_MOTION_LENGTH} characters or fewer`);
-  }
-
-  return motion;
-}
-
-function requireMotion(value: unknown) {
-  const motion = normalizeMotion(value);
-  if (!motion) {
-    throw new BadRequestError('motion is required');
   }
 
   return motion;
@@ -460,10 +472,16 @@ router.post(
           team: null,
           speakerSlot: null,
           positionLocked: false,
+          primaryRole: 'viewer',
           muted: false,
         },
       ],
     });
+
+    const io = getIO();
+    if (io) {
+      io.emit('room:update', { action: 'create', roomId: room._id.toString() });
+    }
 
     sendSuccess(res, room, 'Room created', 201);
   }),
@@ -514,12 +532,10 @@ router.get(
 router.put(
   '/:id',
   authenticate,
+  roomOwnerGuard,
+  validate(updateRoomSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id).select('+password');
-    if (!room) throw new NotFoundError('Room not found');
-    if (room.createdBy.toString() !== req.user!.userId) {
-      throw new ForbiddenError('Only the room owner can edit the room');
-    }
+    const room = (req as any).room;
     if (['active', 'paused', 'completed'].includes(room.status)) {
       throw new BadRequestError('Cannot edit a room that has already started');
     }
@@ -551,6 +567,10 @@ router.put(
 
     await room.save();
     await broadcastRoomState(room._id.toString());
+    const io = getIO();
+    if (io) {
+      io.emit('room:update', { action: 'update', roomId: room._id.toString() });
+    }
     sendSuccess(res, room, 'Room updated');
   }),
 );
@@ -559,17 +579,18 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  roomOwnerGuard,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-    if (room.createdBy.toString() !== req.user!.userId) {
-      throw new ForbiddenError('Only the room owner can delete the room');
-    }
+    const room = (req as any).room;
     if (room.status === 'active' || room.status === 'paused') {
       throw new BadRequestError('Cannot delete a room while a debate is in progress');
     }
 
     await room.deleteOne();
+    const io = getIO();
+    if (io) {
+      io.emit('room:update', { action: 'delete', roomId: room._id.toString() });
+    }
     sendSuccess(res, null, 'Room deleted');
   }),
 );
@@ -578,54 +599,63 @@ router.delete(
 router.post(
   '/:id/assign-role',
   authenticate,
+  roomHostOrOwnerGuard,
+  validate(assignParticipantSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, role, team, speakerSlot } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-    if (room.createdBy.toString() !== req.user!.userId) {
-      throw new ForbiddenError('Only the room owner can assign roles');
-    }
-    if (!['debater', 'host', 'judge', 'viewer'].includes(role)) {
-      throw new BadRequestError('Role must be debater, host, judge, or viewer');
-    }
+    const room = (req as any).room;
 
-    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) {
       throw new NotFoundError('Participant not found');
     }
 
+    // The room creator is always 'owner' — any other role assignment is a side
+    // permission, not a replacement.  The host can also assign roles.
+    const isRoomCreator = participant.userId.toString() === room.createdBy.toString();
+
     room.judges = (room.judges || []).filter(
-      (judge) => judge.userId.toString() !== participant.userId.toString(),
+      (judge: any) => judge.userId.toString() !== participant.userId.toString(),
     ) as any;
 
     if (role === 'host') {
       const previousHost = room.hostId
-        ? room.participants.find((p) => p.userId.toString() === room.hostId?.toString())
+        ? room.participants.find((p: any) => p.userId.toString() === room.hostId?.toString())
         : null;
       if (previousHost && previousHost.userId.toString() !== participant.userId.toString()) {
-        previousHost.roomRole =
-          previousHost.userId.toString() === room.createdBy.toString() ? 'owner' : 'viewer';
+        // Previous host goes back to viewer (or owner if they were the room creator)
+        const wasCreator = previousHost.userId.toString() === room.createdBy.toString();
+        previousHost.roomRole = wasCreator ? 'owner' : 'viewer';
         previousHost.team = null;
         previousHost.speakerSlot = null;
         previousHost.positionLocked = false;
+        if (wasCreator) previousHost.primaryRole = 'viewer';
       }
       room.hostId = participant.userId as any;
       room.hostType = 'human';
-      participant.roomRole = 'host';
+      // The room creator keeps 'owner' even while also being the host.  Anyone
+      // else becomes 'host'.
+      participant.roomRole = isRoomCreator ? 'owner' : 'host';
       participant.team = null;
       participant.speakerSlot = null;
       participant.positionLocked = false;
+      if (isRoomCreator) participant.primaryRole = 'host';
     }
 
     if (role === 'judge') {
-      participant.roomRole = 'judge';
+      // The room creator cannot be demoted to judge — they keep 'owner' regardless
+      participant.roomRole = isRoomCreator ? 'owner' : 'judge';
       participant.team = null;
       participant.speakerSlot = null;
       participant.positionLocked = false;
+      if (isRoomCreator) participant.primaryRole = 'judge';
       if (room.hostId?.toString() === participant.userId.toString()) {
         room.hostId = null;
+        room.hostType = 'ai';
       }
-      room.judges.push({ userId: participant.userId as any, username: participant.username });
+      if (participant.roomRole === 'judge') {
+        room.judges.push({ userId: participant.userId as any, username: participant.username });
+      }
     }
 
     if (role === 'debater') {
@@ -635,23 +665,33 @@ router.post(
       if (speakerSlot !== undefined && !['S1', 'S2', 'S3', null].includes(speakerSlot)) {
         throw new BadRequestError('speakerSlot must be S1, S2, or S3');
       }
-      participant.roomRole = 'debater';
+      // The room creator cannot be demoted to debater — they keep 'owner'
+      if (isRoomCreator) {
+        participant.roomRole = 'owner';
+        participant.primaryRole = 'debater';
+      } else {
+        participant.roomRole = 'debater';
+        participant.primaryRole = null;
+      }
       participant.team = team ?? null;
       participant.speakerSlot = speakerSlot ?? null;
       participant.positionLocked = false;
       if (room.hostId?.toString() === participant.userId.toString()) {
         room.hostId = null;
+        room.hostType = 'ai';
       }
     }
 
     if (role === 'viewer') {
-      participant.roomRole =
-        participant.userId.toString() === room.createdBy.toString() ? 'owner' : 'viewer';
+      // The room creator always keeps 'owner' — they are never just a viewer
+      participant.roomRole = isRoomCreator ? 'owner' : 'viewer';
       participant.team = null;
       participant.speakerSlot = null;
       participant.positionLocked = false;
+      if (isRoomCreator) participant.primaryRole = 'viewer';
       if (room.hostId?.toString() === participant.userId.toString()) {
         room.hostId = null;
+        room.hostType = 'ai';
       }
     }
 
@@ -665,6 +705,7 @@ router.post(
 router.post(
   '/:id/join',
   authenticate,
+  validate(joinRoomSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = await DebateRoom.findById(req.params.id).select('+password');
     if (!room) throw new NotFoundError('Room not found');
@@ -709,15 +750,12 @@ router.post(
 router.post(
   '/:id/position',
   authenticate,
+  roomParticipantGuard(),
+  validate(selectPositionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { team, speakerSlot } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const participant = room.participants.find(
-      (p) => p.userId.toString() === req.user!.userId,
-    );
-    if (!participant) throw new BadRequestError('Not in room');
+    const room = (req as any).room;
+    const participant = (req as any).participant;
     if (participant.positionLocked) throw new BadRequestError('Position is locked');
     if (participant.roomRole !== 'debater') {
       throw new ForbiddenError('Only assigned debaters can select team and speaker slot');
@@ -738,12 +776,9 @@ router.post(
 router.post(
   '/:id/position/lock',
   authenticate,
+  roomOwnerGuard,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-    if (room.createdBy.toString() !== req.user!.userId) {
-      throw new ForbiddenError('Only owner can lock positions');
-    }
+    const room = (req as any).room;
 
     const stats = getLockableParticipantStats(room);
     room.status = room.status === 'waiting' ? 'ready' : room.status;
@@ -757,12 +792,9 @@ router.post(
 router.post(
   '/:id/lock',
   authenticate,
+  roomOwnerGuard,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-    if (room.createdBy.toString() !== req.user!.userId) {
-      throw new ForbiddenError('Only owner can lock positions');
-    }
+    const room = (req as any).room;
 
     const stats = getLockableParticipantStats(room);
     room.status = room.status === 'waiting' ? 'ready' : room.status;
@@ -772,12 +804,95 @@ router.post(
   }),
 );
 
+// POST /api/v1/rooms/:id/position/unlock — Unlock all positions (Owner only)
+router.post(
+  '/:id/position/unlock',
+  authenticate,
+  roomOwnerGuard,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = (req as any).room;
+
+    const canLockParticipant = (participant: any) => {
+      const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+
+      if (!effectiveRole || effectiveRole === 'viewer') return false;
+      if (!['debater', 'host', 'judge'].includes(effectiveRole)) return false;
+      if (effectiveRole === 'debater' && (!participant.team || !participant.speakerSlot)) return false;
+
+      return true;
+    };
+
+    let unlockedCount = 0;
+    room.participants.forEach((participant: any) => {
+      if (!participant.positionLocked) return;
+      if (!canLockParticipant(participant)) return;
+      participant.positionLocked = false;
+      unlockedCount += 1;
+    });
+
+    // If no participants are locked, roll status back to 'waiting' so the
+    // owner can reconfigure the room after unlocking.
+    if (unlockedCount === 0 && room.status === 'ready') {
+      room.status = 'waiting';
+    }
+
+    await room.save();
+    await broadcastRoomState(room._id.toString());
+    sendSuccess(
+      res,
+      { room, unlockedCount },
+      unlockedCount === 0
+        ? 'No positions were locked'
+        : `Unlocked ${unlockedCount} participant${unlockedCount === 1 ? '' : 's'}`,
+    );
+  }),
+);
+
+// POST /api/v1/rooms/:id/position/lock-user — Toggle a single participant's lock (Owner only)
+const toggleLockSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  locked: z.boolean(),
+});
+
+router.post(
+  '/:id/position/lock-user',
+  authenticate,
+  roomOwnerGuard,
+  validate(toggleLockSchema),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = (req as any).room;
+    const { userId, locked } = req.body;
+
+    const canLockParticipant = (participant: any) => {
+      const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+
+      if (!effectiveRole || effectiveRole === 'viewer') return false;
+      if (!['debater', 'host', 'judge'].includes(effectiveRole)) return false;
+      if (effectiveRole === 'debater' && (!participant.team || !participant.speakerSlot)) return false;
+
+      return true;
+    };
+
+    const target = room.participants.find((p: any) => p.userId.toString() === userId);
+    if (!target) throw new NotFoundError('Participant not found in room');
+    if (!canLockParticipant(target)) {
+      throw new BadRequestError('This participant cannot be locked');
+    }
+
+    target.positionLocked = locked;
+    await room.save();
+    await broadcastRoomState(room._id.toString());
+    sendSuccess(res, { room, userId, locked }, locked ? 'Position locked' : 'Position unlocked');
+  }),
+);
+
 // POST /api/v1/rooms/:id/start — Start debate (UC-22)
 router.post(
   '/:id/start',
   authenticate,
+  roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const result = await startDebate(req.params.id, req.user!.userId);
+    const result = await startDebate(req.params.id, (req as any).participant.userId.toString());
 
     // Notify every client in the room so participants auto-navigate from
     // the lobby to the live debate screen.
@@ -789,6 +904,9 @@ router.post(
       room: result.room,
     });
     await broadcastRoomState(roomIdStr);
+    if (io) {
+      io.emit('room:update', { action: 'start', roomId: roomIdStr });
+    }
 
     sendSuccess(res, result, 'Debate started');
   }),
@@ -798,20 +916,15 @@ router.post(
 router.post(
   '/:id/host/motion',
   authenticate,
+  roomControllerGuardDefault,
+  validate(updateMotionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) {
-      throw new ForbiddenError('Only host or owner can update the debate topic');
-    }
+    const room = (req as any).room;
     if (!['waiting', 'ready'].includes(room.status)) {
       throw new BadRequestError('Cannot update the topic after the debate has started');
     }
 
-    room.motion = requireMotion(req.body.motion);
+    room.motion = req.body.motion;
     await room.save();
 
     getIO().to(req.params.id).emit('room:motion-updated', {
@@ -827,13 +940,66 @@ router.post(
 router.post(
   '/:id/leave',
   authenticate,
+  roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
+    const userId = req.user!.userId;
+    const { newOwnerId } = req.body;
 
+    const isOwner = room.createdBy.toString() === userId;
+
+    // 1. Remove from participants
     room.participants = room.participants.filter(
-      (p) => p.userId.toString() !== req.user!.userId,
+      (p: any) => p.userId.toString() !== userId,
     ) as any;
+
+    if (room.participants.length === 0) {
+      await room.deleteOne();
+      sendSuccess(res, null, 'Left room and deleted room as it became empty');
+      return;
+    }
+
+    // 2. Clear host status if leaving user was the host
+    if (room.hostId?.toString() === userId) {
+      room.hostId = null;
+      room.hostType = 'ai';
+    }
+
+    // 3. Remove from judges if leaving user was a judge
+    room.judges = (room.judges || []).filter(
+      (j: any) => j.userId.toString() !== userId,
+    ) as any;
+
+    // 4. Handle owner transfer
+    if (isOwner && room.participants.length > 0) {
+      let successor = null;
+      if (newOwnerId) {
+        successor = room.participants.find(
+          (p: any) => p.userId.toString() === newOwnerId.toString(),
+        );
+      }
+      if (!successor) {
+        successor = room.participants[0];
+      }
+
+      if (successor) {
+        room.createdBy = successor.userId;
+        const prevRole = successor.roomRole;
+        successor.roomRole = 'owner';
+
+        if (prevRole === 'debater') {
+          successor.primaryRole = 'debater';
+        } else if (prevRole === 'host') {
+          successor.primaryRole = 'host';
+          room.hostId = successor.userId;
+        } else if (prevRole === 'judge') {
+          successor.primaryRole = 'judge';
+        } else {
+          successor.primaryRole = 'viewer';
+        }
+      }
+    }
+
     await room.save();
     await broadcastRoomState(room._id.toString());
 
@@ -845,17 +1011,28 @@ router.post(
 router.post(
   '/:id/kick',
   authenticate,
+  roomOwnerGuard,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-    if (room.createdBy.toString() !== req.user!.userId) {
-      throw new ForbiddenError('Only owner can kick');
-    }
+    const room = (req as any).room;
 
     const { userId } = req.body;
+
+    // 1. Remove from participants
     room.participants = room.participants.filter(
-      (p) => p.userId.toString() !== userId,
+      (p: any) => p.userId.toString() !== userId,
     ) as any;
+
+    // 2. Clear host status if kicked user was the host
+    if (room.hostId?.toString() === userId) {
+      room.hostId = null;
+      room.hostType = 'ai';
+    }
+
+    // 3. Remove from judges if kicked user was a judge
+    room.judges = (room.judges || []).filter(
+      (j: any) => j.userId.toString() !== userId,
+    ) as any;
+
     await room.save();
     await broadcastRoomState(room._id.toString());
 
@@ -867,13 +1044,9 @@ router.post(
 router.post(
   '/:id/host/pause',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can pause');
+    const room = (req as any).room;
     if (room.status !== 'active') {
       throw new BadRequestError('Room is not active');
     }
@@ -881,14 +1054,35 @@ router.post(
     room.status = 'paused';
     await room.save();
 
-    // Pause the server-authoritative timer
-    timerService.pause(req.params.id);
+    // Determine correct timer based on active phase
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (session) {
+      session.pauseType = 'host';
+      session.pausedAt = new Date();
+      await session.save();
+    }
+
+    const isCrossExam = session?.currentTurn?.phase === 'cross_exam';
+    let timeRemaining = 0;
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.pause(room._id.toString());
+      const ceState = ceTimerService.getState(room._id.toString());
+      if (ceState) {
+        timeRemaining = ceState.sharedRemaining;
+      }
+    } else {
+      timerService.pause(req.params.id);
+      timeRemaining = timerService.getTimeRemaining(req.params.id);
+    }
 
     // Broadcast pause to every client so they show a synchronized overlay.
     const io = getIO();
     io.to(req.params.id).emit('debate:paused', {
       pausedAt: Date.now(),
-      timeRemaining: timerService.getTimeRemaining(req.params.id),
+      timeRemaining,
+      pauseType: 'host',
+      pausesUsed: session?.pausesUsed || { proposition: 0, opposition: 0 },
     });
 
     sendSuccess(res, { status: room.status }, 'Debate paused');
@@ -899,13 +1093,9 @@ router.post(
 router.post(
   '/:id/host/resume',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can resume');
+    const room = (req as any).room;
     if (room.status !== 'paused') {
       throw new BadRequestError('Room is not paused');
     }
@@ -913,8 +1103,21 @@ router.post(
     room.status = 'active';
     await room.save();
 
-    // Resume the server-authoritative timer
-    timerService.resume(req.params.id);
+    // Determine correct timer based on active phase
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (session) {
+      session.pauseType = null;
+      session.pausedAt = null;
+      await session.save();
+    }
+
+    const isCrossExam = session?.currentTurn?.phase === 'cross_exam';
+    if (isCrossExam) {
+      const { ceTimerService } = await import('../../socket/ce.socket.js');
+      ceTimerService.resume(room._id.toString());
+    } else {
+      timerService.resume(req.params.id);
+    }
 
     // Broadcast resume to every client
     const io = getIO();
@@ -930,14 +1133,8 @@ router.post(
 router.post(
   '/:id/host/next-turn',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can advance turns');
-
     await triggerTransition(req.params.id, req.body.transcript || '');
     sendSuccess(res, { transitioning: true }, 'Turn advanced transition started');
   }),
@@ -947,14 +1144,10 @@ router.post(
 router.post(
   '/:id/host/issue-card',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, reason } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can issue cards');
+    const room = (req as any).room;
 
     const session = await DebateSession.findOne({ roomId: room._id });
     if (!session) throw new NotFoundError('Session not found');
@@ -976,17 +1169,13 @@ router.post(
 router.post(
   '/:id/host/kick',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can kick');
+    const room = (req as any).room;
 
     room.participants = room.participants.filter(
-      (p) => p.userId.toString() !== userId,
+      (p: any) => p.userId.toString() !== userId,
     ) as any;
     await room.save();
 
@@ -998,16 +1187,12 @@ router.post(
 router.post(
   '/:id/host/mute',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, action, type } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
 
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can mute participants');
-
-    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) throw new NotFoundError('Participant not found');
 
     const muteAction = type || action;
@@ -1033,16 +1218,12 @@ router.post(
 router.post(
   '/:id/host/mute-chat',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId, action, type } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
 
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can mute participant chat');
-
-    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) throw new NotFoundError('Participant not found');
 
     const muteAction = type || action;
@@ -1064,20 +1245,52 @@ router.post(
   }),
 );
 
+// POST /api/v1/rooms/:id/host/mute-camera — Mute/unmute participant camera
+router.post(
+  '/:id/host/mute-camera',
+  authenticate,
+  roomControllerGuardDefault,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { userId, action, type } = req.body;
+    const room = (req as any).room;
+
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
+    if (!participant) throw new NotFoundError('Participant not found');
+
+    const muteAction = type || action;
+    if (!['mute', 'unmute'].includes(muteAction)) {
+      throw new BadRequestError('Mute action must be mute or unmute');
+    }
+
+    participant.cameraMuted = muteAction === 'mute';
+    await room.save();
+
+    const io = getIO();
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+    if (state) {
+      io.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
+    // Also broadcast video host-toggle event for WebRTC live update
+    io.to(room._id.toString()).emit('video:host-toggle', {
+      userId: participant.userId.toString(),
+      active: muteAction === 'unmute',
+      byUserId: req.user!.userId,
+    });
+
+    sendSuccess(res, { userId, cameraMuted: participant.cameraMuted }, `Participant camera ${participant.cameraMuted ? 'muted' : 'unmuted'}`);
+  }),
+);
+
 // POST /api/v1/rooms/:id/host/viewer-chat — Enable/disable viewer chat (UC-58)
 router.post(
   '/:id/host/viewer-chat',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { enabled } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) {
-      throw new ForbiddenError('Only host or owner can control viewer chat');
-    }
+    const room = (req as any).room;
 
     if (typeof enabled !== 'boolean') {
       throw new BadRequestError('enabled must be a boolean');
@@ -1103,17 +1316,10 @@ router.post(
 router.post(
   '/:id/host/transfer',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const requesterId = req.user!.userId;
-    const isHost = room.hostId?.toString() === requesterId;
-    const isOwner = room.createdBy.toString() === requesterId;
-    if (!isHost && !isOwner) {
-      throw new ForbiddenError('Only host or owner can transfer host role');
-    }
+    const room = (req as any).room;
 
     if (!userId || typeof userId !== 'string') {
       throw new BadRequestError('userId is required');
@@ -1122,12 +1328,12 @@ router.post(
       throw new BadRequestError('User is already the host');
     }
 
-    const nextHost = room.participants.find((participant) => participant.userId.toString() === userId);
+    const nextHost = room.participants.find((participant: any) => participant.userId.toString() === userId);
     if (!nextHost) throw new NotFoundError('Target participant not found');
 
     const previousHostId = room.hostId?.toString() || null;
     const previousHost = previousHostId
-      ? room.participants.find((participant) => participant.userId.toString() === previousHostId)
+      ? room.participants.find((participant: any) => participant.userId.toString() === previousHostId)
       : null;
 
     if (previousHost && previousHost.roomRole === 'host') {
@@ -1139,7 +1345,7 @@ router.post(
     room.hostId = nextHost.userId as any;
     nextHost.roomRole = 'host';
     room.judges = (room.judges || []).filter(
-      (judge) => judge.userId.toString() !== nextHost.userId.toString(),
+      (judge: any) => judge.userId.toString() !== nextHost.userId.toString(),
     ) as any;
 
     await room.save();
@@ -1172,26 +1378,17 @@ router.post(
 router.post(
   '/:id/judge/submit-score',
   authenticate,
+  roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { speaker, winner, notes } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const { speaker, winner, notes, logic, rebuttal, evidence, crossExam, strategy, communication } = req.body;
+    const room = (req as any).room;
 
-    const judge = room.participants.find(
-      (participant) => participant.userId.toString() === req.user!.userId,
-    );
-    if (!judge || judge.roomRole !== 'judge') {
+    const judge = (req as any).participant;
+    if (judge.roomRole !== 'judge') {
       throw new ForbiddenError('Only human judges assigned to this room can submit scores');
     }
 
-    if (!speaker || typeof speaker !== 'string') {
-      throw new BadRequestError('speaker is required');
-    }
-    if (winner !== undefined && !['proposition', 'opposition', 'draw'].includes(winner)) {
-      throw new BadRequestError('winner must be proposition, opposition, or draw');
-    }
-
-    const scorePayload = buildJudgeScore(req.body);
+    const scorePayload = buildJudgeScore({ logic, rebuttal, evidence, crossExam, strategy, communication });
 
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
@@ -1235,12 +1432,12 @@ router.post(
     const aggregatedScores = aggregateFinalScores(session);
 
     // Determine if we should automatically complete the debate
-    const assignedJudges = room.participants.filter((p) => p.roomRole === 'judge');
+    const assignedJudges = room.participants.filter((p: any) => p.roomRole === 'judge');
     const isOPPS3 = speaker === 'OPP_S3';
     
-    const OPP_S3_verdicts = finalScores.judgeVerdicts.filter((v) => v.speaker === 'OPP_S3');
-    const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v) => v.judgeId?.toString()));
-    const allJudgesSubmitted = assignedJudges.every((j) => uniqueJudgesSubmitted.has(j.userId.toString()));
+    const OPP_S3_verdicts = finalScores.judgeVerdicts.filter((v: any) => v.speaker === 'OPP_S3');
+    const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId?.toString()));
+    const allJudgesSubmitted = assignedJudges.every((j: any) => uniqueJudgesSubmitted.has(j.userId.toString()));
 
     let autoCompleted = false;
     let winnerInfo = null;
@@ -1338,18 +1535,10 @@ router.get(
 router.post(
   '/:id/scores/aggregate',
   authenticate,
+  roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    const isJudge = room.participants.some(
-      (participant) =>
-        participant.userId.toString() === req.user!.userId &&
-        participant.roomRole === 'judge',
-    );
-    if (!isHost && !isOwner && !isJudge) {
+    const isJudge = (req as any).participant.roomRole === 'judge';
+    if (!isJudge) {
       throw new ForbiddenError('Only host, owner, or judge can aggregate scores');
     }
 
@@ -1521,14 +1710,8 @@ router.get(
 router.post(
   '/:id/result',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can finalize result');
-
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
     aggregateFinalScores(session);
@@ -1543,13 +1726,9 @@ router.post(
 router.post(
   '/:id/host/start-phase',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can start the phase');
+    const room = (req as any).room;
 
     const session = await DebateSession.findOne({ roomId: room._id });
     if (!session) throw new NotFoundError('Session not found');
@@ -1558,39 +1737,64 @@ router.post(
       throw new BadRequestError('Current phase is already started or active');
     }
 
+    if (session.currentTurn.phase === 'motion') {
+      // Transition from 'motion' to the next step ('prep_7') immediately
+      const { getFlow, getStepIndex, applyStep } = await import('../debate/debate.service.js');
+      const flow = getFlow((room.format as '1v1' | '3v3') || '3v3');
+      const currentIndex = getStepIndex(flow, session.currentTurn.speaker, session.currentTurn.phase);
+      const nextStep = flow[Math.min(currentIndex + 1, flow.length - 1)];
+      applyStep(session, nextStep);
+      room.currentPhase = nextStep.phase;
+      await room.save();
+    }
+
     session.currentTurn.status = 'active';
-    session.currentTurn.startTime = new Date();
+    session.currentTurn.startTime = new Date(Date.now() + 3000);
     await session.save();
 
-    // Start timer ticking
+    // Start timer ticking after a 3s countdown delay
     const io = getIO();
-    const phase = session.currentTurn.phase;
-    const timeLimit = session.currentTurn.timeRemaining;
+    io.to(room._id.toString()).emit('debate:countdown-start', { durationMs: 3000 });
 
-    if (phase === 'cross_exam') {
-      const ceConfig = session.currentTurn.ceState;
-      const { initCEForRoom } = await import('../../socket/ce.socket.js');
-      initCEForRoom(room._id.toString(), ceConfig?.askingTeam as any || 'proposition');
-    } else {
-      timerService.start(room._id.toString(), timeLimit, phase, () => {
-        triggerTransition(room._id.toString()).catch(console.error);
-      });
-    }
+    setTimeout(async () => {
+      try {
+        const freshSession = await DebateSession.findOne({ roomId: room._id });
+        if (!freshSession || freshSession.currentTurn.status !== 'active') return;
 
-    // Broadcast debate:phase-started
-    io.to(room._id.toString()).emit('debate:phase-started', {
-      phase,
-      speaker: session.currentTurn.speaker,
-      timeLimit,
-    });
+        const phase = freshSession.currentTurn.phase;
+        const timeLimit = freshSession.currentTurn.timeLimit;
 
-    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
-    const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
-    if (state) {
-      io.to(room._id.toString()).emit('room:state-restore', state);
-    }
+        freshSession.currentTurn.timeRemaining = timeLimit;
+        await freshSession.save();
 
-    sendSuccess(res, session.currentTurn, 'Phase started successfully');
+        if (phase === 'cross_exam') {
+          const { initCEForRoom, startCEForRoom } = await import('../../socket/ce.socket.js');
+          initCEForRoom(room._id.toString());
+          startCEForRoom(room._id.toString());
+        } else {
+          timerService.start(room._id.toString(), timeLimit, phase, () => {
+            triggerTransition(room._id.toString()).catch(console.error);
+          });
+        }
+
+        // Broadcast debate:phase-started
+        io.to(room._id.toString()).emit('debate:phase-started', {
+          phase,
+          speaker: freshSession.currentTurn.speaker,
+          timeLimit,
+        });
+
+        const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+        const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+        if (state) {
+          io.to(room._id.toString()).emit('room:state-restore', state);
+        }
+      } catch (err) {
+        console.error('Delayed start-phase REST error:', err);
+      }
+    }, 3000);
+
+    sendSuccess(res, session.currentTurn, 'Phase start countdown triggered');
   }),
 );
 
@@ -1598,16 +1802,12 @@ router.post(
 router.post(
   '/:id/host/grant-speaking',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
 
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can grant speaking permissions');
-
-    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) throw new NotFoundError('Participant not found');
 
     participant.speakingAllowed = true;
@@ -1629,16 +1829,12 @@ router.post(
 router.post(
   '/:id/host/revoke-speaking',
   authenticate,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { userId } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
 
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    if (!isHost && !isOwner) throw new ForbiddenError('Only host or owner can revoke speaking permissions');
-
-    const participant = room.participants.find((p) => p.userId.toString() === userId);
+    const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) throw new NotFoundError('Participant not found');
 
     participant.speakingAllowed = false;
@@ -1653,6 +1849,82 @@ router.post(
     }
 
     sendSuccess(res, { userId, speakingAllowed: false }, 'Revoked speaking permission from viewer');
+  }),
+);
+
+// POST /api/v1/rooms/:id/host/end-phase — End phase by host (UC-27)
+router.post(
+  '/:id/host/end-phase',
+  authenticate,
+  roomControllerGuardDefault,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = (req as any).room;
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    if (session.currentTurn.status === 'completed') {
+      throw new BadRequestError('Debate is already completed');
+    }
+
+    // Stop timers
+    timerService.stop(req.params.id);
+
+    // Emit mute-lock event
+    const io = getIO();
+    io.to(req.params.id).emit('debate:mute-lock', { duration: 3 });
+
+    // Call the service function
+    const result = await endPhaseByHost(req.params.id, req.user!.userId, req.body.transcript || '');
+
+    // Emit state restore after transition
+    setTimeout(async () => {
+      const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+      const state = await buildRoomStatePayload(req.params.id, req.user!.userId);
+      if (state) {
+        io.to(req.params.id).emit('room:state-restore', state);
+      }
+    }, 3500);
+
+    sendSuccess(res, result, 'Phase ended');
+  }),
+);
+
+// POST /api/v1/rooms/:id/speaker/end-phase — End phase by speaker (debater ends their speech early)
+router.post(
+  '/:id/speaker/end-phase',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+
+    const session = await DebateSession.findOne({ roomId: room._id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    if (session.currentTurn.status === 'completed') {
+      throw new BadRequestError('Debate is already completed');
+    }
+
+    // Stop timers
+    timerService.stop(req.params.id);
+
+    // Emit mute-lock event
+    const io = getIO();
+    io.to(req.params.id).emit('debate:mute-lock', { duration: 3 });
+
+    // Call the service function
+    const result = await endPhaseBySpeaker(req.params.id, req.user!.userId, req.body.transcript || '');
+
+    // Emit state restore after transition
+    setTimeout(async () => {
+      const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+      const state = await buildRoomStatePayload(req.params.id, req.user!.userId);
+      if (state) {
+        io.to(req.params.id).emit('room:state-restore', state);
+      }
+    }, 3500);
+
+    sendSuccess(res, result, 'Phase ended by speaker');
   }),
 );
 

@@ -37,7 +37,7 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
   const messages = useDebateStore((state) => state.messages);
   const viewerChatEnabled = useDebateStore((state) => state.viewerChatEnabled);
   const isTransitioning = useDebateStore((state) => state.isTransitioning);
-  const turnStatus = useDebateStore((state) => state.turnStatus);
+  const debateRoom = useDebateStore((state) => state.room);
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -54,13 +54,25 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
   const storeParticipants = useDebateStore((s) => s.participants);
   const restParticipants = roomQuery.data?.participants || [];
   const participants = storeParticipants.length > 0 ? storeParticipants : restParticipants;
-  const currentParticipant = participants.find((p: { userId: string }) => p.userId === user?._id);
+  const currentParticipant = participants.find((p: { userId: any }) => {
+    const pId = typeof p.userId === 'object' && p.userId?._id ? p.userId._id : p.userId;
+    return String(pId) === String(user?._id);
+  });
   const myRole = currentParticipant?.roomRole;
+  const isChatMuted = Boolean(currentParticipant?.chatMuted);
+
+  const isHost =
+    myRole === 'host' ||
+    myRole === 'owner' ||
+    roomQuery.data?.hostId === user?._id ||
+    roomQuery.data?.createdBy === user?._id ||
+    debateRoom?.hostId === user?._id;
+
   const canSend =
     isPrivateRoom ||
-    (myRole === 'host' || myRole === 'judge' || myRole === 'debater');
+    ((isHost || myRole === 'judge' || myRole === 'debater') && !isChatMuted);
 
-  const isLocked = !isPrivateRoom && (isTransitioning || turnStatus === 'waiting_to_start');
+  const isLocked = !isPrivateRoom && isTransitioning;
 
   useEffect(() => {
     if (listRef.current) {
@@ -80,8 +92,8 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
   };
 
   return (
-    <div className="d-flex flex-column h-100" style={{ minHeight: 320 }}>
-      <div className="d-flex align-items-center justify-content-between mb-2">
+    <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
+      <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
         <h6 className="mb-0">
           <i className="bi bi-chat-dots me-2" />
           {isPrivateRoom ? 'Private Team Chat' : 'Main Room Chat'}
@@ -96,7 +108,7 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
       <div
         ref={listRef}
         className="flex-grow-1 overflow-auto px-2 py-2 rounded-3"
-        style={{ maxHeight: 320, background: '#ffffff', color: '#1c1c1c' }}
+        style={{ minHeight: 0, background: '#ffffff', color: '#1c1c1c' }}
       >
         {messages.length === 0 ? (
           <div className="small text-center py-3" style={{ color: '#888888' }}>
@@ -159,8 +171,16 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
           </Button>
         </InputGroup>
       ) : (
-        <div className="text-muted small text-center py-2 border rounded-3 mt-2">
-          {myRole === 'viewer' ? 'Chat disabled for viewers' : 'Join as a participant to chat'}
+        <div
+          className={`small text-center py-2 border rounded-3 mt-2 ${
+            isChatMuted ? 'text-danger border-danger bg-danger bg-opacity-10' : 'text-muted'
+          }`}
+        >
+          {isChatMuted
+            ? 'You have been banned from sending messages in this chat'
+            : myRole === 'viewer'
+            ? 'Chat disabled for viewers'
+            : 'Join as a participant to chat'}
         </div>
       )}
     </div>

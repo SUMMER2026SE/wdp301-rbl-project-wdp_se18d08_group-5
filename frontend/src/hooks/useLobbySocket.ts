@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSocket } from './useSocket';
+import { useSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
 
 /**
@@ -22,9 +22,10 @@ export function useLobbySocket(
   const navigate = useNavigate();
   const setRoom = useDebateStore((state) => state.setRoom);
   const setParticipants = useDebateStore((state) => state.setParticipants);
+  const { socket } = useSocket();
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !socket) return;
 
     const handleStateUpdated = (data: {
       roomId: string;
@@ -53,36 +54,31 @@ export function useLobbySocket(
       onRoomStateUpdated?.();
     };
 
-    const joinChannel = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
+    const joinChannel = () => {
       socket.emit('room:join', { roomId });
     };
 
-    const attach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      joinChannel(socket);
+    const attach = () => {
+      joinChannel();
       socket.on('room:state-updated', handleStateUpdated);
       socket.on('debate:started', handleDebateStarted);
       socket.on('room:participant-update', handleParticipantUpdate);
     };
 
-    const detach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      socket.emit('room:leave', { roomId });
+    const detach = () => {
       socket.off('room:state-updated', handleStateUpdated);
       socket.off('debate:started', handleDebateStarted);
       socket.off('room:participant-update', handleParticipantUpdate);
     };
 
-    const socket = getSocket();
-    attach(socket);
+    attach();
 
-    const handleConnect = () => joinChannel(socket);
-    socket?.on('connect', handleConnect);
+    const handleConnect = () => joinChannel();
+    socket.on('connect', handleConnect);
 
     return () => {
-      socket?.off('connect', handleConnect);
-      detach(socket);
+      socket.off('connect', handleConnect);
+      detach();
     };
-  }, [navigate, onRoomStateUpdated, roomId, setParticipants, setRoom]);
+  }, [navigate, onRoomStateUpdated, roomId, setParticipants, setRoom, socket]);
 }

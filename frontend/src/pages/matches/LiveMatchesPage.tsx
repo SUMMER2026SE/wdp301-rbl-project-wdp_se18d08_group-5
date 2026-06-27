@@ -1,20 +1,23 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, ButtonGroup, Card, Col, Container, Form, Modal, Row, Spinner } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
 import type { DebateFormat, DebateRoom, RoomStatus, RoomType } from '@/types';
+import { useSocket } from '@hooks/useSocket';
 
 export default function LiveMatchesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
   const [format, setFormat] = useState<DebateFormat | ''>('');
   const [roomType, setRoomType] = useState<RoomType | ''>('');
   const [status, setStatus] = useState<RoomStatus | ''>('');
   const [selectedRoom, setSelectedRoom] = useState<DebateRoom | null>(null);
   const [password, setPassword] = useState('');
+  const { socket } = useSocket();
 
   const roomsQuery = useQuery({
     queryKey: ['rooms', { format, roomType, status }],
@@ -25,6 +28,26 @@ export default function LiveMatchesPage() {
       limit: 24,
     })).data.data,
   });
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const invalidateRooms = () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+    };
+
+    socket.on('room:state-restore', invalidateRooms);
+    socket.on('room:update', invalidateRooms);
+    socket.on('debate:ended', invalidateRooms);
+    socket.on('score:winner-determined', invalidateRooms);
+
+    return () => {
+      socket.off('room:state-restore', invalidateRooms);
+      socket.off('room:update', invalidateRooms);
+      socket.off('debate:ended', invalidateRooms);
+      socket.off('score:winner-determined', invalidateRooms);
+    };
+  }, [socket, queryClient]);
 
   const joinMutation = useMutation({
     mutationFn: () => roomService.join(selectedRoom!._id, password),
@@ -66,6 +89,11 @@ export default function LiveMatchesPage() {
       }
     }
   }
+
+  const visibleRooms = useMemo(
+    () => (roomsQuery.data || []).filter((room) => room.status !== 'completed'),
+    [roomsQuery.data],
+  );
 
   return (
     <Container className="py-4">
@@ -117,9 +145,9 @@ export default function LiveMatchesPage() {
         <Spinner animation="border" />
       ) : (
         <Row className="g-3">
-          {(roomsQuery.data || []).map((room) => {
+          {visibleRooms.map((room) => {
             const userPart = room.participants.find((p) => p.userId === currentUser?._id);
-            const canRejoin = userPart && ['host', 'debater', 'judge'].includes(userPart.roomRole);
+            const canRejoin = room.status !== 'completed' && userPart && ['host', 'debater', 'judge'].includes(userPart.roomRole);
             const isLive = room.status === 'active' || room.status === 'paused';
 
             return (

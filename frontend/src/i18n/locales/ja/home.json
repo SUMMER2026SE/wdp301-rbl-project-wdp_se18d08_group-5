@@ -1,92 +1,93 @@
-{
+﻿{
   "hero": {
-    "kicker": "AIが支えるアカデミックディベート",
-    "title": "学術競技のためのAIディベートプラットフォーム",
-    "subtitle": "ランク戦に参加し、プライベートルームを作成し、試合ごとに明確なAIフィードバックを受け取れます。"
+    "kicker": "Academic debate, powered by AI",
+    "title": "AI debate platform for academic competition",
+    "subtitle": "Play ranked debates, create private rooms, and receive clear AI feedback after every match."
   },
   "cta": {
-    "primaryAuth": "ランク戦へ",
-    "primaryGuest": "今すぐ始める",
-    "secondaryAuth": "ルーム作成",
-    "secondaryGuest": "試合を見る"
+    "primaryAuth": "Enter ranked queue",
+    "primaryGuest": "Get started",
+    "secondaryAuth": "Create room",
+    "secondaryGuest": "Watch matches"
   },
   "showcase": {
-    "liveRoom": "ライブディベートルーム",
-    "liveTitle": "Cross Examination 進行中",
-    "liveCopy": "明確な進行、速いテンポ、そして判断力と反論に集中できる設計です。",
-    "playerSnapshot": "プレイヤースナップショット",
-    "format": "形式",
-    "judge": "審査",
-    "queue": "キュー",
+    "liveRoom": "Live Debate Room",
+    "liveTitle": "Cross Examination in progress",
+    "liveCopy": "Structured rounds, fast pacing, and better focus on decision-making and rebuttal.",
+    "playerSnapshot": "Player Snapshot",
+    "format": "Format",
+    "judge": "Judge",
+    "queue": "Queue",
     "elo": "ELO",
-    "winRate": "勝率",
-    "feedback": "フィードバック",
-    "strengths": "強み4項目"
+    "winRate": "Win rate",
+    "feedback": "Feedback",
+    "strengths": "4 strengths"
   },
   "sections": {
     "start": {
-      "title": "自分に合った方法で参加",
-      "description": "ランク戦で実力の近い相手と戦うか、友人やクラブ向けにプライベートルームを開けます。",
-      "bullets": ["ランクマッチング", "柔軟なプライベートルーム", "1v1 と 3v3"],
-      "eyebrow": "素早く開始",
-      "panelTitle": "ランク戦またはカスタムルーム",
-      "panelDetail": "すぐにマッチングへ入るか、自分専用のディベート卓を作成できます。",
+      "title": "Join debates your way",
+      "description": "Queue into ranked matches or open private rooms for your friends and debate club.",
+      "bullets": ["Ranked matchmaking", "Flexible private rooms", "1v1 and 3v3"],
+      "eyebrow": "Fast start",
+      "panelTitle": "Ranked or custom room",
+      "panelDetail": "Jump into matchmaking or host your own debate table.",
       "stats": {
-        "modes": "モード",
-        "access": "公開範囲",
+        "modes": "Modes",
+        "access": "Access",
         "modesValue": "1v1 / 3v3",
-        "accessValue": "公開 / 非公開"
+        "accessValue": "Public / private"
       },
-      "cta": "形式を見る"
+      "cta": "Explore formats"
     },
     "ai": {
-      "title": "AIでより良い議論へ",
-      "description": "AIは採点だけでなく、弱い論理や詭弁、試合後に改善すべき点まで示します。",
-      "bullets": ["論点分析", "詭弁検出", "試合後フィードバック"],
-      "eyebrow": "中核の強み",
-      "panelTitle": "明確で公平なフィードバック",
-      "panelDetail": "すべての試合を測定可能な学習サイクルに変えます。",
+      "title": "AI helps you debate better",
+      "description": "AI does more than score. It highlights weak reasoning, fallacies, and what to improve after the match.",
+      "bullets": ["Argument analysis", "Fallacy detection", "Post-match feedback"],
+      "eyebrow": "Core advantage",
+      "panelTitle": "Clear, fair feedback",
+      "panelDetail": "Turn every debate into a measurable learning loop.",
       "stats": {
-        "analysis": "分析",
-        "detection": "検出",
-        "analysisValue": "論点",
-        "detectionValue": "詭弁"
+        "analysis": "Analysis",
+        "detection": "Detection",
+        "analysisValue": "Arguments",
+        "detectionValue": "Fallacies"
       },
-      "cta": "AI体験を見る"
+      "cta": "See AI experience"
     },
     "progress": {
-      "title": "試合ごとの成長を可視化",
-      "description": "ELO、勝敗履歴、プロフィールにより、自分の成長を正確に把握できます。",
-      "bullets": ["ELOランキング", "対戦履歴", "成長プロフィール"],
-      "eyebrow": "測定できる成長",
-      "panelTitle": "意味のある統計",
-      "panelDetail": "自分の強みと次に鍛えるべき点が見えてきます。",
+      "title": "Track real progress after every match",
+      "description": "ELO, win/loss history, and your profile show exactly where you are improving.",
+      "bullets": ["ELO ranking", "Match history", "Progress profile"],
+      "eyebrow": "Measured growth",
+      "panelTitle": "Stats with meaning",
+      "panelDetail": "See where you are strong and what you should train next.",
       "stats": {
-        "tracking": "追跡",
-        "improvement": "改善",
-        "trackingValue": "勝敗",
-        "improvementValue": "時系列"
+        "tracking": "Tracking",
+        "improvement": "Improvement",
+        "trackingValue": "Win / Loss",
+        "improvementValue": "Over time"
       },
-      "cta": "ランキングを見る"
+      "cta": "View leaderboard"
     },
     "community": {
-      "title": "動いているコミュニティを見る",
-      "description": "ライブ対戦を観戦し、ランキングを確認し、他のプレイヤーを観察して素早く学べます。",
-      "bullets": ["ライブ対戦", "ランキング", "戦略観察"],
-      "eyebrow": "コミュニティ探索",
-      "panelTitle": "見て学ぶ",
-      "panelDetail": "試合に入る前でも、観察・分析・学習が可能です。",
+      "title": "See the debate community in motion",
+      "description": "Watch live debates, explore the leaderboard, and learn faster by observing other players.",
+      "bullets": ["Live matches", "Leaderboard", "Strategy observation"],
+      "eyebrow": "Explore community",
+      "panelTitle": "Learn by watching",
+      "panelDetail": "You can still observe, analyze, and learn even before joining a match.",
       "stats": {
-        "watch": "観戦",
-        "explore": "探索",
-        "watchValue": "ライブ対戦",
-        "exploreValue": "上位プレイヤー"
+        "watch": "Watch",
+        "explore": "Explore",
+        "watchValue": "Live matches",
+        "exploreValue": "Top players"
       },
-      "cta": "ライブを見る"
+      "cta": "Watch live now"
     }
   },
   "finalCta": {
-    "title": "次のディベートに挑みますか？",
-    "copy": "ランク戦を始める、プライベートルームを開く、または今まさに議論しているコミュニティを見てみましょう。"
+    "title": "Ready for your next debate?",
+    "copy": "Start a ranked match, open a private room, or explore the community debating right now."
   }
 }
+

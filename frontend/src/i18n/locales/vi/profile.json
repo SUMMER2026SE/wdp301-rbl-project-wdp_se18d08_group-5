@@ -1,101 +1,102 @@
-{
-  "title": "Hồ sơ",
+﻿{
+  "title": "Profile",
   "hero": {
-    "ownerKicker": "Hồ sơ cá nhân",
-    "publicKicker": "Hồ sơ công khai",
+    "ownerKicker": "Personal profile",
+    "publicKicker": "Public profile",
     "title": "{{name}}",
-    "ownerSubtitle": "Cập nhật danh tính tranh biện, thống kê và hành trình xếp hạng của bạn.",
-    "publicSubtitle": "Tổng quan hồ sơ, thành tích và thông tin cộng đồng của {{name}}."
+    "ownerSubtitle": "Keep your debate identity, stats, and ranking journey up to date.",
+    "publicSubtitle": "Profile overview, competitive record, and community details for {{name}}."
   },
   "fields": {
-    "displayName": "Tên hiển thị",
-    "avatar": "Ảnh đại diện",
+    "displayName": "Display name",
+    "avatar": "Avatar",
     "bio": "Bio",
-    "school": "Trường",
-    "club": "CLB"
+    "school": "School",
+    "club": "Club"
   },
   "stats": {
     "elo": "ELO",
     "tier": "Tier",
-    "winLoss": "Thắng / Thua",
-    "totalDebates": "Tổng debate",
-    "wins": "Thắng",
-    "losses": "Thua",
-    "winRate": "Tỉ lệ thắng",
-    "avgScore": "Điểm TB",
-    "profileCompletion": "Độ hoàn thiện",
-    "memberSince": "Tham gia",
-    "role": "Vai trò",
-    "otherResults": "Khác",
-    "seasonPointsValue": "{{points}} điểm mùa",
-    "winLossValue": "{{wins}} thắng / {{losses}} thua",
-    "totalScoreValue": "{{score}} điểm tổng",
-    "decidedDebates": "{{count}} trận có kết quả"
+    "winLoss": "Wins / Losses",
+    "totalDebates": "Total debates",
+    "wins": "Wins",
+    "losses": "Losses",
+    "winRate": "Win rate",
+    "avgScore": "Avg score",
+    "profileCompletion": "Profile completion",
+    "memberSince": "Member since",
+    "role": "Role",
+    "otherResults": "Other",
+    "seasonPointsValue": "{{points}} season pts",
+    "winLossValue": "{{wins}} wins / {{losses}} losses",
+    "totalScoreValue": "{{score}} total pts",
+    "decidedDebates": "{{count}} decided matches"
   },
   "status": {
-    "emailVerified": "Email đã xác thực",
-    "emailUnverified": "Chưa xác thực email"
+    "emailVerified": "Email verified",
+    "emailUnverified": "Email not verified"
   },
   "messages": {
-    "loadFailed": "Không thể tải hồ sơ",
-    "updateSuccess": "Cập nhật hồ sơ thành công.",
-    "updateFailed": "Không thể cập nhật hồ sơ",
-    "avatarUploadSuccess": "Tải ảnh đại diện thành công.",
-    "avatarUploadFailed": "Tải ảnh đại diện thất bại.",
-    "avatarUploadNoUrl": "Upload không trả về URL ảnh đại diện",
-    "notFound": "Không tìm thấy hồ sơ"
+    "loadFailed": "Unable to load profile",
+    "updateSuccess": "Profile updated successfully.",
+    "updateFailed": "Unable to update profile",
+    "avatarUploadSuccess": "Avatar uploaded successfully.",
+    "avatarUploadFailed": "Unable to upload avatar.",
+    "avatarUploadNoUrl": "Upload did not return an avatar URL",
+    "notFound": "Profile not found"
   },
   "actions": {
-    "viewHistory": "Xem lịch sử tranh biện",
-    "avatarUpload": "Tải ảnh từ thiết bị",
-    "avatarUploading": "Đang tải...",
-    "viewLeaderboard": "Bảng xếp hạng",
-    "startRankQueue": "Vào hàng chờ rank",
-    "changePassword": "Đổi mật khẩu",
-    "updateAvatar": "Cập nhật ảnh"
+    "viewHistory": "View debate history",
+    "avatarUpload": "Upload from device",
+    "avatarUploading": "Uploading...",
+    "viewLeaderboard": "Leaderboard",
+    "startRankQueue": "Join ranked queue",
+    "changePassword": "Change password",
+    "updateAvatar": "Update avatar"
   },
   "sections": {
-    "editProfile": "Chỉnh sửa",
-    "publicProfile": "Giới thiệu",
-    "activity": "Hoạt động",
-    "account": "Tài khoản"
+    "editProfile": "Edit",
+    "publicProfile": "Overview",
+    "activity": "Activity",
+    "account": "Account"
   },
   "form": {
-    "title": "Thông tin hiển thị",
-    "bioPlaceholder": "Viết vài dòng giới thiệu phong cách tranh biện của bạn...",
-    "schoolPlaceholder": "Tên trường hoặc tổ chức",
-    "clubPlaceholder": "Tên CLB hoặc đội nhóm"
+    "title": "Display information",
+    "bioPlaceholder": "Write a short note about your debating style...",
+    "schoolPlaceholder": "School or organization",
+    "clubPlaceholder": "Club or team"
   },
   "details": {
-    "title": "Thông tin cộng đồng"
+    "title": "Community information"
   },
   "activity": {
-    "title": "Phong độ tranh biện",
-    "winRateHint": "Tính theo các trận thắng/thua đã chốt."
+    "title": "Debate performance",
+    "winRateHint": "Calculated from decided wins and losses."
   },
   "account": {
-    "title": "Trạng thái hồ sơ",
+    "title": "Profile status",
     "emailStatus": "Email",
-    "provider": "Đăng nhập"
+    "provider": "Login"
   },
   "avatarUpload": {
-    "hint": "JPG, PNG, GIF hoặc WebP. Tối đa 5MB."
+    "hint": "JPG, PNG, GIF, or WebP. Max 5MB."
   },
   "validation": {
-    "displayNameRequired": "Vui lòng nhập tên hiển thị",
-    "displayNameMax": "Tối đa 50 ký tự",
-    "avatarInvalid": "URL ảnh không hợp lệ",
-    "avatarFileInvalid": "File ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, GIF hoặc WebP, tối đa 5MB.",
-    "bioMax": "Tối đa 500 ký tự",
-    "schoolMax": "Tối đa 100 ký tự",
-    "clubMax": "Tối đa 100 ký tự"
+    "displayNameRequired": "Please enter a display name",
+    "displayNameMax": "Maximum 50 characters",
+    "avatarInvalid": "Invalid image URL",
+    "avatarFileInvalid": "Invalid image file. Use JPG, PNG, GIF, or WebP up to 5MB.",
+    "bioMax": "Maximum 500 characters",
+    "schoolMax": "Maximum 100 characters",
+    "clubMax": "Maximum 100 characters"
   },
   "tiers": {
-    "novice": "Tân binh",
+    "novice": "Novice",
     "debater": "Debater",
-    "advanced": "Nâng cao",
-    "expert": "Chuyên gia",
+    "advanced": "Advanced",
+    "expert": "Expert",
     "master": "Master",
     "grandMaster": "Grand Master"
   }
 }
+

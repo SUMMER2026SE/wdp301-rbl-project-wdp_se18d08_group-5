@@ -71,7 +71,7 @@ export default function LeaderboardPage() {
   if (leaderboardQuery.isError) {
     return (
       <Container className="py-4">
-        <Alert variant="danger">{(leaderboardQuery.error as Error).message || 'Không thể tải leaderboard.'}</Alert>
+        <Alert variant="danger">{(leaderboardQuery.error as Error).message || 'Failed to load leaderboard.'}</Alert>
       </Container>
     );
   }

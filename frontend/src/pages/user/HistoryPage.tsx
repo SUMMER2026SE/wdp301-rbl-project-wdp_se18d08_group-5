@@ -49,7 +49,7 @@ export default function HistoryPage() {
 
   const items = historyQuery.data?.data ?? [];
   const pagination = historyQuery.data?.pagination;
-  const title = useMemo(() => 'Lịch sử tranh biện', []);
+  const title = useMemo(() => 'Debate history', []);
 
   if (historyQuery.isLoading) {
     return <LoadingScreen />;
@@ -58,7 +58,7 @@ export default function HistoryPage() {
   if (historyQuery.isError) {
     return (
       <Container className="py-4">
-        <Alert variant="danger">{(historyQuery.error as Error).message || 'Không thể tải lịch sử tranh biện.'}</Alert>
+        <Alert variant="danger">{(historyQuery.error as Error).message || 'Failed to load debate history.'}</Alert>
       </Container>
     );
   }
@@ -68,10 +68,10 @@ export default function HistoryPage() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h2 className="mb-1">{title}</h2>
-          <p className="text-muted mb-0">Theo dõi các trận đã hoàn thành của người dùng.</p>
+          <p className="text-muted mb-0">Track the user's completed matches.</p>
         </div>
         <Button onClick={() => navigate(userId ? `/profile/${userId}` : '/leaderboard')} variant="outline-primary">
-          Quay lại hồ sơ
+          Back to profile
         </Button>
       </div>
 
@@ -96,14 +96,14 @@ export default function HistoryPage() {
                       </div>
                       <p className="text-muted mb-2">{item.motion || 'No motion recorded.'}</p>
                       <div className="small text-muted d-flex flex-wrap gap-3">
-                        <span>Vai trò: {item.userRole}</span>
-                        <span>Phe: {item.userSide || 'N/A'}</span>
-                        <span>Ngày: {item.endedAt ? new Date(item.endedAt).toLocaleDateString() : 'N/A'}</span>
+                        <span>Role: {item.userRole}</span>
+                        <span>Side: {item.userSide || 'N/A'}</span>
+                        <span>Date: {item.endedAt ? new Date(item.endedAt).toLocaleDateString() : 'N/A'}</span>
                       </div>
                     </div>
                     <div className="d-flex align-items-start">
                       <Button onClick={() => navigate(`/replay/${item.sessionId}`)} variant="outline-secondary" size="sm">
-                        Xem replay
+                        View replay
                       </Button>
                     </div>
                   </div>

@@ -3,7 +3,14 @@ import { ReconnectOverlay } from '@components/common/ReconnectOverlay';
 
 export default function DebateLayout() {
   return (
-    <div className="vh-100 d-flex flex-column" style={{ background: 'var(--bg-surface)' }}>
+    <div
+      className="d-flex flex-column"
+      style={{
+        height: '100dvh',
+        background: 'var(--bg-surface)',
+        overflow: 'hidden',
+      }}
+    >
       <ReconnectOverlay />
       <Outlet />
     </div>

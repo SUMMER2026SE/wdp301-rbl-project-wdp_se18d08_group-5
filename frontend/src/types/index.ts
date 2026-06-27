@@ -1,5 +1,5 @@
 // ============================================================
-// SHARED TYPES — Phù hợp với Database Schema trong 04_TRD
+// SHARED TYPES — Aligned with the Database Schema in 04_TRD
 // ============================================================
 
 // --- Enums ---
@@ -16,6 +16,7 @@ export type CardType = 'yellow' | 'red';
 export type MessageType = 'chat' | 'system' | 'announcement' | 'cross-exam';
 
 export type DebatePhase =
+  | 'waiting_s1'
   | 'motion'
   | 'prep_7'
   | 'speech'
@@ -134,12 +135,14 @@ export interface RoomParticipant {
   username: string;
   avatar: string;
   roomRole: RoomRole;
+  primaryRole?: RoomRole | null;
   team: Team | null;
   speakerSlot: SpeakerSlot | null;
   positionLocked: boolean;
   muted?: boolean;
   speakingAllowed?: boolean;
   chatMuted?: boolean;
+  cameraMuted?: boolean;
 }
 
 export interface DebateRoom {
@@ -325,6 +328,12 @@ export interface DebateSession {
   }[];
   finalScores: FinalScores | null;
   aiSummary: string | null;
+  pauseType?: 'host' | 'proposition' | 'opposition' | null;
+  pausedAt?: string | null;
+  pausesUsed?: {
+    proposition: number;
+    opposition: number;
+  };
 }
 
 // --- Chat ---

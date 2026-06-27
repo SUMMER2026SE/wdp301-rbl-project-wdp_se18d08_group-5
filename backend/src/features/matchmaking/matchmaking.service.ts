@@ -135,5 +135,10 @@ export async function tryCreateRankMatch(entry: IMatchQueue): Promise<MatchResul
 
   emitMatchFound(userIds, room._id);
 
+  const io = getIO();
+  if (io) {
+    io.emit('room:update', { action: 'create', roomId: room._id.toString() });
+  }
+
   return { matched: true, room };
 }

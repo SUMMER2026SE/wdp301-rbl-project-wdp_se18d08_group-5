@@ -37,8 +37,8 @@ export const roomService = {
     return api.post<ApiResponse<DebateRoom>>(`/rooms/${roomId}/join`, { password });
   },
 
-  leave(roomId: string) {
-    return api.post(`/rooms/${roomId}/leave`);
+  leave(roomId: string, newOwnerId?: string) {
+    return api.post(`/rooms/${roomId}/leave`, { newOwnerId });
   },
 
   selectPosition(roomId: string, team: Team, speakerSlot: SpeakerSlot) {
@@ -59,6 +59,14 @@ export const roomService = {
 
   lockPositions(roomId: string) {
     return api.post(`/rooms/${roomId}/position/lock`);
+  },
+
+  unlockPositions(roomId: string) {
+    return api.post(`/rooms/${roomId}/position/unlock`);
+  },
+
+  toggleParticipantLock(roomId: string, userId: string, locked: boolean) {
+    return api.post(`/rooms/${roomId}/position/lock-user`, { userId, locked });
   },
 
   start(roomId: string) {
@@ -148,5 +156,9 @@ export const roomService = {
 
   muteChat(roomId: string, userId: string, action: 'mute' | 'unmute') {
     return api.post(`/rooms/${roomId}/host/mute-chat`, { userId, action });
+  },
+
+  muteCamera(roomId: string, userId: string, action: 'mute' | 'unmute') {
+    return api.post(`/rooms/${roomId}/host/mute-camera`, { userId, action });
   },
 };

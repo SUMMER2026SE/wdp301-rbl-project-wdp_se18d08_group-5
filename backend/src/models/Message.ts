@@ -9,6 +9,7 @@ export interface IMessage extends Document {
   type: string;
   isToxic: boolean;
   timestamp: Date;
+  team?: 'proposition' | 'opposition' | 'judge';
 }
 
 const messageSchema = new Schema<IMessage>({
@@ -19,13 +20,19 @@ const messageSchema = new Schema<IMessage>({
   content: { type: String, required: true, maxlength: 1000 },
   type: {
     type: String,
-    enum: ['chat', 'system', 'announcement', 'cross-exam'],
+    enum: ['chat', 'system', 'announcement', 'cross-exam', 'viewer_chat'],
     default: 'chat',
+  },
+  team: {
+    type: String,
+    enum: ['proposition', 'opposition', 'judge'],
+    default: undefined,
   },
   isToxic: { type: Boolean, default: false },
   timestamp: { type: Date, default: Date.now },
 });
 
 messageSchema.index({ roomId: 1, timestamp: -1 });
+messageSchema.index({ roomId: 1, team: 1, timestamp: -1 });
 
 export const Message = mongoose.model<IMessage>('Message', messageSchema);

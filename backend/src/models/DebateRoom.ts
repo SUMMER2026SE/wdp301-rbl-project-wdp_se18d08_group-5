@@ -23,9 +23,11 @@ export interface IDebateRoom extends Document {
     team: string | null;
     speakerSlot: string | null;
     positionLocked: boolean;
+    primaryRole?: string | null;
     muted: boolean;
     speakingAllowed?: boolean;
     chatMuted?: boolean;
+    cameraMuted?: boolean;
   }[];
   currentPhase: string;
   eloApplied: boolean;
@@ -95,9 +97,15 @@ const debateRoomSchema = new Schema<IDebateRoom>(
           default: null,
         },
         positionLocked: { type: Boolean, default: false },
+        primaryRole: {
+          type: String,
+          enum: ['debater', 'host', 'judge', 'viewer', null],
+          default: null,
+        },
         muted: { type: Boolean, default: false },
         speakingAllowed: { type: Boolean, default: false },
         chatMuted: { type: Boolean, default: false },
+        cameraMuted: { type: Boolean, default: false },
       },
     ],
     currentPhase: {
@@ -124,9 +132,21 @@ const debateRoomSchema = new Schema<IDebateRoom>(
   },
 );
 
-// Indexes
 debateRoomSchema.index({ status: 1, roomType: 1 });
 debateRoomSchema.index({ createdBy: 1 });
 debateRoomSchema.index({ 'participants.userId': 1 });
+
+debateRoomSchema.pre('save', async function (next) {
+  if (this.isModified('status') && (this.status === 'completed' || this.status === 'cancelled')) {
+    try {
+      const { Message } = await import('./Message.js');
+      await Message.deleteMany({ roomId: this._id });
+      console.log(`Cleared all messages for room ${this._id} since it was marked ${this.status}`);
+    } catch (err) {
+      console.error(`Failed to clear messages for room ${this._id}:`, err);
+    }
+  }
+  next();
+});
 
 export const DebateRoom = mongoose.model<IDebateRoom>('DebateRoom', debateRoomSchema);
