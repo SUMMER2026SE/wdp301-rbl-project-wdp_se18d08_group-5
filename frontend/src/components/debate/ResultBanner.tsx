@@ -21,6 +21,23 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
   const aiFinalVerdict = useDebateStore((s) => s.aiFinalVerdict);
   const verdict = aiFinalVerdict ?? finalScores?.winnerTeam ?? finalScores?.winner;
 
+  // Auto redirect after 10 seconds (per the rule docs).
+  // useEffect must always be called, even when we render nothing below.
+  useEffect(() => {
+    if (!verdict) return;
+    const timer = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(timer);
+          navigate(`/replay/${roomId}`);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [verdict, roomId, navigate]);
+
   if (!verdict) return null;
 
   const propScore = finalScores?.teamProposition?.total ?? 0;
@@ -37,20 +54,6 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
     if (verdict === 'opposition' || verdict === 'opp') return '#ff4466';
     return '#ffcc00';
   };
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(timer);
-          navigate(`/replay/${roomId}`);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [roomId, navigate]);
 
   return (
     <div

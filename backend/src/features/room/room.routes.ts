@@ -311,7 +311,7 @@ function resolveWinnerFromTeamScores(propositionTotal: number, oppositionTotal: 
   return scoreDelta > 0 ? 'proposition' : 'opposition';
 }
 
-function aggregateFinalScores(session: any) {
+function aggregateFinalScores(session: any, room?: any) {
   if (!session.finalScores) {
     session.finalScores = {
       teamProposition: { total: 0, breakdown: {} },
@@ -332,36 +332,164 @@ function aggregateFinalScores(session: any) {
     aggregatePolicy?: any;
   };
   const verdicts = getLatestVerdicts(finalScores.judgeVerdicts || []);
-  const proposition = aggregateTeamScores(verdicts, 'proposition');
-  const opposition = aggregateTeamScores(verdicts, 'opposition');
-  const weightedVoteWinner = resolveWinnerFromVerdicts(verdicts, proposition.total, opposition.total);
-  const winnerTeam = resolveWinnerFromTeamScores(proposition.total, opposition.total);
+  const isRoundBased = verdicts.some((v: any) => v.round !== undefined);
 
-  const aiVotes = verdicts.filter((verdict) => verdict?.source === 'ai' && verdict?.winner);
-  const latestAIVote = aiVotes[aiVotes.length - 1]?.winner || null;
+  if (isRoundBased) {
+    const judgeIds = Array.from(new Set(verdicts.map((v) => v.judgeId?.toString() || 'unknown')));
+    
+    let sumProp = 0;
+    let sumOpp = 0;
+    let validJudgesCount = 0;
 
-  finalScores.teamProposition = {
-    total: proposition.total,
-    breakdown: proposition.breakdown,
-    weight: proposition.weight,
-  };
-  finalScores.teamOpposition = {
-    total: opposition.total,
-    breakdown: opposition.breakdown,
-    weight: opposition.weight,
-  };
-  finalScores.winner = winnerTeam;
-  finalScores.winnerTeam = winnerTeam;
-  finalScores.aiVerdict = latestAIVote;
-  finalScores.aggregatePolicy = {
-    humanJudgeWeight: HUMAN_JUDGE_WEIGHT,
-    aiJudgeWeight: AI_JUDGE_WEIGHT,
-    method: 'weighted_average_with_weighted_winner_votes',
-    weightedVoteWinner,
-    winnerMethod: 'compare_team_total_scores',
-    verdictCount: verdicts.length,
-    aggregatedAt: new Date(),
-  };
+    let sumPropS3 = 0;
+    let sumOppS3 = 0;
+    let countS3 = 0;
+
+    let sumPropR2 = 0;
+    let sumOppR2 = 0;
+    let countR2 = 0;
+
+    const judgeVotes = { proposition: 0, opposition: 0, draw: 0 };
+
+    judgeIds.forEach((jId) => {
+      const judgeVerdicts = verdicts.filter((v) => (v.judgeId?.toString() || 'unknown') === jId);
+      
+      let judgePropTotal = 0;
+      let judgeOppTotal = 0;
+
+      judgeVerdicts.forEach((v) => {
+        const isProp = String(v.speaker).startsWith('PRO');
+        // buildRoundScore stores speak in score.logic and ce in score.crossExam
+        const speakVal = Number(v.score?.logic) || 0;
+        const ceVal = Number(v.score?.crossExam) || 0;
+        const scoreVal = speakVal + ceVal;
+
+        if (isProp) {
+          judgePropTotal += scoreVal;
+        } else {
+          judgeOppTotal += scoreVal;
+        }
+
+        const roundNum = Number(v.round);
+        if (roundNum === 3) {
+          if (isProp) sumPropS3 += speakVal;
+          else sumOppS3 += speakVal;
+          countS3 += 0.5;
+        } else if (roundNum === 2) {
+          if (isProp) sumPropR2 += scoreVal;
+          else sumOppR2 += scoreVal;
+          countR2 += 0.5;
+        }
+      });
+
+      sumProp += judgePropTotal;
+      sumOpp += judgeOppTotal;
+      validJudgesCount += 1;
+
+      if (judgePropTotal > judgeOppTotal) {
+        judgeVotes.proposition += 1;
+      } else if (judgePropTotal < judgeOppTotal) {
+        judgeVotes.opposition += 1;
+      } else {
+        judgeVotes.draw += 1;
+      }
+    });
+
+    const propositionTotal = validJudgesCount ? sumProp / validJudgesCount : 0;
+    const oppositionTotal = validJudgesCount ? sumOpp / validJudgesCount : 0;
+
+    // Determine which rounds have been scored across all judges
+    const scoredRounds = new Set(verdicts.map((v: any) => Number(v.round)).filter((r: number) => r >= 1 && r <= 3));
+    const allRoundsScored = scoredRounds.has(1) && scoredRounds.has(2) && scoredRounds.has(3);
+
+    // Only determine winner when ALL 3 rounds have been scored
+    let winnerTeam: DebateWinner | null = null;
+    if (allRoundsScored) {
+      const delta = propositionTotal - oppositionTotal;
+      if (Math.abs(delta) < 0.01) {
+        const avgPropS3 = countS3 ? sumPropS3 / countS3 : 0;
+        const avgOppS3 = countS3 ? sumOppS3 / countS3 : 0;
+        const s3Delta = avgPropS3 - avgOppS3;
+
+        if (Math.abs(s3Delta) > 0.01) {
+          winnerTeam = s3Delta > 0 ? 'proposition' : 'opposition';
+        } else if (room?.format === '3v3') {
+          const avgPropR2 = countR2 ? sumPropR2 / countR2 : 0;
+          const avgOppR2 = countR2 ? sumOppR2 / countR2 : 0;
+          const r2Delta = avgPropR2 - avgOppR2;
+
+          if (Math.abs(r2Delta) > 0.01) {
+            winnerTeam = r2Delta > 0 ? 'proposition' : 'opposition';
+          } else {
+            if (judgeVotes.proposition > judgeVotes.opposition) {
+              winnerTeam = 'proposition';
+            } else if (judgeVotes.proposition < judgeVotes.opposition) {
+              winnerTeam = 'opposition';
+            } else {
+              winnerTeam = 'draw';
+            }
+          }
+        } else {
+          if (judgeVotes.proposition > judgeVotes.opposition) {
+            winnerTeam = 'proposition';
+          } else if (judgeVotes.proposition < judgeVotes.opposition) {
+            winnerTeam = 'opposition';
+          } else {
+            winnerTeam = 'draw';
+          }
+        }
+      } else {
+        winnerTeam = delta > 0 ? 'proposition' : 'opposition';
+      }
+    }
+
+    finalScores.teamProposition = { total: propositionTotal, breakdown: {} };
+    finalScores.teamOpposition = { total: oppositionTotal, breakdown: {} };
+    finalScores.winner = winnerTeam as any;
+    finalScores.winnerTeam = winnerTeam as any;
+    finalScores.aiVerdict = null;
+    finalScores.aggregatePolicy = {
+      humanJudgeWeight: HUMAN_JUDGE_WEIGHT,
+      aiJudgeWeight: AI_JUDGE_WEIGHT,
+      method: 'round_based_average_with_tie_breakers',
+      winnerMethod: allRoundsScored ? 'tie_breaker_rules_applied' : 'pending_more_rounds',
+      scoredRounds: Array.from(scoredRounds),
+      verdictCount: verdicts.length,
+      aggregatedAt: new Date(),
+    };
+  } else {
+    // Legacy criteria-based aggregation
+    const proposition = aggregateTeamScores(verdicts, 'proposition');
+    const opposition = aggregateTeamScores(verdicts, 'opposition');
+    const weightedVoteWinner = resolveWinnerFromVerdicts(verdicts, proposition.total, opposition.total);
+    const winnerTeam = resolveWinnerFromTeamScores(proposition.total, opposition.total);
+
+    const aiVotes = verdicts.filter((verdict) => verdict?.source === 'ai' && verdict?.winner);
+    const latestAIVote = aiVotes[aiVotes.length - 1]?.winner || null;
+
+    finalScores.teamProposition = {
+      total: proposition.total,
+      breakdown: proposition.breakdown,
+      weight: proposition.weight,
+    };
+    finalScores.teamOpposition = {
+      total: opposition.total,
+      breakdown: opposition.breakdown,
+      weight: opposition.weight,
+    };
+    finalScores.winner = winnerTeam;
+    finalScores.winnerTeam = winnerTeam;
+    finalScores.aiVerdict = latestAIVote;
+    finalScores.aggregatePolicy = {
+      humanJudgeWeight: HUMAN_JUDGE_WEIGHT,
+      aiJudgeWeight: AI_JUDGE_WEIGHT,
+      method: 'weighted_average_with_weighted_winner_votes',
+      weightedVoteWinner,
+      winnerMethod: 'compare_team_total_scores',
+      verdictCount: verdicts.length,
+      aggregatedAt: new Date(),
+    };
+  }
 
   return finalScores;
 }
@@ -418,7 +546,7 @@ async function judgeTurnWithAI(
     source: 'ai',
     submittedAt: new Date(),
   });
-  aggregateFinalScores(session);
+  aggregateFinalScores(session, room);
 
   await session.save();
 
@@ -498,8 +626,15 @@ router.get(
     if (format) filter.format = format;
     if (roomType) filter.roomType = roomType;
 
-    // Default: show active/waiting rooms
-    if (!status) filter.status = { $in: ['waiting', 'ready', 'active'] };
+    // Default: show active/waiting rooms. Completed/ended matches should
+    // never show up on the live list — they belong in the replay/history page.
+    if (!status) {
+      filter.status = { $in: ['waiting', 'ready', 'active', 'paused'] };
+    } else if (status === 'completed') {
+      // Explicit completed filter is allowed (for history views), but we keep
+      // the broader inclusive list below just in case.
+      filter.status = 'completed';
+    }
 
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
@@ -1429,7 +1564,7 @@ router.post(
     } else {
       finalScores.judgeVerdicts.push(verdictPayload);
     }
-    const aggregatedScores = aggregateFinalScores(session);
+    const aggregatedScores = aggregateFinalScores(session, room);
 
     // Determine if we should automatically complete the debate
     const assignedJudges = room.participants.filter((p: any) => p.roomRole === 'judge');
@@ -1510,6 +1645,214 @@ router.post(
   }),
 );
 
+// Helper: convert new round-based scores { speak, ce, notes } into the legacy
+// ScoreBreakdown shape so the existing aggregation logic keeps working without
+// any data migration. speak maps to overall speech quality (split across the
+// non-CE criteria); ce maps directly to crossExam.
+function buildRoundScore(input: { speak: number; ce: number }) {
+  // Store raw judge input directly so aggregateFinalScores round-based can read them.
+  // speak (0-20) maps to score.logic (raw, no scaling).
+  // ce (0-20) maps to score.crossExam (raw, no scaling).
+  // Other criteria are set to 0 (irrelevant in round-based scoring).
+  const speakClamped = clampScore(input.speak, 20);
+  const ceClamped = clampScore(input.ce, 20);
+
+  const score = {
+    logic: speakClamped,
+    rebuttal: 0,
+    evidence: 0,
+    crossExam: ceClamped,
+    strategy: 0,
+    communication: 0,
+    overall: 0,
+  };
+  score.overall = speakClamped + ceClamped;
+  return score;
+}
+
+// POST /api/v1/rooms/:id/judge/submit-round-scores — Round-based judge eval
+// Payload:
+//   { round: 1 | 2 | 3,
+//     proposition: { speaker: 'PRO_S1' | 'PRO_S2' | 'PRO_S3', speak: 0-20, ce: 0-20, notes },
+//     opposition: { speaker: 'OPP_S1' | 'OPP_S2' | 'OPP_S3', speak: 0-20, ce: 0-20, notes } }
+//
+// In Round 3, `ce` is ignored (Round 3 has no cross-examination).
+//
+// Records two judgeVerdicts (one per team) and triggers the same auto-complete
+// logic as the legacy submit-score endpoint (only when the OPP_S3 speaker is
+// involved AND all assigned judges have submitted).
+router.post(
+  '/:id/judge/submit-round-scores',
+  authenticate,
+  roomParticipantGuard(),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { round, proposition, opposition } = req.body as {
+      round?: number;
+      proposition?: { speaker?: string; speak?: number; ce?: number; notes?: string };
+      opposition?: { speaker?: string; speak?: number; ce?: number; notes?: string };
+    };
+
+    if (!round || ![1, 2, 3].includes(round)) {
+      throw new BadRequestError('round must be 1, 2, or 3');
+    }
+    if (!proposition || !opposition) {
+      throw new BadRequestError('Both proposition and opposition scores are required');
+    }
+
+    const room = (req as any).room;
+    const judge = (req as any).participant;
+    if (judge.roomRole !== 'judge') {
+      throw new ForbiddenError('Only human judges assigned to this room can submit scores');
+    }
+
+    const session = await DebateSession.findOne({ roomId: req.params.id });
+    if (!session) throw new NotFoundError('Session not found');
+
+    if (!session.finalScores) {
+      session.finalScores = {
+        teamProposition: { total: 0, breakdown: {} },
+        teamOpposition: { total: 0, breakdown: {} },
+        winner: 'draw',
+        aiVerdict: 'pending',
+        judgeVerdicts: [],
+      };
+    }
+    const finalScores = session.finalScores as { judgeVerdicts: any[] };
+    finalScores.judgeVerdicts = finalScores.judgeVerdicts || [];
+
+    const submissions: Array<{ team: 'proposition' | 'opposition'; speaker: string; payload: any }> = [];
+
+    // Validate + push proposition verdict
+    const propSpeaker = proposition.speaker;
+    if (!propSpeaker || !propSpeaker.startsWith('PRO_')) {
+      throw new BadRequestError('proposition.speaker must be a PRO_ speaker turn');
+    }
+    const propScore = buildRoundScore({ speak: Number(proposition.speak) || 0, ce: Number(proposition.ce) || 0 });
+    submissions.push({
+      team: 'proposition',
+      speaker: propSpeaker,
+      payload: {
+        judgeId: req.user!.userId as any,
+        judgeName: judge.username,
+        speaker: propSpeaker,
+        winner: null,
+        score: propScore,
+        notes: typeof proposition.notes === 'string' ? proposition.notes.trim() : '',
+        round,
+        submittedAt: new Date(),
+      },
+    });
+
+    // Validate + push opposition verdict
+    const oppSpeaker = opposition.speaker;
+    if (!oppSpeaker || !oppSpeaker.startsWith('OPP_')) {
+      throw new BadRequestError('opposition.speaker must be an OPP_ speaker turn');
+    }
+    const oppScore = buildRoundScore({ speak: Number(opposition.speak) || 0, ce: Number(opposition.ce) || 0 });
+    submissions.push({
+      team: 'opposition',
+      speaker: oppSpeaker,
+      payload: {
+        judgeId: req.user!.userId as any,
+        judgeName: judge.username,
+        speaker: oppSpeaker,
+        winner: null,
+        score: oppScore,
+        notes: typeof opposition.notes === 'string' ? opposition.notes.trim() : '',
+        round,
+        submittedAt: new Date(),
+      },
+    });
+
+    // Upsert verdicts
+    submissions.forEach(({ payload }) => {
+      const existingIndex = finalScores.judgeVerdicts.findIndex(
+        (v: any) =>
+          v.judgeId?.toString() === req.user!.userId &&
+          v.speaker === payload.speaker,
+      );
+      if (existingIndex >= 0) {
+        finalScores.judgeVerdicts[existingIndex] = payload;
+      } else {
+        finalScores.judgeVerdicts.push(payload);
+      }
+    });
+
+    const aggregatedScores = aggregateFinalScores(session, room);
+
+    // Auto-complete the debate only when:
+    // 1. OPP_S3 speaker was submitted in this round
+    // 2. ALL assigned judges have submitted OPP_S3 verdicts
+    const assignedJudges = room.participants.filter((p: any) => p.roomRole === 'judge');
+    const involvesOPPS3 = submissions.some((s) => s.speaker === 'OPP_S3');
+    const OPP_S3_verdicts = (finalScores.judgeVerdicts || []).filter((v: any) => v.speaker === 'OPP_S3');
+    const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId?.toString()));
+    const allJudgesSubmitted =
+      assignedJudges.length > 0 &&
+      assignedJudges.every((j: any) => uniqueJudgesSubmitted.has(j.userId.toString()));
+
+    let autoCompleted = false;
+    let winnerInfo: any = null;
+
+    if (involvesOPPS3 && allJudgesSubmitted) {
+      session.currentTurn.status = 'completed';
+      session.currentTurn.phase = 'completed';
+      room.status = 'completed';
+      room.currentPhase = 'completed';
+      room.endedAt = new Date();
+      await room.save();
+      autoCompleted = true;
+      winnerInfo = {
+        roomId: room._id.toString(),
+        winnerTeam: aggregatedScores.winner,
+        propositionTotal: aggregatedScores.teamProposition.total,
+        oppositionTotal: aggregatedScores.teamOpposition.total,
+        finalScores: aggregatedScores,
+      };
+    }
+
+    await session.save();
+
+    const io = getIO();
+    submissions.forEach(({ speaker }) => {
+      io?.to(room._id.toString()).emit('score:updated', {
+        roomId: room._id.toString(),
+        judgeId: req.user!.userId,
+        speaker,
+        score: speaker.startsWith('PRO_') ? propScore : oppScore,
+      });
+    });
+    io?.to(room._id.toString()).emit('score:aggregate-updated', {
+      roomId: room._id.toString(),
+      finalScores: aggregatedScores,
+    });
+
+    if (autoCompleted && winnerInfo) {
+      await applyDebateResult(room._id.toString()).catch((err) => {
+        console.error('Failed to apply debate Elo result:', err);
+      });
+      io?.to(room._id.toString()).emit('score:winner-determined', winnerInfo);
+      io?.to(room._id.toString()).emit('debate:ended', { roomId: room._id.toString(), result: winnerInfo });
+
+      const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+      const state = await buildRoomStatePayload(room._id.toString(), req.user!.userId);
+      if (state) io?.to(room._id.toString()).emit('room:state-restore', state);
+    }
+
+    sendSuccess(
+      res,
+      {
+        round,
+        proposition: { speaker: propSpeaker, score: propScore, notes: submissions[0].payload.notes },
+        opposition: { speaker: oppSpeaker, score: oppScore, notes: submissions[1].payload.notes },
+        finalScores: aggregatedScores,
+        autoCompleted,
+      },
+      autoCompleted ? 'Round scores submitted and debate ended' : 'Round scores submitted',
+    );
+  }),
+);
+
 // GET /api/v1/rooms/:id/scores — Get current scores for the room (UC-36)
 router.get(
   '/:id/scores',
@@ -1519,7 +1862,7 @@ router.get(
 
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
-    const aggregatedScores = aggregateFinalScores(session);
+    const aggregatedScores = aggregateFinalScores(session, room);
     await session.save();
 
     sendSuccess(res, {
@@ -1545,7 +1888,8 @@ router.post(
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
 
-    const aggregatedScores = aggregateFinalScores(session);
+    const room = (req as any).room;
+    const aggregatedScores = aggregateFinalScores(session, room);
     await session.save();
 
     getIO().to(req.params.id).emit('score:aggregate-updated', {
@@ -1567,7 +1911,7 @@ router.get(
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
 
-    const finalScores = aggregateFinalScores(session);
+    const finalScores = aggregateFinalScores(session, room);
     await session.save();
 
     sendSuccess(res, {
@@ -1602,7 +1946,7 @@ router.post(
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
 
-    const finalScores = aggregateFinalScores(session);
+    const finalScores = aggregateFinalScores(session, room);
     await session.save();
 
     const payload = {
@@ -1714,7 +2058,8 @@ router.post(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const session = await DebateSession.findOne({ roomId: req.params.id });
     if (!session) throw new NotFoundError('Session not found');
-    aggregateFinalScores(session);
+    const room = (req as any).room;
+    aggregateFinalScores(session, room);
     await session.save();
 
     const rankingResult = await applyDebateResult(req.params.id);
@@ -1748,7 +2093,10 @@ router.post(
       await room.save();
     }
 
+    // Set status='active' AND phaseStatus='active' so that endPhaseBySpeaker
+    // / endPhaseByHost guards accept Skip actions while a phase is running.
     session.currentTurn.status = 'active';
+    session.currentTurn.phaseStatus = 'active';
     session.currentTurn.startTime = new Date(Date.now() + 3000);
     await session.save();
 

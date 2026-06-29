@@ -45,8 +45,12 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      // All phases start with 3s countdown (including motion)
+      // All phases start with 3s countdown (including motion).
+      // We must also set phaseStatus='active' here so that endPhaseBySpeaker
+      // / endPhaseByHost guards accept Skip actions from the speaker or host
+      // (these guards require phaseStatus in ['active','paused']).
       session.currentTurn.status = 'active';
+      session.currentTurn.phaseStatus = 'active';
       session.currentTurn.startTime = new Date(Date.now() + 3000);
       await session.save();
 
@@ -287,8 +291,8 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
       const room = await DebateRoom.findById(roomId);
       if (!room) return;
 
-      // Only for no-host rooms
-      if (room.hostType !== 'ai') return;
+      // Only for no-host rooms (both 'ai' and 'none' hostType qualify)
+      if (room.hostType === 'human') return;
 
       const session = await DebateSession.findOne({ roomId: room._id });
       if (!session) return;

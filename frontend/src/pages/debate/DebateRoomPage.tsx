@@ -22,7 +22,7 @@ import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
 import { useDebateStore } from '@stores/debateStore';
 import { useDebateSocket } from '@hooks/useDebateSocket';
-import { useSocket } from '@hooks/useSocket';
+import { useSocket, getSocket } from '@hooks/useSocket';
 import { useDebateVideo } from '@hooks/useDebateVideo';
 import { useDebateRoomTracker, clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
 import { CameraGrid } from '@components/debate/CameraGrid';
@@ -39,27 +39,16 @@ import { DisconnectTimer } from '@components/debate/DisconnectTimer';
 import { TransitionPopup } from '@components/debate/TransitionPopup';
 import { ResultBanner } from '@components/debate/ResultBanner';
 import { AIFeedbackPopup } from '@components/debate/AIFeedbackPopup';
+import { RoundJudgeForm } from '@components/debate/RoundJudgeForm';
 import type {
   RoomParticipant,
   ScoreBreakdown,
   SpeakerTurn,
   SpeakerSlot,
-  Team,
 } from '@/types';
 
 
-const scoreFields: Array<{ key: keyof Omit<ScoreBreakdown, 'overall'>; max: number }> = [
-  { key: 'logic', max: 30 },
-  { key: 'rebuttal', max: 20 },
-  { key: 'evidence', max: 15 },
-  { key: 'crossExam', max: 15 },
-  { key: 'strategy', max: 10 },
-  { key: 'communication', max: 10 },
-];
 
-const speakerTurns: SpeakerTurn[] = [
-  'PRO_S1', 'OPP_S1', 'PRO_S2', 'OPP_S2', 'PRO_S3', 'OPP_S3',
-];
 
 type DebateWorkflowStep = {
   speaker: string;
@@ -76,17 +65,17 @@ type DebateWorkflowStep = {
 const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Pro S1', detail: 'Opening speech (3 min)' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Pro S2', detail: 'Extension (3 min)' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp S2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Extension (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Extension (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp S3', detail: 'Closing (3 min)' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Pro S3', detail: 'Closing (3 min)' },
-  { speaker: 'JUDGES', phase: 'final_judging', label: 'Final Judging', detail: 'Final decision' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing (3 min)' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
@@ -96,13 +85,17 @@ const debateWorkflow3v3: DebateWorkflowStep[] = [
 const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Pro S1', detail: 'Opening speech (3 min)' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp S1', detail: 'Closing speech (3 min)' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Pro S1', detail: 'Closing speech (3 min)' },
-  { speaker: 'JUDGES', phase: 'final_judging', label: 'Final Judging', detail: 'Final decision' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Closing speech (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing speech (3 min)' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing speech (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
@@ -127,9 +120,7 @@ export default function DebateRoomPage() {
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [joinPassword, setJoinPassword] = useState('');
   const [isJoining, setIsJoining] = useState(false);
-  const [scoreSpeaker, setScoreSpeaker] = useState<SpeakerTurn>('PRO_S1');
-  const [scoreWinner, setScoreWinner] = useState<Team | 'draw'>('proposition');
-  const [notes, setNotes] = useState('');
+
   const [turnTranscript, setTurnTranscript] = useState('');
   const [captionMode, setCaptionMode] = useState<CaptionMode>(() => {
     const saved = window.localStorage.getItem('debate-caption-mode');
@@ -239,9 +230,16 @@ export default function DebateRoomPage() {
     };
   }, [roomId, resetStore]);
 
-  const [scores, setScores] = useState<Record<string, number>>(
-    Object.fromEntries(scoreFields.map((f) => [f.key, Math.round(f.max * 0.7)])),
-  );
+
+
+  // New round-based scoring state (used in judge_feedback / final_judging UI)
+  const [roundPropSpeak, setRoundPropSpeak] = useState(14);
+  const [roundPropCe, setRoundPropCe] = useState(14);
+  const [roundPropNotes, setRoundPropNotes] = useState('');
+  const [roundOppSpeak, setRoundOppSpeak] = useState(14);
+  const [roundOppCe, setRoundOppCe] = useState(14);
+  const [roundOppNotes, setRoundOppNotes] = useState('');
+  const [showPreviousScoresModal, setShowPreviousScoresModal] = useState(false);
 
   // Derive the correct workflow based on room format — uses roomFromStore which is
   // populated before this point, avoiding the forward-reference issue.
@@ -318,7 +316,10 @@ export default function DebateRoomPage() {
       setTurnTranscript('');
       invalidate();
     },
-    onError: () => toast.error('Action failed'),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Action failed';
+      toast.error(msg);
+    },
   });
 
   const startPhaseMutation = useMutation({
@@ -334,7 +335,6 @@ export default function DebateRoomPage() {
   const noHostS1StartMutation = useMutation({
     mutationFn: () => {
       return new Promise<void>((resolve, reject) => {
-        const { getSocket } = require('@hooks/useSocket');
         const sock = getSocket();
         if (!sock) return reject(new Error('Socket not connected'));
         (sock as any).emit('debater:s1-start', { roomId }, (res: any) => {
@@ -403,25 +403,24 @@ export default function DebateRoomPage() {
     onError: () => toast.error('Failed to change camera permission'),
   });
 
-  const scoreMutation = useMutation({
-    mutationFn: () =>
-      roomService.submitJudgeScore(roomId, {
-        speaker: scoreSpeaker,
-        logic: scores.logic,
-        rebuttal: scores.rebuttal,
-        evidence: scores.evidence,
-        crossExam: scores.crossExam,
-        strategy: scores.strategy,
-        communication: scores.communication,
-        winner: scoreWinner,
-        notes,
-      }),
+  // Round-based judge evaluation: one payload covers BOTH teams.
+  const roundScoreMutation = useMutation({
+    mutationFn: (payload: {
+      round: 1 | 2 | 3;
+      proposition: { speaker: SpeakerTurn; speak: number; ce: number; notes: string };
+      opposition: { speaker: SpeakerTurn; speak: number; ce: number; notes: string };
+    }) => roomService.submitRoundScores(roomId, payload),
     onSuccess: () => {
-      toast.success('Score submitted');
-      setNotes('');
+      toast.success('Round scores submitted');
+      setRoundPropSpeak(14);
+      setRoundOppSpeak(14);
+      setRoundPropCe(14);
+      setRoundOppCe(14);
+      setRoundPropNotes('');
+      setRoundOppNotes('');
       invalidate();
     },
-    onError: () => toast.error('Failed to submit score'),
+    onError: () => toast.error('Failed to submit round scores'),
   });
 
   const playerActionMutation = useMutation({
@@ -617,7 +616,7 @@ export default function DebateRoomPage() {
     const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
     return role === 'judge';
   }) || [];
-  const canManageScores = Boolean(isController || isJudge);
+  const canManageScores = Boolean(isController);
 
   const pendingDrawRequest = session?.finalScores?.drawRequests?.find((r) => r.status === 'pending');
   const ownTeamPendingDraw = Boolean(
@@ -718,6 +717,65 @@ export default function DebateRoomPage() {
   const currentWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex] : null;
   const nextWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex + 1] : debateWorkflow[0];
 
+  const currentRound = useMemo(() => {
+    return getRoundForStepIndex(currentWorkflowIndex, room?.format, room?.hostType);
+  }, [currentWorkflowIndex, room?.format, room?.hostType]);
+
+  const isScoringAllowed = useMemo(() => {
+    const phase = currentPhase || session?.currentTurn?.phase;
+    const speaker = (currentSpeaker || session?.currentTurn?.speaker) as string;
+    if (currentRound === 1) {
+      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_1';
+    }
+    if (currentRound === 2) {
+      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_2';
+    }
+    if (currentRound === 3) {
+      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_3';
+    }
+    return false;
+  }, [currentRound, currentPhase, session?.currentTurn?.phase, currentSpeaker, session?.currentTurn?.speaker]);
+
+  const isJudge3 = useMemo(() => {
+    const phase = currentPhase || session?.currentTurn?.phase;
+    const speaker = (currentSpeaker || session?.currentTurn?.speaker) as string;
+    return phase === 'judge_feedback' && speaker === 'JUDGES_FB_3';
+  }, [currentPhase, currentSpeaker, session?.currentTurn?.phase, session?.currentTurn?.speaker]);
+
+  useEffect(() => {
+    if (!session?.finalScores?.judgeVerdicts || !user?._id) return;
+    const verdicts = session.finalScores.judgeVerdicts;
+    const propSpeaker = resolvePropSpeakerForRound(currentRound, room?.format);
+    const oppSpeaker = resolveOppSpeakerForRound(currentRound, room?.format);
+    
+    const propVerdict = verdicts.find(
+      (v: any) => v.judgeId?.toString() === user._id && v.speaker === propSpeaker
+    );
+    const oppVerdict = verdicts.find(
+      (v: any) => v.judgeId?.toString() === user._id && v.speaker === oppSpeaker
+    );
+
+    if (propVerdict) {
+      setRoundPropSpeak((propVerdict.score as any)?.speak ?? 14);
+      setRoundPropCe((propVerdict.score as any)?.ce ?? 14);
+      setRoundPropNotes(propVerdict.notes ?? '');
+    } else {
+      setRoundPropSpeak(14);
+      setRoundPropCe(14);
+      setRoundPropNotes('');
+    }
+
+    if (oppVerdict) {
+      setRoundOppSpeak((oppVerdict.score as any)?.speak ?? 14);
+      setRoundOppCe((oppVerdict.score as any)?.ce ?? 14);
+      setRoundOppNotes(oppVerdict.notes ?? '');
+    } else {
+      setRoundOppSpeak(14);
+      setRoundOppCe(14);
+      setRoundOppNotes('');
+    }
+  }, [currentRound, session?.finalScores?.judgeVerdicts, user?._id, room?.format]);
+
 
 
   const activeSpeakerParticipant = useMemo(() => {
@@ -742,14 +800,48 @@ export default function DebateRoomPage() {
       }
     });
 
-    // 2. Judge verdicts
+    // 2. Judge verdicts — group by judge+round and display per-team notes
     const verdicts = session?.finalScores?.judgeVerdicts || [];
-    verdicts.forEach((v) => {
-      list.push(`Judge ${v.judgeName || 'assigned'} voted for ${v.winner || 'Draw'} - Notes: "${v.notes || 'No notes'}"`);
-    });
+    const isRoundBased = verdicts.some((v: any) => v.round !== undefined);
+
+    if (isRoundBased) {
+      // Group by judge + round
+      const byJudgeRound = new Map<string, Map<number, any>>();
+      verdicts.forEach((v: any) => {
+        const key = v.judgeName || 'Judge';
+        if (!byJudgeRound.has(key)) byJudgeRound.set(key, new Map());
+        const roundNum = Number(v.round) || 0;
+        const existing = byJudgeRound.get(key)!.get(roundNum);
+        if (!existing || !existing.speaker) {
+          byJudgeRound.get(key)!.set(roundNum, v);
+        }
+      });
+
+      byJudgeRound.forEach((roundMap, judgeName) => {
+        roundMap.forEach((v, roundNum) => {
+          const propNotes = v.notes || '—';
+          // Find the opposing verdict for the same round
+          const oppVerdict = verdicts.find((ov: any) =>
+            ov.judgeName === judgeName &&
+            Number(ov.round) === roundNum &&
+            String(ov.speaker).startsWith('OPP_'),
+          );
+          const oppNotes = oppVerdict?.notes || '—';
+          list.push(
+            `Judge ${judgeName} — Round ${roundNum}:\n  Propo team: ${propNotes}\n  Oppo team: ${oppNotes}`,
+          );
+        });
+      });
+    } else {
+      verdicts.forEach((v: any) => {
+        list.push(
+          `Judge ${v.judgeName || 'assigned'} — Notes: "${v.notes || 'No notes'}"`,
+        );
+      });
+    }
 
     // 3. Match completed
-    if (session?.finalScores?.winner) {
+    if (session?.finalScores?.winner && room?.status === 'completed') {
       list.push(`Debate has ended! Winner: ${session.finalScores.winner.toUpperCase()}`);
     }
 
@@ -1428,7 +1520,7 @@ export default function DebateRoomPage() {
             {/* Bottom: Dedicated Debater quick-actions bar - compact */}
             {canUseDebaterActions && (
               <div className="flex-shrink-0 bg-dark bg-opacity-30 border border-secondary border-opacity-20 rounded-2 p-1.5 text-center">
-                <span className="text-muted me-2" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>TRẬN ĐẤU:</span>
+                <span className="text-muted me-2" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>MATCH:</span>
 
                 <Button
                   size="sm"
@@ -1617,6 +1709,18 @@ export default function DebateRoomPage() {
                       Current standings
                     </h6>
                     <ScoreBreakdown finalScores={session.finalScores} />
+                    
+                    <Button
+                      size="sm"
+                      variant="outline-info"
+                      className="mt-3 w-100"
+                      onClick={() => setShowPreviousScoresModal(true)}
+                      style={{ fontSize: '11px', fontFamily: 'Orbitron' }}
+                    >
+                      <i className="bi bi-journal-text me-1" />
+                      Điểm các vòng
+                    </Button>
+
                     {canManageScores && (
                       <div className="d-grid gap-2 mt-3">
                         <Button size="sm" variant="outline-primary" onClick={() => aggregateMutation.mutate()} disabled={aggregateMutation.isPending}>
@@ -1685,40 +1789,38 @@ export default function DebateRoomPage() {
                       <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
                         Submit evaluation
                       </h6>
-                      <Form.Group className="mb-2">
-                        <Form.Label className="small text-muted mb-1">Speaker position</Form.Label>
-                        <Form.Select size="sm" className="mb-2" value={scoreSpeaker} onChange={(e) => setScoreSpeaker(e.target.value as SpeakerTurn)}>
-                          {speakerTurns
-                            .filter((s) => room.format === '3v3' || s.endsWith('_S1'))
-                            .map((s) => <option key={s} value={s}>{s}</option>)}
-                        </Form.Select>
-                      </Form.Group>
-                      <Form.Group className="mb-2">
-                        <Form.Label className="small text-muted mb-1">Vote for winner</Form.Label>
-                        <Form.Select size="sm" className="mb-3" value={scoreWinner} onChange={(e) => setScoreWinner(e.target.value as Team | 'draw')}>
-                          <option value="proposition">Proposition</option>
-                          <option value="opposition">Opposition</option>
-                          <option value="draw">Draw</option>
-                        </Form.Select>
-                      </Form.Group>
-                      {scoreFields.map(({ key, max }) => (
-                        <Form.Group className="mb-2" key={key}>
-                          <Form.Label className="text-capitalize small text-white mb-1">{key}: {scores[key]}/{max}</Form.Label>
-                          <Form.Range
-                            min={0}
-                            max={max}
-                            value={scores[key]}
-                            onChange={(e) => setScores((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
-                          />
-                        </Form.Group>
-                      ))}
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small text-muted mb-1">Notes</Form.Label>
-                        <Form.Control as="textarea" rows={2} placeholder="Enter notes here..." className="small" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                      </Form.Group>
-                      <Button size="sm" className="w-100 btn-primary" onClick={() => scoreMutation.mutate()} disabled={scoreMutation.isPending}>
-                        Submit evaluation
-                      </Button>
+                      <RoundJudgeForm
+                        round={currentRound}
+                        propSpeaker={resolvePropSpeakerForRound(currentRound, room?.format)}
+                        oppSpeaker={resolveOppSpeakerForRound(currentRound, room?.format)}
+                        propSpeak={roundPropSpeak}
+                        propCe={roundPropCe}
+                        propNotes={roundPropNotes}
+                        oppSpeak={roundOppSpeak}
+                        oppCe={roundOppCe}
+                        oppNotes={roundOppNotes}
+                        onPropSpeakChange={setRoundPropSpeak}
+                        onPropCeChange={setRoundPropCe}
+                        onPropNotesChange={setRoundPropNotes}
+                        onOppSpeakChange={setRoundOppSpeak}
+                        onOppCeChange={setRoundOppCe}
+                        onOppNotesChange={setRoundOppNotes}
+                        onSubmit={() => {
+                          const propSpeaker = resolvePropSpeakerForRound(currentRound, room?.format);
+                          const oppSpeaker = resolveOppSpeakerForRound(currentRound, room?.format);
+                          if (!propSpeaker || !oppSpeaker) {
+                            toast.error('Could not resolve speakers for this round');
+                            return;
+                          }
+                          roundScoreMutation.mutate({
+                            round: currentRound as 1 | 2 | 3,
+                            proposition: { speaker: propSpeaker, speak: roundPropSpeak, ce: roundPropCe, notes: roundPropNotes },
+                            opposition: { speaker: oppSpeaker, speak: roundOppSpeak, ce: roundOppCe, notes: roundOppNotes },
+                          });
+                        }}
+                        isPending={roundScoreMutation.isPending}
+                        isSubmitEnabled={isScoringAllowed}
+                      />
                     </div>
                   )}
 
@@ -1786,22 +1888,25 @@ export default function DebateRoomPage() {
                           className="flex-fill py-1.5 fw-bold"
                           style={{
                             background:
-                              turnStatus === 'waiting_to_start' ||
-                              currentPhase === 'judge_feedback' ||
-                              currentPhase === 'final_judging'
+                              (turnStatus === 'waiting_to_start' ||
+                               currentPhase === 'judge_feedback' ||
+                               currentPhase === 'final_judging') &&
+                              !isJudge3
                                 ? '#00ff66'
                                 : 'rgba(255,255,255,0.05)',
                             color:
-                              turnStatus === 'waiting_to_start' ||
-                              currentPhase === 'judge_feedback' ||
-                              currentPhase === 'final_judging'
+                              (turnStatus === 'waiting_to_start' ||
+                               currentPhase === 'judge_feedback' ||
+                               currentPhase === 'final_judging') &&
+                              !isJudge3
                                 ? '#000'
                                 : 'rgba(255, 255, 255, 0.3)',
                             border: 'none',
                             boxShadow:
-                              turnStatus === 'waiting_to_start' ||
-                              currentPhase === 'judge_feedback' ||
-                              currentPhase === 'final_judging'
+                              (turnStatus === 'waiting_to_start' ||
+                               currentPhase === 'judge_feedback' ||
+                               currentPhase === 'final_judging') &&
+                              !isJudge3
                                 ? '0 0 10px rgba(0, 255, 102, 0.4)'
                                 : 'none',
                             fontSize: '11px',
@@ -1821,9 +1926,11 @@ export default function DebateRoomPage() {
                           disabled={
                             startPhaseMutation.isPending ||
                             controlMutation.isPending ||
-                            (turnStatus !== 'waiting_to_start' &&
+                            isJudge3 ||
+                            ((turnStatus !== 'waiting_to_start' &&
                               currentPhase !== 'judge_feedback' &&
-                              currentPhase !== 'final_judging')
+                              currentPhase !== 'final_judging') &&
+                              !isJudge3)
                           }
                         >
                           Start
@@ -1833,7 +1940,13 @@ export default function DebateRoomPage() {
                           variant="outline-primary"
                           className="flex-fill py-1.5"
                           onClick={() => controlMutation.mutate('finish')}
-                          disabled={controlMutation.isPending || turnStatus !== 'active'}
+                          disabled={
+                            controlMutation.isPending ||
+                            turnStatus !== 'active' ||
+                            currentPhase === 'judge_feedback' ||
+                            currentPhase === 'final_judging' ||
+                            isJudge3
+                          }
                           style={{ fontSize: '11px' }}
                         >
                           Skip
@@ -2235,6 +2348,104 @@ export default function DebateRoomPage() {
         </div>
       )}
 
+      {/* PREVIOUS SCORES MODAL */}
+      <Modal
+        show={showPreviousScoresModal}
+        onHide={() => setShowPreviousScoresModal(false)}
+        size="lg"
+        centered
+        className="bg-opacity-50"
+      >
+        <Modal.Header closeButton className="bg-dark text-white border-secondary border-opacity-20">
+          <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '14px' }} className="text-neon-cyan text-uppercase font-weight-bold">
+            <i className="bi bi-journal-text me-2" />
+            Điểm các vòng (Round Scores)
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-dark text-white p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          <div className="d-flex flex-column gap-4">
+            {[1, 2, 3].map((rNum) => {
+              
+              const propSpk = resolvePropSpeakerForRound(rNum, room?.format);
+              const oppSpk = resolveOppSpeakerForRound(rNum, room?.format);
+              
+              const verdicts = session?.finalScores?.judgeVerdicts || [];
+              const propVerdicts = verdicts.filter((v: any) => v.speaker === propSpk);
+              const oppVerdicts = verdicts.filter((v: any) => v.speaker === oppSpk);
+              
+              const allVectIdx = Array.from(new Set([
+                ...propVerdicts.map((v: any) => v.judgeId?.toString()),
+                ...oppVerdicts.map((v: any) => v.judgeId?.toString())
+              ]));
+
+              return (
+                <div key={rNum} className="p-3 rounded-3 bg-secondary bg-opacity-5 border border-secondary border-opacity-10">
+                  <h5 className="text-neon-yellow border-bottom border-secondary border-opacity-15 pb-2 mb-3 text-uppercase font-weight-bold" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
+                    Round {rNum} ({propSpk} vs {oppSpk})
+                  </h5>
+                  
+                  {allVectIdx.length === 0 ? (
+                    <div className="text-muted small italic">Chưa có điểm đã nộp cho round này.</div>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {allVectIdx.map((jId) => {
+                        const propV = propVerdicts.find((v: any) => v.judgeId?.toString() === jId);
+                        const oppV = oppVerdicts.find((v: any) => v.judgeId?.toString() === jId);
+                        const judgeName = propV?.judgeName || oppV?.judgeName || 'Judge';
+                        
+                        return (
+                          <div key={jId} className="bg-black bg-opacity-25 rounded p-3 border-start border-neon-cyan border-2">
+                            <div className="fw-bold text-white mb-2 small">{judgeName}</div>
+                            <Row>
+                              <Col md={6} className="mb-2 mb-md-0">
+                                <div className="text-neon-cyan small fw-bold mb-1">Proposition</div>
+                                {propV ? (
+                                  <div className="small">
+                                    <div className="mb-1 text-white-50">
+                                      Speak: <strong className="text-white">{(propV.score as any)?.logic ?? 0}</strong>/20
+                                      {rNum !== 3 && <> | CE: <strong className="text-white">{(propV.score as any)?.crossExam ?? 0}</strong>/20</>}
+                                    </div>
+                                    {propV.notes && (
+                                      <div className="text-light italic text-opacity-80" style={{ fontSize: '10px' }}>
+                                        &ldquo;{propV.notes}&rdquo;
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-muted small">Chưa nộp điểm.</div>
+                                )}
+                              </Col>
+                              <Col md={6}>
+                                <div className="text-neon-pink small fw-bold mb-1">Opposition</div>
+                                {oppV ? (
+                                  <div className="small">
+                                    <div className="mb-1 text-white-50">
+                                      Speak: <strong className="text-white">{(oppV.score as any)?.logic ?? 0}</strong>/20
+                                      {rNum !== 3 && <> | CE: <strong className="text-white">{(oppV.score as any)?.crossExam ?? 0}</strong>/20</>}
+                                    </div>
+                                    {oppV.notes && (
+                                      <div className="text-light italic text-opacity-80" style={{ fontSize: '10px' }}>
+                                        &ldquo;{oppV.notes}&rdquo;
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-muted small">Chưa nộp điểm.</div>
+                                )}
+                              </Col>
+                            </Row>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Modal.Body>
+      </Modal>
+
     </>
   );
 }
@@ -2256,3 +2467,35 @@ function ScoreBreakdown({ finalScores }: { finalScores: any }) {
     </>
   );
 }
+
+export function resolvePropSpeakerForRound(round: number, _format?: string): SpeakerTurn | null {
+  if (round === 1) return 'PRO_S1';
+  if (round === 2) return 'PRO_S2';
+  return 'PRO_S3';
+}
+
+export function resolveOppSpeakerForRound(round: number, _format?: string): SpeakerTurn | null {
+  if (round === 1) return 'OPP_S1';
+  if (round === 2) return 'OPP_S2';
+  return 'OPP_S3';
+}
+
+export function getRoundForStepIndex(index: number, format?: string, hostType?: string): 1 | 2 | 3 {
+  if (index === -1) return 1;
+  if (format === '1v1') {
+    if (index <= 5) return 1;
+    if (index <= 9) return 2;
+    return 3;
+  }
+  const isNoHost = hostType === 'ai';
+  if (isNoHost) {
+    if (index <= 6) return 1;
+    if (index <= 10) return 2;
+    return 3;
+  } else {
+    if (index <= 5) return 1;
+    if (index <= 9) return 2;
+    return 3;
+  }
+}
+

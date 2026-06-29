@@ -27,6 +27,8 @@ export default function LiveMatchesPage() {
       status: status || undefined,
       limit: 24,
     })).data.data,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
@@ -91,8 +93,16 @@ export default function LiveMatchesPage() {
   }
 
   const visibleRooms = useMemo(
-    () => (roomsQuery.data || []).filter((room) => room.status !== 'completed'),
-    [roomsQuery.data],
+    () => (roomsQuery.data || []).filter((room) => {
+      if (status) {
+        return room.status === status;
+      }
+      if (room.status === 'completed' || room.status === 'cancelled') {
+        return false;
+      }
+      return ['waiting', 'ready', 'active', 'paused'].includes(room.status);
+    }),
+    [roomsQuery.data, status],
   );
 
   return (
@@ -166,7 +176,11 @@ export default function LiveMatchesPage() {
                     </div>
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted small">{room.participants.length} participants</span>
-                      {isLive ? (
+                      {room.status === 'completed' ? (
+                        <Button size="sm" variant="info" onClick={() => navigate(`/replay/${room._id}`)}>
+                          View result
+                        </Button>
+                      ) : isLive ? (
                         canRejoin ? (
                           <Button size="sm" variant="success" onClick={() => navigate(`/debate/${room._id}`)}>
                             Rejoin

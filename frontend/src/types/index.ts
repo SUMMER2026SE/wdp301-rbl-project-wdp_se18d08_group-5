@@ -200,6 +200,32 @@ export interface SubmitJudgeScoreRequest {
   notes?: string;
 }
 
+// Round-based judge evaluation (new UX).
+// Each round = one Judge Feedback phase where the judge scores BOTH teams.
+export interface SubmitJudgeRoundScoresRequest {
+  round: 1 | 2 | 3;
+  proposition: {
+    speaker: SpeakerTurn; // PRO_S1 | PRO_S2 | PRO_S3
+    speak: number;        // 0-20
+    ce: number;           // 0-20 (ignored in round 3)
+    notes?: string;
+  };
+  opposition: {
+    speaker: SpeakerTurn; // OPP_S1 | OPP_S2 | OPP_S3
+    speak: number;        // 0-20
+    ce: number;           // 0-20 (ignored in round 3)
+    notes?: string;
+  };
+}
+
+export interface SubmitJudgeRoundScoresResponse {
+  round: number;
+  proposition: { speaker: SpeakerTurn; score: ScoreBreakdown; notes: string };
+  opposition: { speaker: SpeakerTurn; score: ScoreBreakdown; notes: string };
+  finalScores: FinalScores;
+  autoCompleted: boolean;
+}
+
 export interface SubmitJudgeScoreResponse {
   speaker: SpeakerTurn;
   winner: Team | 'draw' | null;

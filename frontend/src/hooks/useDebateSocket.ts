@@ -211,10 +211,17 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Phase change with announcement text
-    socket.on('debate:phase-change', (data: { phase: DebatePhase; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean }) => {
+    socket.on('debate:phase-change', (data: { phase: DebatePhase; speaker?: SpeakerTurn; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean }) => {
       setPhase(data.phase);
+      if (data.speaker) {
+        setSpeaker(data.speaker);
+      }
       if (data.announcement) {
         setTransitionAnnouncement(data.announcement);
+      }
+      if (['waiting_s1', 'judge_feedback', 'final_judging', 'completed'].includes(data.phase)) {
+        setTimeRemaining(0);
+        setTotalTime(0);
       }
     });
 

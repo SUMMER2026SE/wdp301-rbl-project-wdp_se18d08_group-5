@@ -9,6 +9,8 @@ import type {
   RoomParticipant,
   SubmitJudgeScoreRequest,
   SubmitJudgeScoreResponse,
+  SubmitJudgeRoundScoresRequest,
+  SubmitJudgeRoundScoresResponse,
   FinalScores,
   WinnerResult,
   RankingApplicationResult,
@@ -118,6 +120,16 @@ export const roomService = {
   submitJudgeScore(roomId: string, data: SubmitJudgeScoreRequest) {
     return api.post<ApiResponse<SubmitJudgeScoreResponse>>(
       `/rooms/${roomId}/judge/submit-score`,
+      data,
+    );
+  },
+
+  submitRoundScores(
+    roomId: string,
+    data: SubmitJudgeRoundScoresRequest,
+  ) {
+    return api.post<ApiResponse<SubmitJudgeRoundScoresResponse>>(
+      `/rooms/${roomId}/judge/submit-round-scores`,
       data,
     );
   },

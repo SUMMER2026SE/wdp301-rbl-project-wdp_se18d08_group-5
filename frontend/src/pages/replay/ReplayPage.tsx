@@ -6,6 +6,12 @@ import { debateService } from '@services/debateService';
 import { useSocket } from '@hooks/useSocket';
 import { clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
 
+const ROUNDS = [
+  { num: 1, label: 'Round 1 — Opening Speeches', propSpeaker: 'PRO_S1', oppSpeaker: 'OPP_S1', hasCE: true },
+  { num: 2, label: 'Round 2 — Rebuttal & Extensions', propSpeaker: 'PRO_S2', oppSpeaker: 'OPP_S2', hasCE: true },
+  { num: 3, label: 'Round 3 — Final Summaries', propSpeaker: 'PRO_S3', oppSpeaker: 'OPP_S3', hasCE: false },
+];
+
 export default function ReplayPage() {
   const { sessionId = '' } = useParams();
   const navigate = useNavigate();
@@ -20,27 +26,21 @@ export default function ReplayPage() {
     queryKey: ['replay', sessionId],
     queryFn: async () => (await debateService.getReplay(sessionId)).data.data,
     enabled: Boolean(sessionId),
-    refetchInterval: 3000, // Poll every 3 seconds as a backup
+    refetchInterval: 3000,
   });
 
-  // Real-time socket listener to invalidate queries and update immediately
   useEffect(() => {
     if (!socket) return;
-
-    const handleUpdate = () => {
-      queryClient.invalidateQueries({ queryKey: ['replay', sessionId] });
-    };
-
+    const handleUpdate = () => queryClient.invalidateQueries({ queryKey: ['replay', sessionId] });
     socket.on('score:updated', handleUpdate);
     socket.on('score:aggregate-updated', handleUpdate);
     socket.on('score:winner-determined', handleUpdate);
     socket.on('debate:ended', handleUpdate);
-
     return () => {
       socket.off('score:updated', handleUpdate);
       socket.off('score:aggregate-updated', handleUpdate);
       socket.off('score:winner-determined', handleUpdate);
-      socket.off('debate:ended', handleUpdate);
+      socket.off('score:debate:ended', handleUpdate);
     };
   }, [sessionId, queryClient, socket]);
 
@@ -68,29 +68,52 @@ export default function ReplayPage() {
 
   const { session } = replayQuery.data;
   const room = replayQuery.data.room as any;
-  const proScore = session.finalScores?.teamProposition?.total || 0;
-  const oppScore = session.finalScores?.teamOpposition?.total || 0;
-  const total = Math.max(proScore + oppScore, 1);
-
-  const winner = session.finalScores?.winner || 'draw';
   const participants = room?.participants || [];
   const verdicts = session.finalScores?.judgeVerdicts || [];
 
+  // Detect round-based scoring
+  const isRoundBased = verdicts.some((v: any) => v.round !== undefined);
+
+  // Get unique judges
+  const judgeIds = Array.from(new Set(verdicts.map((v: any) => v.judgeId?.toString()).filter(Boolean)));
+
+  // Per-round per-team averages (round-based only)
+  const roundTeamScores = ROUNDS.map(({ num, propSpeaker, oppSpeaker }) => {
+    const propVerdicts = verdicts.filter((v: any) => v.speaker === propSpeaker);
+    const oppVerdicts = verdicts.filter((v: any) => v.speaker === oppSpeaker);
+
+    const propAvg =
+      judgeIds.length > 0
+        ? propVerdicts.reduce((sum, v) => sum + ((Number(v.score?.logic) || 0) + (Number(v.score?.crossExam) || 0)), 0) / judgeIds.length
+        : 0;
+    const oppAvg =
+      judgeIds.length > 0
+        ? oppVerdicts.reduce((sum, v) => sum + ((Number(v.score?.logic) || 0) + (Number(v.score?.crossExam) || 0)), 0) / judgeIds.length
+        : 0;
+
+    return { num, label: ROUNDS[num - 1].label, propAvg, oppAvg, propVerdicts, oppVerdicts };
+  });
+
+  const grandPropTotal = roundTeamScores.reduce((s, r) => s + r.propAvg, 0);
+  const grandOppTotal = roundTeamScores.reduce((s, r) => s + r.oppAvg, 0);
+  const grandTotal = Math.max(grandPropTotal + grandOppTotal, 1);
+
+  const winner =
+    session.finalScores?.winner === 'proposition'
+      ? 'proposition'
+      : session.finalScores?.winner === 'opposition'
+        ? 'opposition'
+        : 'draw';
+
   const proDebaters = participants.filter((p: any) => p.roomRole === 'debater' && p.team === 'proposition');
   const oppDebaters = participants.filter((p: any) => p.roomRole === 'debater' && p.team === 'opposition');
-  const judges = participants.filter((p: any) => p.roomRole === 'judge');
+  const judgeList = participants.filter((p: any) => p.roomRole === 'judge');
   const hosts = participants.filter((p: any) => p.roomRole === 'host' || p.roomRole === 'owner');
-
-  const rounds = [
-    { name: 'Round 1: Opening Speeches', turns: ['PRO_S1', 'OPP_S1'] },
-    { name: 'Round 2: Rebuttal & Extensions', turns: ['PRO_S2', 'OPP_S2'] },
-    { name: 'Round 3: Final Summaries', turns: ['PRO_S3', 'OPP_S3'] },
-  ];
 
   return (
     <div style={{ background: '#0a0a0f', color: '#fff', minHeight: '100vh', fontFamily: 'Rajdhani, sans-serif' }} className="py-4">
       <Container>
-        {/* Header Block */}
+        {/* Header */}
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 p-4 rounded-4 border border-secondary border-opacity-15 bg-secondary bg-opacity-5">
           <div className="min-width-0">
             <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.15em', fontFamily: 'Orbitron' }}>
@@ -108,8 +131,12 @@ export default function ReplayPage() {
               style={{
                 fontFamily: 'Orbitron',
                 letterSpacing: '0.05em',
-                boxShadow: winner === 'proposition' ? '0 0 10px rgba(0, 245, 255, 0.4)' : winner === 'opposition' ? '0 0 10px rgba(255, 0, 110, 0.4)' : '0 0 10px rgba(255, 214, 10, 0.4)',
-                color: winner === 'draw' ? '#000' : '#fff'
+                boxShadow: winner === 'proposition'
+                  ? '0 0 10px rgba(0, 245, 255, 0.4)'
+                  : winner === 'opposition'
+                    ? '0 0 10px rgba(255, 0, 110, 0.4)'
+                    : '0 0 10px rgba(255, 214, 10, 0.4)',
+                color: winner === 'draw' ? '#000' : '#fff',
               }}
             >
               {winner === 'proposition' ? 'Proposition Wins' : winner === 'opposition' ? 'Opposition Wins' : 'Draw Match'}
@@ -118,41 +145,51 @@ export default function ReplayPage() {
         </div>
 
         <Row className="g-4">
-          {/* Left Column: Scores & Participants */}
+          {/* Left Column */}
           <Col lg={4} className="d-flex flex-column gap-4">
-            
-            {/* Scorecard */}
+
+            {/* Scorecard — per-round breakdown */}
             <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
                   <i className="bi bi-bar-chart-fill text-neon-cyan me-2"></i> Final Scoreboard
                 </Card.Title>
-                
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between mb-1 small fw-bold">
-                    <span className="text-neon-cyan">PROPOSITION</span>
-                    <span className="text-white">{Math.round(proScore)} points</span>
-                  </div>
-                  <ProgressBar 
-                    now={(proScore / total) * 100} 
-                    className="bg-dark border border-secondary border-opacity-10" 
-                    style={{ height: '12px' }} 
-                    variant="info" 
-                  />
-                </div>
 
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between mb-1 small fw-bold">
-                    <span className="text-neon-pink">OPPOSITION</span>
-                    <span className="text-white">{Math.round(oppScore)} points</span>
-                  </div>
-                  <ProgressBar 
-                    now={(oppScore / total) * 100} 
-                    className="bg-dark border border-secondary border-opacity-10" 
-                    style={{ height: '12px' }} 
-                    variant="danger" 
-                  />
-                </div>
+                {isRoundBased || verdicts.length > 0 ? (
+                  <>
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                        <span className="text-neon-cyan">PROPOSITION</span>
+                        <span className="text-white">{grandPropTotal.toFixed(1)} points</span>
+                      </div>
+                      <ProgressBar now={(grandPropTotal / grandTotal) * 100} className="bg-dark" style={{ height: '12px' }} variant="info" />
+                    </div>
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                        <span className="text-neon-pink">OPPOSITION</span>
+                        <span className="text-white">{grandOppTotal.toFixed(1)} points</span>
+                      </div>
+                      <ProgressBar now={(grandOppTotal / grandTotal) * 100} className="bg-dark" style={{ height: '12px' }} variant="danger" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                        <span className="text-neon-cyan">PROPOSITION</span>
+                        <span className="text-white">— points</span>
+                      </div>
+                      <ProgressBar now={50} className="bg-dark" style={{ height: '12px' }} variant="info" />
+                    </div>
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                        <span className="text-neon-pink">OPPOSITION</span>
+                        <span className="text-white">— points</span>
+                      </div>
+                      <ProgressBar now={50} className="bg-dark" style={{ height: '12px' }} variant="danger" />
+                    </div>
+                  </>
+                )}
 
                 {session.aiSummary && (
                   <div className="p-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-15 mt-3">
@@ -163,46 +200,37 @@ export default function ReplayPage() {
               </Card.Body>
             </Card>
 
-            {/* Participants list */}
+            {/* Participants */}
             <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
                   <i className="bi bi-people-fill text-neon-cyan me-2"></i> Match Participants
                 </Card.Title>
-
                 <ListGroup className="bg-transparent border-0 d-flex flex-column gap-2.5">
-                  {/* Hosts */}
                   {hosts.map((h: any) => (
                     <div key={h.userId} className="d-flex align-items-center justify-content-between bg-dark bg-opacity-30 border border-secondary border-opacity-10 rounded-3 p-2 px-3">
                       <span className="fw-semibold text-white">{h.username}</span>
                       <Badge bg="warning" className="text-dark font-monospace text-uppercase" style={{ fontSize: '8px' }}>Host</Badge>
                     </div>
                   ))}
-
-                  {/* Judges */}
-                  {judges.map((j: any) => (
+                  {judgeList.map((j: any) => (
                     <div key={j.userId} className="d-flex align-items-center justify-content-between bg-dark bg-opacity-30 border border-secondary border-opacity-10 rounded-3 p-2 px-3">
                       <span className="fw-semibold text-white">{j.username}</span>
-                      <Badge bg="secondary" className="font-monospace text-uppercase" style={{ fontSize: '8px', background: '#ffd60a', color: '#000' }}>Judge</Badge>
+                      <Badge style={{ fontSize: '8px', background: '#ffd60a', color: '#000' }} className="font-monospace text-uppercase">Judge</Badge>
                     </div>
                   ))}
-
-                  {/* PRO Debaters */}
                   {proDebaters.map((p: any) => (
                     <div key={p.userId} className="d-flex align-items-center justify-content-between bg-dark bg-opacity-30 border border-secondary border-opacity-10 rounded-3 p-2 px-3">
                       <span className="fw-semibold text-white">{p.username}</span>
                       <Badge bg="info" className="font-monospace text-uppercase" style={{ fontSize: '8px' }}>PRO {p.speakerSlot || ''}</Badge>
                     </div>
                   ))}
-
-                  {/* OPP Debaters */}
                   {oppDebaters.map((p: any) => (
                     <div key={p.userId} className="d-flex align-items-center justify-content-between bg-dark bg-opacity-30 border border-secondary border-opacity-10 rounded-3 p-2 px-3">
                       <span className="fw-semibold text-white">{p.username}</span>
                       <Badge bg="danger" className="font-monospace text-uppercase" style={{ fontSize: '8px' }}>OPP {p.speakerSlot || ''}</Badge>
                     </div>
                   ))}
-
                   {participants.length === 0 && (
                     <div className="text-muted small text-center py-2">No participant records found.</div>
                   )}
@@ -217,7 +245,7 @@ export default function ReplayPage() {
             </div>
           </Col>
 
-          {/* Right Column: Detailed Feedback by Turn */}
+          {/* Right Column — Judges Feedback per Round */}
           <Col lg={8}>
             <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
               <Card.Body className="p-4">
@@ -226,68 +254,101 @@ export default function ReplayPage() {
                 </Card.Title>
 
                 <div className="d-flex flex-column gap-4">
-                  {rounds.map((round) => {
+                  {ROUNDS.map((round) => {
+                    const propVerdicts = verdicts.filter((v: any) => v.speaker === round.propSpeaker);
+                    const oppVerdicts = verdicts.filter((v: any) => v.speaker === round.oppSpeaker);
+
                     return (
-                      <div key={round.name} className="p-3 rounded-3 bg-dark bg-opacity-20 border border-secondary border-opacity-10">
-                        <h5 className="text-neon-cyan border-bottom border-secondary border-opacity-15 pb-2 mb-3" style={{ fontFamily: 'Orbitron', fontSize: '13px' }}>
-                          {round.name}
+                      <div key={round.num} className="p-3 rounded-3 bg-dark bg-opacity-20 border border-secondary border-opacity-10">
+                        <h5 className="text-neon-yellow border-bottom border-secondary border-opacity-15 pb-2 mb-3 text-uppercase" style={{ fontFamily: 'Orbitron', fontSize: '13px', fontWeight: 700 }}>
+                          {round.label}
                         </h5>
 
-                        <div className="d-flex flex-column gap-3">
-                          {round.turns.map((turn) => {
-                            const turnVerdicts = verdicts.filter((v: any) => v.speaker === turn);
-                            const sideLabel = turn.startsWith('PRO_') ? 'PRO' : 'OPP';
-                            const sideColorClass = turn.startsWith('PRO_') ? 'text-neon-cyan' : 'text-neon-pink';
+                        {judgeIds.length === 0 ? (
+                          <p className="text-muted small italic m-0">Chưa có điểm nào được nộp cho round này.</p>
+                        ) : (
+                          <div className="d-flex flex-column gap-3">
+                            {judgeIds.map((jId) => {
+                              const propV = propVerdicts.find((v: any) => v.judgeId?.toString() === jId);
+                              const oppV = oppVerdicts.find((v: any) => v.judgeId?.toString() === jId);
+                              const judgeName = propV?.judgeName || oppV?.judgeName || 'Judge';
+                              const hasProp = Boolean(propV);
+                              const hasOpp = Boolean(oppV);
 
-                            return (
-                              <div key={turn} className="bg-secondary bg-opacity-5 border border-secondary border-opacity-10 rounded p-3">
-                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                  <span className={`fw-bold font-monospace text-uppercase ${sideColorClass}`} style={{ fontSize: '11px' }}>
-                                    {sideLabel} Speaking Slot ({turn.replace('_', ' ')})
-                                  </span>
-                                  <Badge bg="secondary" style={{ fontSize: '8px' }}>
-                                    {turnVerdicts.length} ratings
-                                  </Badge>
-                                </div>
+                              if (!hasProp && !hasOpp) return null;
 
-                                {turnVerdicts.length === 0 ? (
-                                  <p className="text-muted small italic m-0">No judge verdicts or comments submitted yet for this turn.</p>
-                                ) : (
-                                  <div className="d-flex flex-column gap-2.5 mt-2">
-                                    {turnVerdicts.map((v: any, vIdx: number) => {
-                                      const sc = v.score || {};
-                                      return (
-                                        <div key={vIdx} className="bg-black bg-opacity-25 rounded p-2.5 border-start border-warning border-2">
-                                          <div className="d-flex justify-content-between align-items-center mb-1.5 flex-wrap gap-1">
-                                            <span className="text-white small fw-bold">{v.judgeName || 'Judge'}</span>
-                                            <span className="text-muted font-monospace" style={{ fontSize: '9px' }}>
-                                              Winner Vote: <strong className="text-white text-uppercase">{v.winner || 'None'}</strong>
-                                            </span>
-                                          </div>
-                                          
-                                          {v.notes && (
-                                            <p className="text-light small mb-2 italic" style={{ fontSize: '10px', lineHeight: 1.4 }}>
-                                              &ldquo;{v.notes}&rdquo;
-                                            </p>
-                                          )}
-
-                                          <div className="d-flex flex-wrap gap-2 text-muted" style={{ fontSize: '9px' }}>
-                                            <span className="bg-secondary bg-opacity-10 px-1.5 py-0.5 rounded text-white">Logic: <strong>{sc.logic || 0}</strong></span>
-                                            <span className="bg-secondary bg-opacity-10 px-1.5 py-0.5 rounded text-white">Rebuttal: <strong>{sc.rebuttal || 0}</strong></span>
-                                            <span className="bg-secondary bg-opacity-10 px-1.5 py-0.5 rounded text-white">Evidence: <strong>{sc.evidence || 0}</strong></span>
-                                            <span className="bg-secondary bg-opacity-10 px-1.5 py-0.5 rounded text-white">CE: <strong>{sc.crossExam || 0}</strong></span>
-                                            <span className="bg-secondary bg-opacity-10 px-1.5 py-0.5 rounded text-white">Strategy: <strong>{sc.strategy || 0}</strong></span>
-                                            <span className="bg-secondary bg-opacity-10 px-1.5 py-0.5 rounded text-white">Delivery: <strong>{sc.communication || 0}</strong></span>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
+                              return (
+                                <div key={jId} className="bg-black bg-opacity-25 rounded p-3 border-start border-warning border-2">
+                                  {/* Judge name + round badge */}
+                                  <div className="d-flex justify-content-between align-items-center mb-3">
+                                    <span className="text-white fw-bold small">{judgeName}</span>
+                                    <Badge bg="secondary" style={{ fontSize: '8px', fontFamily: 'Orbitron' }}>
+                                      Round {round.num}
+                                    </Badge>
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+
+                                  <Row>
+                                    {/* Proposition scores */}
+                                    <Col md={6} className="mb-2 mb-md-0">
+                                      <div className="text-neon-cyan small fw-bold mb-1">PROPOSITION</div>
+                                      {hasProp ? (
+                                        (() => {
+                                          const pv = propV!;
+                                          return (
+                                            <div className="small">
+                                              <div className="mb-1 text-white-50">
+                                                Speech: <strong className="text-white">{pv.score?.logic ?? 0}</strong>/20
+                                                {round.hasCE && (
+                                                  <> | CE: <strong className="text-white">{pv.score?.crossExam ?? 0}</strong>/20</>
+                                                )}
+                                                <span className="text-muted ms-2">({((Number(pv.score?.logic) || 0) + (Number(pv.score?.crossExam) || 0)).toFixed(1)}/40)</span>
+                                              </div>
+                                              {pv.notes && (
+                                                <div className="text-light italic" style={{ fontSize: '10px', lineHeight: 1.4 }}>
+                                                  &ldquo;{pv.notes}&rdquo;
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })()
+                                      ) : (
+                                        <div className="text-muted small">Chưa nộp.</div>
+                                      )}
+                                    </Col>
+
+                                    {/* Opposition scores */}
+                                    <Col md={6}>
+                                      <div className="text-neon-pink small fw-bold mb-1">OPPOSITION</div>
+                                      {hasOpp ? (
+                                        (() => {
+                                          const ov = oppV!;
+                                          return (
+                                            <div className="small">
+                                              <div className="mb-1 text-white-50">
+                                                Speech: <strong className="text-white">{ov.score?.logic ?? 0}</strong>/20
+                                                {round.hasCE && (
+                                                  <> | CE: <strong className="text-white">{ov.score?.crossExam ?? 0}</strong>/20</>
+                                                )}
+                                                <span className="text-muted ms-2">({((Number(ov.score?.logic) || 0) + (Number(ov.score?.crossExam) || 0)).toFixed(1)}/40)</span>
+                                              </div>
+                                              {ov.notes && (
+                                                <div className="text-light italic" style={{ fontSize: '10px', lineHeight: 1.4 }}>
+                                                  &ldquo;{ov.notes}&rdquo;
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })()
+                                      ) : (
+                                        <div className="text-muted small">Chưa nộp.</div>
+                                      )}
+                                    </Col>
+                                  </Row>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -532,7 +532,8 @@ router.post(
     let autoCompleted = false;
     let winnerInfo = null;
 
-    if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0) {
+    const hasHumanController = room.hostType === 'human' || room.judgeType === 'human';
+    if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0 && !hasHumanController) {
       const aggregate = aggregateScores(finalScores.judgeVerdicts);
       
       finalScores.teamProposition = aggregate.teamProposition;

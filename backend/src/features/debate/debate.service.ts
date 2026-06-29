@@ -55,9 +55,9 @@ const DEBATE_FLOW_HOST_3V3: DebateStep[] = [
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
   // 1: Prep — 7m auto / both teams skip / host skip
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: true },
-  // 2: PRO_S1 speech
+  // 2: PROP1 speech (PRO_S1)
   { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 3: OPP_S1 speech
+  // 3: OPP1 speech (OPP_S1)
   { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   // 4: CE Round 1 — both teams can talk
   {
@@ -66,10 +66,10 @@ const DEBATE_FLOW_HOST_3V3: DebateStep[] = [
   },
   // 5: Judge Feedback 1 — free, no timer, wait for scores
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 6: PRO_S2 speech
-  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 7: OPP_S2 speech
+  // 6: OPP2 speech (OPP_S2)
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  // 7: PROP2 speech (PRO_S2)
+  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   // 8: CE Round 2 — both teams can talk
   {
     speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: true,
@@ -77,22 +77,25 @@ const DEBATE_FLOW_HOST_3V3: DebateStep[] = [
   },
   // 9: Judge Feedback 2 — free, no timer
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 10: OPP_S3 — closing round starts with opposition
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 11: PRO_S3 — closing round ends with proposition
+  // 10: PROP3 speech (PRO_S3)
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 12: Final Judging — wait for host to click End
-  { speaker: 'JUDGES', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
+  // 11: OPP3 speech (OPP_S3)
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  // 12: Judge Feedback 3 — final round feedback
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
   // 13: Match complete — room still active, host must click End
   { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
 ];
 
 /**
- * Human Host 1v1 — same structure but no S2/S3
+ * Human Host 1v1 — uses unique speaker IDs per round (S1/S2/S3) so
+ * getStepIndex can distinguish rounds without ambiguity.
  */
 const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
+  // Motion + Prep
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: true },
+  // Round 1: Prop → Opp → CE → Judge FB
   { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   {
@@ -100,9 +103,19 @@ const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
     ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  { speaker: 'JUDGES', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
+  // Round 2: Opp → Prop → CE → Judge FB
+  { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  {
+    speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: true,
+    ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
+  },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
+  // Round 3: Prop → Opp → Judge FB (no CE)
+  { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
+  // Complete
   { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
 ];
 
@@ -125,45 +138,39 @@ const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // 2: Prep — 7m auto, both teams can skip
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: false },
-  // 3: PRO_S1 speech
+  // Round 1: Prop → Opp → CE → Judge FB
   { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // 4: OPP_S1 speech
   { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // 5: CE Round 1 — starts 10s after OPP_S1 ends
   {
     speaker: 'CE_ROUND_1', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
     ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
-  // 6: Judge Feedback 1 — free + AI scores
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // 7: PRO_S2 speech
-  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // 8: OPP_S2 speech
+  // Round 2: Opp → Prop → CE → Judge FB
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // 9: CE Round 2 — starts 10s after OPP_S2 ends
+  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   {
     speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
     ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
-  // 10: Judge Feedback 2 — free + AI scores
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // 11: OPP_S3 — closing round (no CE in round 3)
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // 12: PRO_S3 — closing round ends
+  // Round 3: Prop → Opp → Judge FB (no CE)
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // 13: Final Judging — auto-score + end
-  { speaker: 'JUDGES', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // 14: Match complete — auto-ended
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
+  // Match complete — auto-ended
   { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
 ];
 
 /**
- * No-Host 1v1 — same structure but PRO_S1/OPP_S1 repeat for closing.
+ * No-Host 1v1 — uses unique speaker IDs per round (S1/S2/S3) so
+ * getStepIndex can distinguish rounds without ambiguity.
  */
 const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
   { speaker: 'WAITING_S1_START', phase: 'waiting_s1', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: false },
+  // Round 1: Prop → Opp → CE → Judge FB
   { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   {
@@ -171,9 +178,19 @@ const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
     ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'JUDGES', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
+  // Round 2: Opp → Prop → CE → Judge FB
+  { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  {
+    speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
+    ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
+  },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
+  // Round 3: Prop → Opp → Judge FB (no CE)
+  { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
+  // Complete
   { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
 ];
 
@@ -484,12 +501,6 @@ function computeTransitionAnnouncement(
   const { speaker: curr } = currentStep;
   const { speaker: next } = nextStep;
 
-  // After CE rounds (R1 -> free time, R2 -> free time)
-  if (curr.startsWith('CE_')) {
-    const roundNum = curr.split('_')[1]?.toLowerCase();
-    return `End of ${roundNum}`;
-  }
-
   // Round 3 transition: OPP before PRO
   if (curr === 'OPP_S3' && next === 'PRO_S3') {
     return 'Proposition turn';
@@ -508,10 +519,9 @@ function computeTransitionAnnouncement(
     return 'Opposition turn';
   }
 
-  if (
-    (curr === 'OPP_S1' && next === 'PRO_S2') ||
-    (curr === 'OPP_S2' && next === 'PRO_S3')
-  ) {
+  // OPP -> PRO within the same round (covers both 1v1 final round and
+  // other formats where the same speaker plays multiple rounds)
+  if (curr.startsWith('OPP_') && next.startsWith('PRO_')) {
     return 'Proposition turn';
   }
 
@@ -528,8 +538,8 @@ function computeTransitionAnnouncement(
     return `End of Round ${roundNum?.replace('round', '')}`;
   }
 
-  // After Judge Feedback -> Next round start (PRO)
-  if (curr.startsWith('JUDGES_FB') && next.startsWith('PRO_')) {
+  // After Judge Feedback -> Next round start (PRO or OPP)
+  if (curr.startsWith('JUDGES_FB') && (next.startsWith('PRO_') || next.startsWith('OPP_'))) {
     return 'Next round starting';
   }
 
@@ -573,6 +583,44 @@ export async function triggerTransition(
   // This is triggered when both S1 debaters have pressed Start
   timerService.stop(roomId);
   ceTimerService.stop(roomId);
+
+  // Pre-compute the announcement so the popup can be shown immediately at
+  // t=0 with the correct text (matching the rule: "Mute + Lock Chat (3s) —
+  // popup: <announcement>"). Without this, the popup only appears after the
+  // 3s mute, which is the opposite of the documented UX.
+  let preAnnouncement = '';
+  try {
+    const preSession = await DebateSession.findOne({ roomId: room._id });
+    if (preSession) {
+      const preFormat = (room.format as '1v1' | '3v3') || '3v3';
+      const preFlow = getFlow(preFormat, (room.hostType as 'human' | 'ai') || undefined);
+      const preIdx = getStepIndex(preFlow, preSession.currentTurn.speaker, preSession.currentTurn.phase);
+      if (preIdx !== -1) {
+        const next = preFlow[Math.min(preIdx + 1, preFlow.length - 1)];
+        preAnnouncement = computeTransitionAnnouncement(preFlow[preIdx], next, preFormat);
+      }
+    }
+  } catch (err) {
+    console.error('Pre-announcement compute error:', err);
+  }
+
+  // Emit the transition popup immediately at t=0 so users see the
+  // announcement right when the current phase ends. Duration reflects the
+  // full transition window:
+  //   - Human host OR no-host + human judge (Judge S1 controls):
+  //       3s mute + waiting-for-Judge-S1 (popup stays up until Start)
+  //   - No-host + AI judge (auto-advance):
+  //       3s mute + 10s countdown to next active phase
+  const isAutoAdvance = isNoHost && isAIJudge;
+  io?.to(roomId).emit('debate:transition-start', {
+    duration: isAutoAdvance
+      ? TRANSITION_MUTE_SECONDS + AUTO_TRANSITION_COUNTDOWN
+      : TRANSITION_MUTE_SECONDS,
+    isAuto: isAutoAdvance,
+    announcement: preAnnouncement,
+    waitingForHost: !isAutoAdvance,
+  });
+  io?.to(roomId).emit('debate:mute-lock', { reason: 'transition' });
 
   setTimeout(async () => {
     try {
@@ -667,6 +715,16 @@ export async function triggerTransition(
         // Unlock mic for all debaters + judges (free time)
         await unlockAllParticipantsMic(updatedRoom);
 
+        // Snapshot current turn history, then advance the session step
+        // to final_judging as 'active' (free time, no timer).
+        snapshotCurrentTurn(session, '');
+        applyStep(session, nextStep);
+        session.currentTurn.phaseStatus = 'active';
+        session.currentTurn.status = 'active';
+        updatedRoom.currentPhase = nextStep.phase;
+        await session.save();
+        await updatedRoom.save();
+
         // Broadcast entering final judging
         io?.to(roomId).emit('debate:phase-change', {
           phase: 'final_judging',
@@ -675,8 +733,6 @@ export async function triggerTransition(
           announcement: 'Finish Debate',
         });
         io?.to(roomId).emit('debate:turn-status-change', { turnStatus: 'active', phaseStatus: 'active' });
-        await session.save();
-        await updatedRoom.save();
 
         if (isNoHost) {
           // Auto: compute AI verdict + end debate
@@ -698,6 +754,13 @@ export async function triggerTransition(
         // Unlock mic for all debaters + judges (free time)
         await unlockAllParticipantsMic(updatedRoom);
 
+        // Snapshot current turn history with the old phase, then advance to
+        // judge_feedback as 'active' (free time, no timer).
+        snapshotCurrentTurn(session, '');
+        applyStep(session, nextStep);
+        session.currentTurn.phaseStatus = 'active';
+        session.currentTurn.status = 'active';
+        updatedRoom.currentPhase = nextStep.phase;
         await session.save();
         await updatedRoom.save();
 
@@ -711,12 +774,20 @@ export async function triggerTransition(
         io?.to(roomId).emit('debate:turn-status-change', { turnStatus: 'active', phaseStatus: 'active' });
 
         if (isAIJudge) {
-          // AI judge: request AI feedback, then auto-advance after 10s
-          generateAIFeedback(roomId, nextStep.speaker);
-          setTimeout(async () => {
+          // AI judge: request AI feedback, then auto-advance 10s after
+          // feedback is shown (per the rule: "AI feedback hiển thị lên
+          // màn hình → Đếm ngược 10s"). We wait up to 30s for AI to respond,
+          // then start the 10s transition countdown.
+          (async () => {
+            const feedbackShown = await generateAIFeedback(roomId, nextStep.speaker);
+            if (!feedbackShown) {
+              console.warn('AI feedback not available within timeout, advancing anyway');
+            }
             io?.to(roomId).emit('debate:ai-feedback-received', {});
-            triggerTransition(roomId).catch(console.error);
-          }, 10000);
+            setTimeout(async () => {
+              triggerTransition(roomId).catch(console.error);
+            }, 10000);
+          })();
         } else {
           // Human judge: broadcast that we're waiting for judge scores + vote
           io?.to(roomId).emit('debate:waiting-judge-feedback', {
@@ -727,17 +798,25 @@ export async function triggerTransition(
         return;
       }
 
-      // === Human Host: stay idle, wait for host Start ===
-      if (!isNoHost) {
-        // Unlock mic for all debaters + judges (free time)
+      // === Human Host + No-Host+Human-Judge (Judge S1 controls): stay idle, wait for Start ===
+      // The 3s mute popup was already emitted at t=0. After the 3s mute we
+      // broadcast the phase-change to idle so the host / Judge S1 can click Start.
+      // NOTE: for NH+AI (auto-advance), this branch is skipped — the system
+      // handles the auto-transition further down in this function.
+      if (!isAutoAdvance) {
+        // Unlock mic for all debaters + judges (free time during waiting_to_start)
         await unlockAllParticipantsMic(updatedRoom);
 
-        io?.to(roomId).emit('debate:transition-start', {
-          duration: TRANSITION_MUTE_SECONDS,
-          announcement,
-          waitingForHost: true,
-        });
-        io?.to(roomId).emit('debate:mute-lock', { reason: 'transition' });
+        // Advance the session step immediately so the DB reflects the new
+        // phase + waiting_to_start status. The Host's "Start" click then
+        // moves it to active with the proper timer.
+        // Snapshot current turn history with the old phase, then apply the
+        // next step as waiting_to_start so the Start endpoint can pick it up.
+        snapshotCurrentTurn(session, '');
+        applyStep(session, nextStep);
+        updatedRoom.currentPhase = nextStep.phase;
+        await session.save();
+        await updatedRoom.save();
 
         setTimeout(async () => {
           try {
@@ -748,7 +827,7 @@ export async function triggerTransition(
               announcement,
               waitingForHost: true,
             });
-            io?.to(roomId).emit('debate:turn-status-change', { turnStatus: 'idle', phaseStatus: 'idle' });
+            io?.to(roomId).emit('debate:turn-status-change', { turnStatus: 'waiting_to_start', phaseStatus: 'idle' });
             const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
             const state = await buildRoomStatePayload(
               roomId,
@@ -756,19 +835,25 @@ export async function triggerTransition(
             );
             if (state) io?.to(roomId).emit('room:state-restore', state);
           } catch (err) {
-            console.error('Human host transition error:', err);
+            console.error('Human host / NH+HJ transition error:', err);
           }
         }, TRANSITION_MUTE_SECONDS * 1000);
         return;
       }
 
-      // === No-Host: auto-start after 10s countdown ===
-      io?.to(roomId).emit('debate:transition-start', {
-        duration: AUTO_TRANSITION_COUNTDOWN,
-        isAuto: true,
-        announcement,
-      });
+      // === No-Host + AI Judge: auto-start after 10s countdown ===
+      // Note: the 3s mute popup was already emitted at t=0. After the 10s
+      // countdown (10s after the 3s mute, so 13s total) we activate the next
+      // phase and clear the popup via phase-change.
       io?.to(roomId).emit('debate:mute-lock', { reason: 'transition' });
+
+      // Snapshot + advance session to the next step so the DB matches the
+      // upcoming active phase once the 10s countdown completes.
+      snapshotCurrentTurn(session, '');
+      applyStep(session, nextStep);
+      updatedRoom.currentPhase = nextStep.phase;
+      await session.save();
+      await updatedRoom.save();
 
       setTimeout(async () => {
         try {
@@ -812,8 +897,6 @@ export async function triggerTransition(
           console.error('No-host auto transition error:', err);
         }
       }, AUTO_TRANSITION_COUNTDOWN * 1000);
-
-      await Promise.all([session.save(), updatedRoom.save()]);
     } catch (err) {
       console.error('Error in transition timeout:', err);
     }
@@ -823,13 +906,16 @@ export async function triggerTransition(
 /**
  * Generate AI feedback during judge feedback phases.
  * Called after entering a judge_feedback phase in AI judge mode.
+ * Returns true when feedback was generated successfully, false on error
+ * or timeout. The caller uses the return value to decide whether to wait
+ * for feedback before starting the 10s transition countdown.
  */
-async function generateAIFeedback(roomId: string, speaker: string) {
+async function generateAIFeedback(roomId: string, speaker: string): Promise<boolean> {
   try {
     const { getIO } = await import('../../socket/index.js');
     const { aiService } = await import('../ai/ai.service.js');
     const session = await DebateSession.findOne({ roomId });
-    if (!session) return;
+    if (!session) return false;
 
     const history = session.turnHistory || [];
     const speakerPrefix = speaker.replace('JUDGES_FB_', '').toUpperCase();
@@ -848,9 +934,12 @@ async function generateAIFeedback(roomId: string, speaker: string) {
         speaker: speech.speaker,
         feedback: result,
       });
+      return true;
     }
+    return false;
   } catch (err) {
     console.error('AI feedback generation error:', err);
+    return false;
   }
 }
 
