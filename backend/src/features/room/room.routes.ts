@@ -117,6 +117,10 @@ function normalizeMotion(value: unknown) {
   return motion;
 }
 
+function getEffectiveRoomRole(participant: any) {
+  return participant?.roomRole === 'owner' ? participant.primaryRole : participant?.roomRole;
+}
+
 async function buildRoomPayload(room: any) {
   const payload = room.toObject ? room.toObject() : room;
   const userIds = (payload.participants || []).map((participant: any) => participant.userId);
@@ -788,9 +792,7 @@ router.post(
         room.hostId = null;
         room.hostType = 'ai';
       }
-      if (participant.roomRole === 'judge') {
-        room.judges.push({ userId: participant.userId as any, username: participant.username });
-      }
+      room.judges.push({ userId: participant.userId as any, username: participant.username });
     }
 
     if (role === 'debater') {
@@ -810,6 +812,15 @@ router.post(
       }
       participant.team = team ?? null;
       participant.speakerSlot = speakerSlot ?? null;
+      if (participant.team && participant.speakerSlot) {
+        const slotTaken = room.participants.some((p: any) =>
+          p.userId.toString() !== participant.userId.toString() &&
+          getEffectiveRoomRole(p) === 'debater' &&
+          p.team === participant.team &&
+          p.speakerSlot === participant.speakerSlot,
+        );
+        if (slotTaken) throw new BadRequestError('Speaker slot is already taken');
+      }
       participant.positionLocked = false;
       if (room.hostId?.toString() === participant.userId.toString()) {
         room.hostId = null;
@@ -892,9 +903,17 @@ router.post(
     const room = (req as any).room;
     const participant = (req as any).participant;
     if (participant.positionLocked) throw new BadRequestError('Position is locked');
-    if (participant.roomRole !== 'debater') {
+    if (getEffectiveRoomRole(participant) !== 'debater') {
       throw new ForbiddenError('Only assigned debaters can select team and speaker slot');
     }
+
+    const slotTaken = room.participants.some((p: any) =>
+      p.userId.toString() !== participant.userId.toString() &&
+      getEffectiveRoomRole(p) === 'debater' &&
+      p.team === team &&
+      p.speakerSlot === speakerSlot,
+    );
+    if (slotTaken) throw new BadRequestError('Speaker slot is already taken');
 
     if (team) participant.team = team;
     if (speakerSlot) participant.speakerSlot = speakerSlot;
@@ -965,9 +984,9 @@ router.post(
       unlockedCount += 1;
     });
 
-    // If no participants are locked, roll status back to 'waiting' so the
-    // owner can reconfigure the room after unlocking.
-    if (unlockedCount === 0 && room.status === 'ready') {
+    // If positions were unlocked, roll status back to 'waiting' so the owner
+    // can reconfigure the room before starting.
+    if (unlockedCount > 0 && room.status === 'ready') {
       room.status = 'waiting';
     }
 
@@ -1519,7 +1538,7 @@ router.post(
     const room = (req as any).room;
 
     const judge = (req as any).participant;
-    if (judge.roomRole !== 'judge') {
+    if (getEffectiveRoomRole(judge) !== 'judge') {
       throw new ForbiddenError('Only human judges assigned to this room can submit scores');
     }
 
@@ -1567,7 +1586,7 @@ router.post(
     const aggregatedScores = aggregateFinalScores(session, room);
 
     // Determine if we should automatically complete the debate
-    const assignedJudges = room.participants.filter((p: any) => p.roomRole === 'judge');
+    const assignedJudges = room.participants.filter((p: any) => getEffectiveRoomRole(p) === 'judge');
     const isOPPS3 = speaker === 'OPP_S3';
     
     const OPP_S3_verdicts = finalScores.judgeVerdicts.filter((v: any) => v.speaker === 'OPP_S3');
@@ -1701,7 +1720,7 @@ router.post(
 
     const room = (req as any).room;
     const judge = (req as any).participant;
-    if (judge.roomRole !== 'judge') {
+    if (getEffectiveRoomRole(judge) !== 'judge') {
       throw new ForbiddenError('Only human judges assigned to this room can submit scores');
     }
 
@@ -1783,7 +1802,7 @@ router.post(
     // Auto-complete the debate only when:
     // 1. OPP_S3 speaker was submitted in this round
     // 2. ALL assigned judges have submitted OPP_S3 verdicts
-    const assignedJudges = room.participants.filter((p: any) => p.roomRole === 'judge');
+    const assignedJudges = room.participants.filter((p: any) => getEffectiveRoomRole(p) === 'judge');
     const involvesOPPS3 = submissions.some((s) => s.speaker === 'OPP_S3');
     const OPP_S3_verdicts = (finalScores.judgeVerdicts || []).filter((v: any) => v.speaker === 'OPP_S3');
     const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId?.toString()));
@@ -1880,8 +1899,12 @@ router.post(
   authenticate,
   roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const isJudge = (req as any).participant.roomRole === 'judge';
-    if (!isJudge) {
+    const participant = (req as any).participant;
+    const effectiveRole = getEffectiveRoomRole(participant);
+    const isOwner = participant?.roomRole === 'owner';
+    const isHost = effectiveRole === 'host';
+    const isJudge = effectiveRole === 'judge';
+    if (!isOwner && !isHost && !isJudge) {
       throw new ForbiddenError('Only host, owner, or judge can aggregate scores');
     }
 
@@ -2085,7 +2108,7 @@ router.post(
     if (session.currentTurn.phase === 'motion') {
       // Transition from 'motion' to the next step ('prep_7') immediately
       const { getFlow, getStepIndex, applyStep } = await import('../debate/debate.service.js');
-      const flow = getFlow((room.format as '1v1' | '3v3') || '3v3');
+      const flow = getFlow((room.format as '1v1' | '3v3') || '3v3', (room.hostType as 'human' | 'ai') || undefined);
       const currentIndex = getStepIndex(flow, session.currentTurn.speaker, session.currentTurn.phase);
       const nextStep = flow[Math.min(currentIndex + 1, flow.length - 1)];
       applyStep(session, nextStep);

@@ -286,28 +286,49 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
    * Both S1 debaters (one from each team) must press Start.
    * When consensus is reached, transition to motion phase.
    */
-  socket.on('debater:s1-start', async ({ roomId }: { roomId: string }) => {
+  socket.on('debater:s1-start', async ({ roomId }: { roomId: string }, ack?: (res: { ok?: boolean; error?: { message: string } }) => void) => {
     try {
       const room = await DebateRoom.findById(roomId);
-      if (!room) return;
+      if (!room) {
+        ack?.({ error: { message: 'Room not found' } });
+        return;
+      }
 
       // Only for no-host rooms (both 'ai' and 'none' hostType qualify)
-      if (room.hostType === 'human') return;
+      if (room.hostType === 'human') {
+        ack?.({ error: { message: 'S1 start is only available in no-host rooms' } });
+        return;
+      }
 
       const session = await DebateSession.findOne({ roomId: room._id });
-      if (!session) return;
+      if (!session) {
+        ack?.({ error: { message: 'Session not found' } });
+        return;
+      }
 
       // Must be in waiting_s1 phase
-      if (session.currentTurn.phase !== 'waiting_s1') return;
+      if (session.currentTurn.phase !== 'waiting_s1') {
+        ack?.({ error: { message: 'Room is not waiting for S1 start' } });
+        return;
+      }
 
       const participant = room.participants.find(
         (p) => p.userId.toString() === userId,
       );
-      if (!participant) return;
+      if (!participant) {
+        ack?.({ error: { message: 'You are not in this room' } });
+        return;
+      }
       const role = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
-      if (role !== 'debater') return;
+      if (role !== 'debater') {
+        ack?.({ error: { message: 'Only debaters can start this phase' } });
+        return;
+      }
       const speakerSlot = (participant as any).speakerSlot;
-      if (speakerSlot !== 'S1') return;
+      if (speakerSlot !== 'S1') {
+        ack?.({ error: { message: 'Only S1 debaters can start this phase' } });
+        return;
+      }
 
       // Track consensus
       let consensusSet = s1StartConsensus.get(roomId);
@@ -330,6 +351,7 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
         readyUserIds: Array.from(consensusSet),
         totalS1: s1Debaters.length,
       });
+      ack?.({ ok: true });
 
       // If all S1 debaters are ready, start the debate
       if (consensusSet.size >= s1Debaters.length && s1Debaters.length > 0) {
@@ -339,6 +361,7 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
       }
     } catch (error) {
       console.error('Socket debater:s1-start error:', error);
+      ack?.({ error: { message: 'Failed to start S1 consensus' } });
     }
   });
 

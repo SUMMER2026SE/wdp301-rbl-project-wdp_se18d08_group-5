@@ -426,15 +426,15 @@ export async function endPhaseBySpeaker(roomId: string, userId: string, transcri
   if (currentIndex === -1) throw new BadRequestError('Current step not in flow');
   const currentStep = flow[currentIndex];
   if (!currentStep.speakerCanEnd) throw new BadRequestError('Speaker cannot end this phase');
-  const expectedPrefix = String(turn.speaker || '').split('_')[0];
   const participant = room.participants.find((p: any) => p.userId.toString() === userId);
   if (!participant) throw new ForbiddenError('Only room participants can end a speech');
   const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
   const participantTeam = participant.team === 'proposition' ? 'PRO' : 'OPP';
+  const participantSpeaker = participant.speakerSlot ? `${participantTeam}_${participant.speakerSlot}` : null;
   const isJudgeS1 = room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1';
   const hasHostControl = effectiveRole === 'host' || isJudgeS1;
 
-  if (participantTeam !== expectedPrefix && !hasHostControl) {
+  if (participantSpeaker !== turn.speaker && !hasHostControl) {
     throw new ForbiddenError('Only the active speaker (or host) can end the speech');
   }
   

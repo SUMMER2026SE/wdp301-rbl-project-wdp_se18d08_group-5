@@ -756,8 +756,8 @@ export default function DebateRoomPage() {
     );
 
     if (propVerdict) {
-      setRoundPropSpeak((propVerdict.score as any)?.speak ?? 14);
-      setRoundPropCe((propVerdict.score as any)?.ce ?? 14);
+      setRoundPropSpeak((propVerdict.score as any)?.logic ?? (propVerdict.score as any)?.speak ?? 14);
+      setRoundPropCe((propVerdict.score as any)?.crossExam ?? (propVerdict.score as any)?.ce ?? 14);
       setRoundPropNotes(propVerdict.notes ?? '');
     } else {
       setRoundPropSpeak(14);
@@ -766,8 +766,8 @@ export default function DebateRoomPage() {
     }
 
     if (oppVerdict) {
-      setRoundOppSpeak((oppVerdict.score as any)?.speak ?? 14);
-      setRoundOppCe((oppVerdict.score as any)?.ce ?? 14);
+      setRoundOppSpeak((oppVerdict.score as any)?.logic ?? (oppVerdict.score as any)?.speak ?? 14);
+      setRoundOppCe((oppVerdict.score as any)?.crossExam ?? (oppVerdict.score as any)?.ce ?? 14);
       setRoundOppNotes(oppVerdict.notes ?? '');
     } else {
       setRoundOppSpeak(14);
