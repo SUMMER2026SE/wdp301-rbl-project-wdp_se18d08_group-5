@@ -1,0 +1,34 @@
+{
+  "loadingMatchResults": "Đang tải kết quả trận đấu...",
+  "matchNotFound": "KHÔNG TÌM THẤY TRẬN ĐẤU",
+  "matchNotFoundDesc": "Không thể tìm thấy kết quả phiên tranh luận được yêu cầu.",
+  "backToMatches": "Quay lại trận đấu",
+
+  "debateArenaConcluded": "ARENA TRANH LUẬN KẾT THÚC",
+  "motionSelection": "Lựa chọn chủ đề",
+  "winner": "NGƯỜI THẮNG",
+  "propositionWins": "Bên Đi Thắng",
+  "oppositionWins": "Bên Vãng Thắng",
+  "drawMatch": "Hòa",
+
+  "finalScoreboard": "Bảng điểm cuối cùng",
+  "proposition": "BÊN ĐI",
+  "opposition": "BÊN VÃNG",
+  "points": "điểm",
+
+  "aiSummaryVerdict": "Phán quyết tóm tắt AI",
+
+  "matchParticipants": "Người tham gia trận đấu",
+  "host": "Host",
+  "judge": "Giám khảo",
+  "noParticipantRecords": "Không tìm thấy bản ghi người tham gia.",
+
+  "judgesFeedback": "Phản hồi giám khảo & Chi tiết điểm",
+  "round": "Vòng {{num}}",
+  "speech": "Diễn thuyết",
+  "ce": "CE",
+  "noScoresForRound": "Chưa có điểm nào được nộp cho vòng này.",
+  "notSubmitted": "Chưa nộp.",
+
+  "viewReplay": "Xem lại"
+}

@@ -121,6 +121,23 @@ function getEffectiveRoomRole(participant: any) {
   return participant?.roomRole === 'owner' ? participant.primaryRole : participant?.roomRole;
 }
 
+// Returns the list of speakers expected to be scored across the full debate.
+// Per docs/ruleScore.md: each round scores the Round-N speaker from each side,
+// and rounds 1-2 also score cross-examination. For 3v3 the full list is:
+//   PRO_S1, OPP_S1, PRO_S2, OPP_S2, PRO_S3, OPP_S3
+// For 1v1 it's the single speaker from each side.
+//
+// Note: rounds 1 and 2 CE scores are stored on the speaker verdict (crossExam
+// field), not as separate verdicts. So the expected speaker set is just the
+// two speakers per round across all rounds.
+function getExpectedScoringSpeakersForRoom(room: any): string[] {
+  const format = room.format;
+  if (format === '1v1') {
+    return ['PRO_S1', 'OPP_S1'];
+  }
+  return ['PRO_S1', 'OPP_S1', 'PRO_S2', 'OPP_S2', 'PRO_S3', 'OPP_S3'];
+}
+
 async function buildRoomPayload(room: any) {
   const payload = room.toObject ? room.toObject() : room;
   const userIds = (payload.participants || []).map((participant: any) => participant.userId);
@@ -315,7 +332,7 @@ function resolveWinnerFromTeamScores(propositionTotal: number, oppositionTotal: 
   return scoreDelta > 0 ? 'proposition' : 'opposition';
 }
 
-function aggregateFinalScores(session: any, room?: any) {
+function aggregateFinalScores(session: any, _room?: any) {
   if (!session.finalScores) {
     session.finalScores = {
       teamProposition: { total: 0, breakdown: {} },
@@ -376,13 +393,15 @@ function aggregateFinalScores(session: any, room?: any) {
 
         const roundNum = Number(v.round);
         if (roundNum === 3) {
-          if (isProp) sumPropS3 += speakVal;
-          else sumOppS3 += speakVal;
-          countS3 += 0.5;
+          // S3 only has speech score (no CE). Use total score for tiebreaker consistency.
+          if (isProp) sumPropS3 += scoreVal;
+          else sumOppS3 += scoreVal;
+          countS3 += 1;
         } else if (roundNum === 2) {
+          // R2: total score = speech + CE. Use full total for tiebreaker per ruleScore.md.
           if (isProp) sumPropR2 += scoreVal;
           else sumOppR2 += scoreVal;
-          countR2 += 0.5;
+          countR2 += 1;
         }
       });
 
@@ -417,9 +436,11 @@ function aggregateFinalScores(session: any, room?: any) {
 
         if (Math.abs(s3Delta) > 0.01) {
           winnerTeam = s3Delta > 0 ? 'proposition' : 'opposition';
-        } else if (room?.format === '3v3') {
-          const avgPropR2 = countR2 ? sumPropR2 / countR2 : 0;
-          const avgOppR2 = countR2 ? sumOppR2 / countR2 : 0;
+        } else if (countR2 > 0) {
+          // Tiebreaker step 2: compare Round 2 totals. Per ruleScore.md §Tie Break Rule,
+          // this applies to ALL formats (1v1 and 3v3), not just 3v3.
+          const avgPropR2 = sumPropR2 / countR2;
+          const avgOppR2 = sumOppR2 / countR2;
           const r2Delta = avgPropR2 - avgOppR2;
 
           if (Math.abs(r2Delta) > 0.01) {
@@ -792,7 +813,11 @@ router.post(
         room.hostId = null;
         room.hostType = 'ai';
       }
-      room.judges.push({ userId: participant.userId as any, username: participant.username });
+      // Only push non-owner judges into the judges list.
+      // Owner-as-judge uses effective role (primaryRole) for judge counts.
+      if (!isRoomCreator) {
+        room.judges.push({ userId: participant.userId as any, username: participant.username });
+      }
     }
 
     if (role === 'debater') {
@@ -1186,6 +1211,12 @@ router.post(
     room.judges = (room.judges || []).filter(
       (j: any) => j.userId.toString() !== userId,
     ) as any;
+
+    // 4. Invalidate ready state — kick can remove a required role
+    // (host, judge, or S1 debater), making the room unsafe to start.
+    if (room.status === 'ready') {
+      room.status = 'waiting';
+    }
 
     await room.save();
     await broadcastRoomState(room._id.toString());
@@ -1583,6 +1614,9 @@ router.post(
     } else {
       finalScores.judgeVerdicts.push(verdictPayload);
     }
+    // Mongoose doesn't detect changes inside embedded mixed-type subdocuments
+    // by default — mark the field so the next save() persists the new verdicts.
+    session.markModified('finalScores');
     const aggregatedScores = aggregateFinalScores(session, room);
 
     // Determine if we should automatically complete the debate
@@ -1668,13 +1702,11 @@ router.post(
 // ScoreBreakdown shape so the existing aggregation logic keeps working without
 // any data migration. speak maps to overall speech quality (split across the
 // non-CE criteria); ce maps directly to crossExam.
-function buildRoundScore(input: { speak: number; ce: number }) {
-  // Store raw judge input directly so aggregateFinalScores round-based can read them.
-  // speak (0-20) maps to score.logic (raw, no scaling).
-  // ce (0-20) maps to score.crossExam (raw, no scaling).
-  // Other criteria are set to 0 (irrelevant in round-based scoring).
+// Per ruleScore.md §Final Summary: Round 3 has no cross-examination.
+function buildRoundScore(input: { speak: number; ce: number }, round?: number) {
   const speakClamped = clampScore(input.speak, 20);
-  const ceClamped = clampScore(input.ce, 20);
+  // R3 has no CE per rule: ignore CE score
+  const ceClamped = round === 3 ? 0 : clampScore(input.ce, 20);
 
   const score = {
     logic: speakClamped,
@@ -1746,7 +1778,7 @@ router.post(
     if (!propSpeaker || !propSpeaker.startsWith('PRO_')) {
       throw new BadRequestError('proposition.speaker must be a PRO_ speaker turn');
     }
-    const propScore = buildRoundScore({ speak: Number(proposition.speak) || 0, ce: Number(proposition.ce) || 0 });
+    const propScore = buildRoundScore({ speak: Number(proposition.speak) || 0, ce: Number(proposition.ce) || 0 }, round);
     submissions.push({
       team: 'proposition',
       speaker: propSpeaker,
@@ -1767,7 +1799,7 @@ router.post(
     if (!oppSpeaker || !oppSpeaker.startsWith('OPP_')) {
       throw new BadRequestError('opposition.speaker must be an OPP_ speaker turn');
     }
-    const oppScore = buildRoundScore({ speak: Number(opposition.speak) || 0, ce: Number(opposition.ce) || 0 });
+    const oppScore = buildRoundScore({ speak: Number(opposition.speak) || 0, ce: Number(opposition.ce) || 0 }, round);
     submissions.push({
       team: 'opposition',
       speaker: oppSpeaker,
@@ -1796,19 +1828,33 @@ router.post(
         finalScores.judgeVerdicts.push(payload);
       }
     });
+    // Mongoose doesn't detect changes inside embedded mixed-type subdocuments
+    // by default — mark the field so the next save() persists the new verdicts.
+    session.markModified('finalScores');
 
     const aggregatedScores = aggregateFinalScores(session, room);
 
     // Auto-complete the debate only when:
-    // 1. OPP_S3 speaker was submitted in this round
-    // 2. ALL assigned judges have submitted OPP_S3 verdicts
+    // 1. OPP_S3 speaker was submitted in this round (last round per scoring rules)
+    // 2. ALL assigned judges have submitted verdicts for ALL rounds
+    //    (every expected speaker scored by every judge — partial scores would
+    //    skew the team averages)
     const assignedJudges = room.participants.filter((p: any) => getEffectiveRoomRole(p) === 'judge');
     const involvesOPPS3 = submissions.some((s) => s.speaker === 'OPP_S3');
-    const OPP_S3_verdicts = (finalScores.judgeVerdicts || []).filter((v: any) => v.speaker === 'OPP_S3');
-    const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId?.toString()));
+    const expectedSpeakers = getExpectedScoringSpeakersForRoom(room);
+    const verdictByJudgeAndSpeaker = new Map<string, number>();
+    (finalScores.judgeVerdicts || []).forEach((v: any) => {
+      const key = `${v.judgeId?.toString() || 'unknown'}::${v.speaker}`;
+      verdictByJudgeAndSpeaker.set(key, (verdictByJudgeAndSpeaker.get(key) || 0) + 1);
+    });
     const allJudgesSubmitted =
       assignedJudges.length > 0 &&
-      assignedJudges.every((j: any) => uniqueJudgesSubmitted.has(j.userId.toString()));
+      assignedJudges.every((j: any) =>
+        expectedSpeakers.every((sp) => {
+          const cnt = verdictByJudgeAndSpeaker.get(`${j.userId.toString()}::${sp}`) || 0;
+          return cnt > 0;
+        }),
+      );
 
     let autoCompleted = false;
     let winnerInfo: any = null;
@@ -1994,12 +2040,15 @@ router.post(
 router.post(
   '/:id/cross-exam/pass-turn',
   authenticate,
+  roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { nextSpeaker, transcript } = req.body;
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
+    const room = (req as any).room;
+    const participant = (req as any).participant;
+    if (!participant) throw new ForbiddenError('You are not in this room');
+    if (!participant.team) throw new ForbiddenError('Participant must be on a team');
 
-    const session = await DebateSession.findOne({ roomId: req.params.id });
+    const session = await DebateSession.findOne({ roomId: room._id });
     if (!session) throw new NotFoundError('Session not found');
     if (session.currentTurn.phase !== 'cross_exam') {
       throw new BadRequestError('Current phase is not cross-exam');
@@ -2036,16 +2085,41 @@ router.post(
 router.post(
   '/:id/cross-exam/finish',
   authenticate,
+  roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const session = await DebateSession.findOne({ roomId: req.params.id });
+    const room = (req as any).room;
+    const participant = (req as any).participant;
+    if (!participant) throw new ForbiddenError('You are not in this room');
+
+    const session = await DebateSession.findOne({ roomId: room._id });
     if (!session) throw new NotFoundError('Session not found');
     if (session.currentTurn.phase !== 'cross_exam') {
       throw new BadRequestError('Current phase is not cross-exam');
+    }
+    if (session.currentTurn.phaseStatus !== 'active') {
+      throw new BadRequestError('Cross-examination is not active');
+    }
+
+    // Require team membership or controller (host/owner) to finish CE
+    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+    const isController = participant.roomRole === 'owner' || effectiveRole === 'host';
+    const isAskingTeam = participant.team === session.currentTurn.ceState?.askingTeam;
+    if (!isController && !isAskingTeam) {
+      throw new ForbiddenError('Only the asking team or host can finish cross-examination');
     }
 
     session.currentTurn.status = 'completed';
     session.currentTurn.phase = 'judge_feedback';
     await session.save();
+
+    // Broadcast phase change so frontend exits cross-exam UI
+    getIO().to(room._id.toString()).emit('debate:phase-change', {
+      phase: 'judge_feedback',
+      phaseStatus: 'active',
+      speaker: 'JUDGES_FB_1',
+      announcement: 'End of Round',
+    });
+    getIO().to(room._id.toString()).emit('debate:turn-status-change', { turnStatus: 'active', phaseStatus: 'active' });
 
     sendSuccess(res, session.currentTurn, 'Cross-exam finished');
   }),
@@ -2238,17 +2312,13 @@ router.post(
       throw new BadRequestError('Debate is already completed');
     }
 
-    // Stop timers
-    timerService.stop(req.params.id);
-
-    // Emit mute-lock event
-    const io = getIO();
-    io.to(req.params.id).emit('debate:mute-lock', { duration: 3 });
-
-    // Call the service function
+    // endPhaseByHost → triggerTransition handles timer stop, timer-update(0),
+    // transition-start, and mute-lock synchronously. Don't pre-emit mute-lock
+    // here because that would race with the transition events.
     const result = await endPhaseByHost(req.params.id, req.user!.userId, req.body.transcript || '');
 
-    // Emit state restore after transition
+    // Emit state restore after transition so any late UI subscriptions sync up.
+    const io = getIO();
     setTimeout(async () => {
       const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
       const state = await buildRoomStatePayload(req.params.id, req.user!.userId);
@@ -2276,17 +2346,13 @@ router.post(
       throw new BadRequestError('Debate is already completed');
     }
 
-    // Stop timers
-    timerService.stop(req.params.id);
-
-    // Emit mute-lock event
-    const io = getIO();
-    io.to(req.params.id).emit('debate:mute-lock', { duration: 3 });
-
-    // Call the service function
+    // endPhaseBySpeaker → triggerTransition handles timer stop, timer-update(0),
+    // transition-start, and mute-lock synchronously. Don't pre-emit mute-lock
+    // here because that would race with the transition events.
     const result = await endPhaseBySpeaker(req.params.id, req.user!.userId, req.body.transcript || '');
 
-    // Emit state restore after transition
+    // Emit state restore after transition so any late UI subscriptions sync up.
+    const io = getIO();
     setTimeout(async () => {
       const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
       const state = await buildRoomStatePayload(req.params.id, req.user!.userId);

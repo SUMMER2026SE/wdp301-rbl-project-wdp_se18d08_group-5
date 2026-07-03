@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Badge } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 import { useDebateStore } from '@stores/debateStore';
 import type { RoomParticipant } from '@/types';
 
@@ -69,6 +70,7 @@ function VideoTile({
   isSpeaking = false,
   isCameraActive = false,
 }: VideoTileProps) {
+  const { t } = useTranslation('common');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const baseStream = isLocal ? localStream : peer?.stream ?? null;
   const stream = isCameraActive ? baseStream : null;
@@ -140,8 +142,8 @@ function VideoTile({
         style={{ left: 8, bottom: 8, background: 'rgba(0,0,0,0.65)', borderRadius: 6, zIndex: 2 }}
       >
         <span className="text-light" style={{ fontSize: '0.7rem' }}>{label}</span>
-        {muted && <Badge bg="danger" pill className="ms-1" style={{ fontSize: '0.5rem', padding: '0.15em 0.4em' }}>MUTED</Badge>}
-        {isLocal && <Badge bg="primary" pill className="ms-1" style={{ fontSize: '0.5rem', padding: '0.15em 0.4em' }}>YOU</Badge>}
+        {muted && <Badge bg="danger" pill className="ms-1" style={{ fontSize: '0.5rem', padding: '0.15em 0.4em' }}>{t('components.cameraGrid.muted')}</Badge>}
+        {isLocal && <Badge bg="primary" pill className="ms-1" style={{ fontSize: '0.5rem', padding: '0.15em 0.4em' }}>{t('components.cameraGrid.you')}</Badge>}
       </div>
 
       {/* Role Badge */}
@@ -184,6 +186,7 @@ export function CameraGrid({
   localMuted = false,
   resolveUserId,
 }: CameraGridProps) {
+  const { t } = useTranslation('common');
   const currentSpeaker = useDebateStore((s) => s.currentSpeaker);
   const cameraActiveMap = useDebateStore((s) => s.cameraActive);
 
@@ -283,7 +286,7 @@ export function CameraGrid({
                 </div>
               ))}
               {proParticipants.length === 0 && (
-                <div className="text-muted small fst-italic py-3">No Proposition debaters</div>
+                <div className="text-muted small fst-italic py-3">{t('common:components.cameraGrid.noProposition')}</div>
               )}
             </div>
           </div>
@@ -317,7 +320,7 @@ export function CameraGrid({
                 </div>
               ))}
               {adminParticipants.length === 0 && (
-                <div className="text-muted small fst-italic py-3">No Host or Judges present</div>
+                <div className="text-muted small fst-italic py-3">{t('common:components.cameraGrid.noHostOrJudges')}</div>
               )}
             </div>
           </div>
@@ -351,7 +354,7 @@ export function CameraGrid({
                 </div>
               ))}
               {oppParticipants.length === 0 && (
-                <div className="text-muted small fst-italic py-3">No Opposition debaters</div>
+                <div className="text-muted small fst-italic py-3">{t('common:components.cameraGrid.noOpposition')}</div>
               )}
             </div>
           </div>

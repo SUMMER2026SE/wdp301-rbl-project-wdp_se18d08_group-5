@@ -1,0 +1,145 @@
+{
+  "dashboardTitle": "管理ダッシュボード",
+  "dashboardSubtitle": "アカウント、部屋、レポート、プラットフォームモデレーション。",
+
+  "overview": {
+    "title": "概要"
+  },
+
+  "users": {
+    "title": "ユーザー",
+    "adminAccess": "管理者アクセス",
+    "restricted": "制限あり",
+    "active": "アクティブ",
+    "pending": "保留中",
+    "verifiedAccount": "確認済みアカウント",
+    "emailNotVerified": "メール未確認",
+    "until": "まで",
+    "banActive": "BAN中",
+    "banned": "BAN済み",
+    "ban": "BAN",
+    "unban": "BAN解除",
+    "noBanned": "BANされたユーザーはいません",
+    "allRoles": "すべての役割",
+    "allStatus": "すべてのステータス",
+    "search": "検索",
+    "searchPlaceholder": "名前、メール、ユーザー名で検索...",
+    "loadingError": "ユーザーを読み込めません",
+    "noUsers": "ユーザーが見つかりません",
+    "role": {
+      "admin": "管理者",
+      "user": "ユーザー",
+      "banned": "BAN済み"
+    },
+    "columns": {
+      "user": "ユーザー",
+      "email": "メール",
+      "role": "役割",
+      "provider": "プロバイダー",
+      "status": "ステータス",
+      "ranking": "ランキング",
+      "joined": "参加日",
+      "actions": "アクション"
+    }
+  },
+
+  "rooms": {
+    "title": "部屋",
+    "untitledRoom": "無題の部屋",
+    "noMotionSet": "モーション未設定",
+    "openRoom": "部屋を開く",
+    "phase": "フェーズ",
+    "participants": "参加者",
+    "muted": "ミュート済み",
+    "viewerChat": "觀覧者チャット",
+    "on": "オン",
+    "off": "オフ",
+    "allStatus": "すべてのステータス",
+    "allTypes": "すべてのタイプ",
+    "allFormats": "すべてのフォーマット",
+    "search": "検索",
+    "searchPlaceholder": "タイトル、モーションで検索...",
+    "loadingError": "部屋を読み込めません",
+    "noRooms": "部屋が見つかりません",
+    "private": "プライベート",
+    "columns": {
+      "room": "部屋",
+      "status": "ステータス",
+      "type": "タイプ",
+      "people": "人数",
+      "hostJudge": "ホスト / 審判",
+      "created": "作成日",
+      "actions": "アクション"
+    }
+  },
+
+  "reports": {
+    "title": "レポート",
+    "openReports": "オープンレポート",
+    "toxicMessages": "有害メッセージ",
+    "noDetails": "詳細なし",
+    "review": "確認",
+    "noReports": "レポートが見つかりません",
+    "search": "検索",
+    "searchPlaceholder": "理由、ターゲットで検索...",
+    "allStatus": "すべてのステータス",
+    "allTargets": "すべてのターゲット",
+    "loadingError": "レポートを読み込めません",
+    "reporter": "報告者",
+    "target": "ターゲット",
+    "columns": {
+      "report": "レポート",
+      "target": "ターゲット",
+      "status": "ステータス",
+      "reporter": "報告者",
+      "created": "作成日",
+      "actions": "アクション"
+    }
+  },
+
+  "ban": {
+    "title": "ユーザーをBAN",
+    "account": "アカウント",
+    "duration": "期間",
+    "durationHours": "{{count}}時間",
+    "durationDays": "{{count}}日",
+    "customDuration": "カスタム",
+    "customPlaceholderMinutes": "分数を入力（最小1）。",
+    "customPlaceholderHours": "時間数を入力（最小1）。",
+    "customPlaceholderDays": "日数を入力（最小1）。",
+    "reason": "理由",
+    "reasonPlaceholder": "BAN理由を入力...",
+    "cancel": "キャンセル",
+    "confirmBan": "BANを確認",
+    "applying": "適用中...",
+    "roomModeration": "ルームモデレーション",
+    "participant": "参加者",
+    "role": "役割",
+    "team": "チーム",
+    "slot": "スロット",
+    "state": "状態",
+    "actions": "アクション",
+    "muted": "ミュート",
+    "clear": "クリア",
+    "close": "閉じる"
+  },
+
+  "reviewReport": {
+    "title": "レポートを確認",
+    "status": "ステータス",
+    "resolution": "解決",
+    "adminNote": "管理メモ",
+    "adminNotePlaceholder": "メモを追加...",
+    "cancel": "キャンセル",
+    "saveReview": "確認を保存",
+    "saving": "保存中...",
+    "pending": "保留中",
+    "resolved": "解決済み",
+    "dismissed": "却下済み"
+  },
+
+  "errors": {
+    "feedback": "フィードバック",
+    "unableToLoadOverview": "管理概要を読み込めません"
+  }
+}

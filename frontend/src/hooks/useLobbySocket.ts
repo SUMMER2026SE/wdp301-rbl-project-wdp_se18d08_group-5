@@ -55,10 +55,17 @@ export function useLobbySocket(
     };
 
     const joinChannel = () => {
-      socket.emit('room:join', { roomId });
+      if (socket.connected) {
+        socket.emit('room:join', { roomId });
+      }
     };
 
     const attach = () => {
+      // If the socket is already connected, join immediately. Otherwise wait
+      // for the 'connect' event before emitting — `socket.emit` while
+      // disconnected buffers the event, but if the buffer overflows or the
+      // socket is mid-reconnect, the server may never receive `room:join`
+      // and the participant will miss `debate:started` broadcasts.
       joinChannel();
       socket.on('room:state-updated', handleStateUpdated);
       socket.on('debate:started', handleDebateStarted);
@@ -69,6 +76,12 @@ export function useLobbySocket(
       socket.off('room:state-updated', handleStateUpdated);
       socket.off('debate:started', handleDebateStarted);
       socket.off('room:participant-update', handleParticipantUpdate);
+      // Leave the room channel so the next page (DebateRoomPage) can rejoin
+      // cleanly. Without this, the socket stays subscribed to the lobby
+      // channel and the next emit('join-room') may race against stale state.
+      if (socket.connected) {
+        socket.emit('leave-room', { roomId });
+      }
     };
 
     attach();

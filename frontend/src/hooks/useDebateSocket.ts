@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { getSocket } from './useSocket';
+import { getSocket, useSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
 import { clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
@@ -44,6 +44,16 @@ interface RoomStateRestore {
 export function useDebateSocket(roomId: string | undefined) {
   const { t } = useTranslation('errors');
   const user = useAuthStore((s) => s.user);
+  // Use the hook so we re-run listeners when the singleton socket becomes
+  // available. Previously we called `getSocket()` once and returned early if
+  // it was null — that permanently skipped listener registration when the
+  // socket was still mid-connect at mount time.
+  const { socket: socketFromHook } = useSocket();
+  // Guard the transition interval so duplicate `debate:transition-start`
+  // events can't leak running intervals. Must be a top-level hook call —
+  // calling useRef inside useEffect violates the Rules of Hooks and causes
+  // React to throw "Invalid hook call" on mount, blanking the page.
+  const transitionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const {
     setRoom,
     setPhase,
@@ -85,7 +95,10 @@ export function useDebateSocket(roomId: string | undefined) {
   useEffect(() => {
     if (!roomId) return;
 
-    const socket = getSocket();
+    // Prefer the socket from the hook so this effect re-runs whenever the
+    // singleton becomes available or reconnects. Falls back to getSocket()
+    // for environments where the hook hasn't been wired up yet.
+    const socket = socketFromHook ?? getSocket();
     if (!socket) return;
 
     const restoreState = (data: RoomStateRestore) => {
@@ -135,15 +148,30 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Auto Mute Transition Countdown Overlay
+    // Guard: store the interval ID in a ref so duplicate events can't leak intervals
     socket.on('debate:transition-start', (data: { duration: number; announcement?: string }) => {
+      // Clear any stale interval from a previous transition event
+      if (transitionIntervalRef.current !== null) {
+        clearInterval(transitionIntervalRef.current);
+        transitionIntervalRef.current = null;
+      }
+      // Freeze the displayed timer at 00:00 immediately — matches the rule
+      // "Timer reset về 00:00" that happens the moment the popup appears.
+      // The server already emits a debate:timer-update with timeRemaining: 0
+      // before this event, but we set it explicitly here too so the local
+      // ticker can't race and decrement past 0 during the popup.
+      setTimeRemaining(0);
       setTransitionState(true, data.duration);
       if (data.announcement) setTransitionAnnouncement(data.announcement);
       window.dispatchEvent(new CustomEvent('debate:force-mute'));
       let remaining = data.duration;
-      const interval = setInterval(() => {
+      transitionIntervalRef.current = setInterval(() => {
         remaining--;
         if (remaining <= 0) {
-          clearInterval(interval);
+          if (transitionIntervalRef.current !== null) {
+            clearInterval(transitionIntervalRef.current);
+            transitionIntervalRef.current = null;
+          }
           setTransitionState(false, 0);
         } else {
           setTransitionState(true, remaining);
@@ -211,7 +239,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Phase change with announcement text
-    socket.on('debate:phase-change', (data: { phase: DebatePhase; speaker?: SpeakerTurn; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean }) => {
+    socket.on('debate:phase-change', (data: { phase: DebatePhase; speaker?: SpeakerTurn; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean; phaseStatus?: string }) => {
       setPhase(data.phase);
       if (data.speaker) {
         setSpeaker(data.speaker);
@@ -219,9 +247,17 @@ export function useDebateSocket(roomId: string | undefined) {
       if (data.announcement) {
         setTransitionAnnouncement(data.announcement);
       }
+      // Always reset the timer when transitioning into a free / waiting /
+      // completed phase — these have no running countdown.
       if (['waiting_s1', 'judge_feedback', 'final_judging', 'completed'].includes(data.phase)) {
         setTimeRemaining(0);
         setTotalTime(0);
+      }
+      // When the new phase arrives while a transition popup is still on
+      // screen (e.g. countdown finished), close the popup so the user sees
+      // the new phase immediately.
+      if (data.phaseStatus === 'active' || data.phaseStatus === 'idle') {
+        setTransitionState(false, 0);
       }
     });
 
@@ -446,18 +482,40 @@ export function useDebateSocket(roomId: string | undefined) {
       },
     );
 
-    // Join the room channel
-    socket.emit('join-room', { roomId });
+    // Join the room channel — guard against emitting before the socket is
+    // connected. If we're mid-reconnect, queue the join on the next
+    // 'connect' event so the server is actually subscribed before
+    // `room:joined` arrives.
+    const emitJoin = () => socket.emit('join-room', { roomId });
+    if (socket.connected) {
+      emitJoin();
+    } else {
+      socket.once('connect', emitJoin);
+    }
 
     // Re-join whenever the socket reconnects
     const handleConnect = () => {
-      socket.emit('join-room', { roomId });
+      emitJoin();
     };
     socket.on('connect', handleConnect);
 
+    // Safety net: if `room:joined` doesn't come back within 3s, the server
+    // either rejected our join (room gone / kicked) or the emit was lost.
+    // Re-emit and surface a warning so the user knows to refresh.
+    const safetyTimer = window.setTimeout(() => {
+      const storeRoomId = useDebateStore.getState().room?._id;
+      if (storeRoomId === roomId) return; // already populated, nothing to do
+      // eslint-disable-next-line no-console
+      console.warn('[useDebateSocket] room:joined not received in 3s — retrying join-room');
+      emitJoin();
+    }, 3000);
+
     return () => {
-      socket.emit('leave-room', { roomId });
+      window.clearTimeout(safetyTimer);
       socket.off('connect', handleConnect);
+      if (socket.connected) {
+        socket.emit('leave-room', { roomId });
+      }
       socket.off('room:joined');
       socket.off('room:state-restore');
       socket.off('chat:history');

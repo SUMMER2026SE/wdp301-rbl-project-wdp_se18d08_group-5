@@ -1,0 +1,354 @@
+{
+  "loading": "Đang tải...",
+  "retry": "Thử lại",
+  "backToMatches": "Quay lại trận đấu",
+  "back": "Quay lại",
+  "cancel": "Hủy",
+  "close": "Đóng",
+  "save": "Lưu",
+  "submit": "Nộp",
+  "confirm": "Xác nhận",
+  "yes": "Có",
+  "no": "Không",
+
+  "debateRoom": {
+    "loading": "Đang tải phòng tranh luận...",
+    "sessionStarting": "Phiên tranh luận đang bắt đầu...",
+    "hostClickedStart": "Host vừa bấm Bắt đầu",
+    "syncBanner": "Đang đồng bộ trạng thái tranh luận...",
+    "phaseTransition": "CHUYỂN GIAI ĐOẠN",
+    "muteMicAndLockChat": "Tắt mic và khóa chat",
+    "startsIn": "{{label}} bắt đầu sau",
+    "startingSoon": "Bắt đầu sớm thôi",
+    "startNow": "Bắt đầu!",
+
+    "privateRoom": "Phòng tranh luận riêng tư",
+    "enterPassword": "Phòng tranh luận này là riêng tư. Nhập mật khẩu để tham gia với tư cách khán giả.",
+    "passwordPlaceholder": "Nhập mật khẩu...",
+    "enterRoom": "Vào phòng",
+    "backToMatch": "Quay lại trận đấu",
+
+    "roomNotFound": "Không thể tải dữ liệu phòng. Thông thường điều này có nghĩa là phòng tranh luận không còn tồn tại hoặc phiên của bạn đã hết hạn.",
+    "roomNotFoundRetry": "Thử lại",
+    "roomNotFoundBack": "Quay lại trận đấu",
+
+    "privatePasswordWrong": "Mật khẩu không đúng",
+    "joiningAsSpectator": "Đang tham gia với tư cách khán giả...",
+    "joinedAsSpectator": "Đã tham gia với tư cách khán giả",
+    "failedToJoin": "Không thể tham gia phòng tranh luận",
+
+    "proposition": "Bên Đi",
+    "opposition": "Bên Vãng",
+
+    "camera": "Camera",
+    "liveCamera": "Camera trực tiếp",
+    "viewerOnly": "Chế độ khán giả",
+    "viewerCount": "Số khán giả",
+    "spectator": "Khán giả",
+    "empty": "Trống",
+
+    "workflow": "Luồng tranh luận",
+    "current": "Hiện tại",
+    "next": "Tiếp theo",
+    "waiting": "Chờ",
+    "result": "Kết quả",
+    "completed": "Hoàn thành",
+
+    "notifications": "Thông báo",
+    "noNotifications": "Chưa có thông báo nào.",
+
+    "countdown": {
+      "matchStarting": "Trận đấu bắt đầu",
+      "startsIn": "{{label}} bắt đầu sau"
+    },
+
+    "previousScores": {
+      "round": "Vòng {{round}}"
+    },
+
+    "winner": {
+      "label": "Người thắng:",
+      "waiting": "Đang chờ"
+    },
+
+    "debateEnded": "Tranh luận đã kết thúc! Người thắng: {{winner}}",
+
+    "speakerStatus": {
+      "speaking": "ĐANG NÓI",
+      "waiting": "ĐANG CHỜ",
+      "empty": "TRỐNG"
+    },
+
+    "spectator": "Khán giả",
+
+    "scoreBreakdown": {
+      "speak": "Diễn thuyết:",
+      "ce": "CE:"
+    },
+
+    "matchChat": "Chat trận đấu",
+    "noMessages": "Chưa có tin nhắn nào.",
+    "joinAsParticipantToChat": "Tham gia với tư cách người tranh luận để chat",
+
+    "crossExam": {
+      "sharedTimer": "Đồng hồ CE chung",
+      "propQuestionsLeft": "Câu hỏi Đi còn lại",
+      "oppQuestionsLeft": "Câu hỏi Vãng còn lại",
+      "askQuestion": "Đặt câu hỏi",
+      "cannotFinish": "Không thể kết thúc CE từ giao diện này",
+      "finishCE": "Kết thúc CE",
+      "ask": "Hỏi",
+      "pass": "Bỏ qua"
+    },
+
+    "judge": {
+      "assigned": "Giám khảo được chỉ định",
+      "noJudges": "Chưa có giám khảo",
+      "quickReaction": "Phản ứng nhanh",
+      "agree": "Đồng ý",
+      "disagree": "Không đồng ý",
+      "submitEvaluation": "Gửi đánh giá",
+      "currentStandings": "Bảng điểm hiện tại",
+      "roundScores": "Điểm các vòng",
+      "aggregateScores": "Tổng hợp điểm",
+      "determineWinner": "Xác định người thắng",
+      "notYetSubmitted": "Chưa có điểm được nộp cho vòng này.",
+      "noSubmitted": "Chưa nộp điểm.",
+      "speech": "Diễn thuyết",
+      "ce": "CE",
+      "notes": "Ghi chú",
+      "score": "Điểm",
+      "outOf": "{{value}}/20",
+      "judgeNotePlaceholder": "Ghi chú cho {{team}}...",
+      "scoreSubmitted": "Đã nộp điểm vòng",
+      "failedToSubmit": "Không thể nộp điểm",
+      "canPreFill": "Bạn có thể điền điểm và ghi chú trước. Chỉ bấm Nộp khi đến phase chấm điểm.",
+      "roundSubmitted": "Đã nộp vòng {{round}}"
+    },
+
+    "actions": {
+      "start": "Bắt đầu",
+      "skip": "Bỏ qua",
+      "pause": "Tạm dừng",
+      "resume": "Tiếp tục",
+      "end": "Kết thúc",
+      "surrender": "Đầu hàng",
+      "surrenderConfirm": "Đầu hàng trận đấu này?",
+      "surrenderSent": "Đã gửi đầu hàng",
+      "draw": "Hòa",
+      "acceptDraw": "Chấp nhận hòa",
+      "drawRequested": "Đã gửi yêu cầu hòa. Đang chờ đội kia chấp nhận.",
+      "drawRequestAlert": "{{name}} yêu cầu hòa. Chấp nhận sẽ kết thúc trận đấu với kết quả hòa.",
+      "drawSent": "Đã gửi yêu cầu hòa",
+      "actionFailed": "Hành động thất bại",
+
+      "muteMic": "Tắt mic",
+      "unmuteMic": "Bật mic",
+      "micMuted": "Đã tắt mic",
+      "micUnmuted": "Đã bật mic",
+      "micChangeFailed": "Không thể thay đổi trạng thái mic",
+
+      "turnCameraOff": "Tắt camera",
+      "turnCameraOn": "Bật camera",
+      "cameraDisabled": "Đã tắt camera",
+      "cameraEnabled": "Đã bật camera",
+      "cameraChangeFailed": "Không thể thay đổi trạng thái camera",
+
+      "muteChat": "Tắt chat",
+      "unmuteChat": "Bật chat",
+      "chatDisabled": "Đã tắt chat",
+      "chatEnabled": "Đã bật chat",
+      "chatChangeFailed": "Không thể thay đổi trạng thái chat",
+
+      "speak": "Nói",
+      "lockedByHost": "Bị khóa bởi host"
+    },
+
+    "debateControls": "Điều khiển tranh luận",
+    "participantControls": "Điều khiển người tham gia",
+    "user": "Người dùng",
+    "role": "Vai trò",
+    "cam": "Cam",
+    "mic": "Mic",
+    "chat": "Chat",
+    "viewers": "Khán giả",
+    "viewersCount": "{{count}} khán giả",
+
+    "roles": {
+      "viewer": "Khán giả",
+      "debater": "Người tranh luận",
+      "speaker": "Diễn giả",
+      "judge": "Giám khảo",
+      "host": "Host",
+      "owner": "Chủ phòng",
+      "prop": "ĐI",
+      "opp": "VÃNG",
+      "propSlot": "ĐI {{slot}}",
+      "oppSlot": "VÃNG {{slot}}"
+    },
+
+    "noHost": {
+      "waitingForS1": "Đang chờ S1 bắt đầu",
+      "s1MustStart": "Cả hai đội S1 phải bấm Bắt đầu để tiến hành trận đấu.",
+      "judgeS1Responsible": "Với vai trò Giám khảo S1, bạn chịu trách nhiệm bắt đầu trận đấu.",
+      "youHaveStarted": "Bạn đã bấm Bắt đầu",
+      "youHaveNotStarted": "Bạn chưa bấm Bắt đầu",
+      "started": "Đã bắt đầu"
+    },
+
+    "preparation": {
+      "endPreparation": "Kết thúc chuẩn bị",
+      "ready": "Sẵn sàng",
+      "waitingForReady": "Đang chờ cả hai đội sẵn sàng",
+      "countReady": "{{count}}/{{total}}"
+    },
+
+    "speakerStatus": {
+      "speaking": "Đang nói",
+      "asked": "Đang hỏi",
+      "idle": "Trống"
+    },
+
+    "privateRoom": {
+      "enter": "Vào phòng riêng",
+      "exit": "Ra khỏi phòng riêng",
+      "enterPrivateRoom": "Vào phòng riêng",
+      "exitPrivateRoom": "Ra khỏi phòng riêng",
+      "leftRoom": "Đã rời phòng riêng",
+      "inThisRoom": "Trong phòng này",
+      "noOneHere": "Chưa có ai ở đây",
+      "you": "(bạn)"
+    },
+
+    "rules": {
+      "title": "Nội quy phòng tranh luận",
+      "generalStructure": "Cấu trúc chung",
+      "structureDesc": "Cuộc tranh luận này tuân theo cấu trúc luân phiên chính thức với việc chấm điểm liên tục:",
+      "motion": "Chủ đề / Vấn đề tranh luận",
+      "motionDesc": "Được công bố bởi host hoặc thiết lập trước khi ghép cặp.",
+      "prep7": "Chuẩn bị (7 phút)",
+      "prep7Desc": "Các đội thảo luận trong phòng riêng của họ.",
+      "speeches": "Diễn văn (3 phút)",
+      "speechesDesc": "Diễn giả lần lượt trình bày luận điểm.",
+      "crossExam": "Chất vấn (2 phút)",
+      "crossExamDesc": "Hỏi đáp nhanh giữa các đội.",
+      "judgeFeedback": "Phản hồi của giám khảo",
+      "judgeFeedbackDesc": "Giám khảo xem xét và nộp phán quyết.",
+      "speakerPositions": "Vị trí diễn giả",
+      "s1": "S1 (Diễn giả 1)",
+      "s1Desc": "Tập trung vào khung arguments và đường lối tranh luận.",
+      "s2": "S2 (Diễn giả 2)",
+      "s2Desc": "Mở rộng điểm arguments và phản bác trường phái đối lập.",
+      "s3": "S3 (Diễn giả 3 — Kết luận)",
+      "s3Desc": "Tóm tắt cuộc tranh luận. Không có chất vấn sau S3.",
+      "scoringCriteria": "Tiêu chí chấm điểm",
+      "scoringCriteriaDesc": "Giám khảo chấm điểm theo {{max}} tiêu chí:",
+      "logic": "Logic ({{max}} điểm)",
+      "logicDesc": "Tính mạch lạc và rõ ràng của arguments.",
+      "rebuttal": "Phản bác ({{max}} điểm)",
+      "rebuttalDesc": "Hiệu quả trong việc đối phó với các tuyên bố đối lập.",
+      "evidence": "Bằng chứng ({{max}} điểm)",
+      "evidenceDesc": "Sử dụng dữ liệu cụ thể và chứng minh logic.",
+      "crossExamCriteria": "Chất vấn ({{max}} điểm)",
+      "crossExamCriteriaDesc": "Kỹ năng đặt câu hỏi và phòng thủ trong CE.",
+      "strategy": "Chiến lược ({{max}} điểm)",
+      "strategyDesc": "Cấu trúc và ưu tiên các điểm arguments.",
+      "communication": "Giao tiếp ({{max}} điểm)",
+      "communicationDesc": "Cách trình bày, rõ ràng và kiểm soát giọng nói.",
+      "closeRules": "Đóng nội quy"
+    },
+
+    "leave": {
+      "title": "Rời phòng tranh luận",
+      "ownerWarning": "Bạn là Chủ phòng. Nếu rời đi, bạn phải chuyển quyền sở hữu phòng trước.",
+      "ownerWarning2": "Chọn người kế nhiệm để chuyển quyền sở hữu, hoặc bấm \"Rời ngay\" để tự động chuyển cho người tham gia tiếp theo.",
+      "onlyOneWarning": "Vì bạn là người duy nhất trong phòng, rời đi sẽ đóng phòng.",
+      "leaveNow": "Rời ngay",
+      "leftRoom": "Đã rời phòng tranh luận",
+      "selectSuccessor": "Chọn người kế nhiệm"
+    },
+
+    "admin": {
+      "title": "Quản trị",
+      "controlPanel": "Bảng điều khiển",
+      "hostControlPanel": "Bảng điều khiển host",
+      "score": "Điểm",
+      "privateRoom": "Phòng riêng",
+      "chat": "Chat",
+      "leaveRoom": "Rời phòng"
+    },
+
+    "errors": {
+      "cannotResolveSpeakers": "Không thể xác định diễn giả cho vòng này",
+      "scoresAggregated": "Điểm đã được tổng hợp",
+      "failedToAggregate": "Không thể tổng hợp điểm",
+      "winnerDetermined": "Đã xác định người thắng",
+      "failedToDetermine": "Không thể xác định người thắng",
+      "phaseStarted": "Giai đoạn đã bắt đầu",
+      "failedToStartPhase": "Không thể bắt đầu giai đoạn",
+      "waitingForOpposingS1": "Đang chờ S1 bên đối lập...",
+      "teamPauseStarted": "Đội đã tạm dừng",
+      "failedToPause": "Không thể tạm dừng tranh luận",
+      "teamPauseResumed": "Đội đã tiếp tục",
+      "failedToResume": "Không thể tiếp tục tranh luận",
+      "micMutedByHost": "Host đã tắt mic của bạn",
+      "micUnmutedByHost": "Host đã bật mic của bạn",
+      "chatRestrictedByHost": "Host đã hạn chế chat của bạn",
+      "chatRestoredByHost": "Host đã khôi phục chat của bạn",
+      "cameraRestrictedByHost": "Host đã hạn chế camera của bạn",
+      "cameraRestoredByHost": "Host đã khôi phục camera của bạn",
+      "browserNoSpeechRecognition": "Nhận diện giọng nói không được hỗ trợ trên trình duyệt này",
+      "opponentRequestedDraw": "Đối thủ yêu cầu hòa",
+      "debateUpdated": "Cập nhật tranh luận thành công",
+      "failedToUpdateDebate": "Không thể cập nhật cài đặt tranh luận",
+      "noOtherParticipants": "Không có người tham gia khác."
+    },
+
+    "reconnect": {
+      "reconnecting": "Đang kết nối lại…",
+      "restoring": "Đang khôi phục trạng thái phòng tranh luận"
+    },
+
+    "timer": {
+      "idle": "Chờ",
+      "paused": "Tạm dừng",
+      "disconnected": "{{team}} đã ngắt kết nối"
+    },
+
+    "roundLabels": {
+      "r1Opening": "Vòng 1 — Diễn văn mở đầu",
+      "r2Rebuttal": "Vòng 2 — Phản bác & Mở rộng",
+      "r3Closing": "Vòng 3 — Tóm tắt cuối cùng"
+    },
+
+    "match": "TRẬN:",
+    "preparation": "Chuẩn bị",
+    "speech": "Diễn thuyết",
+    "crossExam": "Chất vấn",
+    "judgeFeedback": "Phản hồi GK",
+    "finalJudging": "Chấm cuối",
+    "judgesFb1": "Phản hồi GK 1",
+    "judgesFb2": "Phản hồi GK 2",
+    "judgesFb3": "Phản hồi GK 3",
+    "ce1": "CE 1",
+    "ce2": "CE 2",
+    "prop1": "ĐI 1",
+    "opp1": "VÃNG 1",
+    "prop2": "ĐI 2",
+    "opp2": "VÃNG 2",
+    "prop3": "ĐI 3",
+    "opp3": "VÃNG 3",
+    "prep": "Chuẩn bị",
+    "motion": "Chủ đề",
+    "waiting": "Chờ",
+    "oppositionTurn": "Lượt bên Vãng",
+    "propositionTurn": "Lượt bên Đi",
+    "getReadyForCE": "Sẵn sàng cho chất vấn",
+    "endOfRound": "Kết thúc Vòng {{round}}",
+    "nextRoundStarting": "Vòng tiếp theo bắt đầu",
+    "getReadyToSpeak": "Sẵn sàng phát biểu",
+    "preparationStarts": "Bắt đầu chuẩn bị",
+    "aiVerdict": "Phán quyết AI",
+    "finishDebate": "Kết thúc tranh luận"
+  }
+}

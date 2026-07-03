@@ -11,7 +11,6 @@ type Team = 'proposition' | 'opposition';
 
 interface CETimerState {
   roomId: string;
-  // Shared timer — both teams see the same countdown
   sharedRemaining: number;
   totalSeconds: number;
   isPaused: boolean;
@@ -19,6 +18,9 @@ interface CETimerState {
   questionsPro: number;
   questionsOpp: number;
 }
+
+/** Tracks which teams have requested early CE finish for consensus-based ending. */
+const ceFinishConsensus: Map<string, Set<Team>> = new Map();
 
 /**
  * Cross Examination Timer (Human Host Mode):
@@ -272,7 +274,65 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
   });
 
   /**
-   * Finish CE early — host or debater triggers end.
+   * Debater requests early CE end — tracks which teams have consented.
+   * When both teams have requested, auto-triggers transition.
+   * Rule: "cả 2 đội cùng skip" ends CE early.
+   */
+  socket.on('debater:request-ce-early', async ({ roomId }: { roomId: string }) => {
+    try {
+      const room = await DebateRoom.findById(roomId);
+      if (!room) return;
+      const participant = room.participants.find(
+        (entry) => entry.userId.toString() === userId,
+      );
+      if (!participant || !participant.team) {
+        socket.emit('ce-early:error', { message: 'Only debaters can request early CE end' });
+        return;
+      }
+
+      const session = await DebateSession.findOne({ roomId: room._id });
+      if (!session) return;
+      const turn = session.currentTurn as any;
+      if (turn?.phase !== 'cross_exam') {
+        socket.emit('ce-early:error', { message: 'Current phase is not cross-exam' });
+        return;
+      }
+
+      const team = participant.team as Team;
+      if (!ceFinishConsensus.has(roomId)) {
+        ceFinishConsensus.set(roomId, new Set());
+      }
+      const consensus = ceFinishConsensus.get(roomId)!;
+
+      if (consensus.has(team)) {
+        // Already requested — no-op
+        return;
+      }
+
+      consensus.add(team);
+      const io = getIO();
+      io?.to(roomId).emit('ce-early:update', {
+        roomId,
+        requestingTeams: Array.from(consensus),
+        requiredTeams: ['proposition', 'opposition'],
+        allAgreed: consensus.size >= 2,
+      });
+
+      // When both teams agree, end CE
+      if (consensus.size >= 2) {
+        ceFinishConsensus.delete(roomId);
+        ceTimerService.stopTickingOnly(roomId);
+        await broadcastSystemMessage(roomId, 'Both teams agreed to end Cross-Examination');
+        const { triggerTransition } = await import('../features/debate/debate.service.js');
+        triggerTransition(roomId).catch(console.error);
+      }
+    } catch (error) {
+      console.error('CE early request error:', error);
+    }
+  });
+
+  /**
+   * Finish CE early — host or Judge S1 forces end; also called after both teams agree.
    */
   socket.on('cross-exam:finish', async ({ roomId }: { roomId: string }) => {
     try {
@@ -286,10 +346,30 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
       if (!session) return;
       const turn = session.currentTurn as any;
 
-      if (turn.phase !== 'cross_exam') {
+      if (turn?.phase !== 'cross_exam') {
         socket.emit('cross-exam:error', { message: 'Current phase is not cross-exam' });
         return;
       }
+
+      // Gate: only host, Judge S1 (no-host modes), or both teams agreed
+      const effectiveRole = participant
+        ? participant.roomRole === 'owner' ? (participant as any).primaryRole : participant.roomRole
+        : null;
+      const isController =
+        participant?.roomRole === 'owner' ||
+        effectiveRole === 'host' ||
+        (room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1');
+      const bothTeamsAgreed = (ceFinishConsensus.get(roomId)?.size ?? 0) >= 2;
+
+      if (!isController && !bothTeamsAgreed) {
+        socket.emit('cross-exam:error', {
+          message: 'Only host/Judge S1 can force-end CE, or both teams must agree via the "End CE" button',
+        });
+        return;
+      }
+
+      // Clear consensus state
+      ceFinishConsensus.delete(roomId);
 
       const ceState = turn.ceState as any;
       const questionsPro = ceState?.questionsPro || 0;
@@ -301,7 +381,7 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
       const io = getIO();
       io?.to(roomId).emit('cross-exam:ended', {
         scoresAdjustment: penalty,
-        finishedBy: participant?.team || 'host',
+        finishedBy: isController ? 'controller' : 'both_teams_agreed',
       });
 
       const { triggerTransition } = await import('../features/debate/debate.service.js');

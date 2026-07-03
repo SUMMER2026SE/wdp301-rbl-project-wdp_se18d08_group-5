@@ -8,6 +8,12 @@ import { useAuthStore } from '@stores/authStore';
 import type { DebateFormat, DebateRoom, RoomStatus, RoomType } from '@/types';
 import { useSocket } from '@hooks/useSocket';
 
+function getEffectiveRole(participant: DebateRoom['participants'][0] | undefined): string | null {
+  if (!participant) return null;
+  if (participant.roomRole === 'owner') return participant.primaryRole || 'owner';
+  return participant.roomRole;
+}
+
 export default function LiveMatchesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -157,7 +163,8 @@ export default function LiveMatchesPage() {
         <Row className="g-3">
           {visibleRooms.map((room) => {
             const userPart = room.participants.find((p) => p.userId === currentUser?._id);
-            const canRejoin = room.status !== 'completed' && userPart && ['host', 'debater', 'judge'].includes(userPart.roomRole);
+            const userEffectiveRole = getEffectiveRole(userPart);
+            const canRejoin = room.status !== 'completed' && userPart && ['host', 'debater', 'judge'].includes(userEffectiveRole || '');
             const isLive = room.status === 'active' || room.status === 'paused';
 
             return (

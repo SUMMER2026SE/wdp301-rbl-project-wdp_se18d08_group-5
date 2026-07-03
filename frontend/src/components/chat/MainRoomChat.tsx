@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Form, InputGroup } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
 import { getSocket } from '@hooks/useSocket';
@@ -33,6 +34,7 @@ function isCrossExamMessage(message: ChatMessage) {
  * - viewer: read-only (input hidden)
  */
 export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProps) {
+  const { t } = useTranslation('common');
   const { user } = useAuthStore();
   const messages = useDebateStore((state) => state.messages);
   const viewerChatEnabled = useDebateStore((state) => state.viewerChatEnabled);
@@ -177,10 +179,10 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
           }`}
         >
           {isChatMuted
-            ? 'You have been banned from sending messages in this chat'
+            ? t('common:components.mainRoomChat.bannedFromChat')
             : myRole === 'viewer'
-            ? 'Chat disabled for viewers'
-            : 'Join as a participant to chat'}
+            ? t('common:components.mainRoomChat.disabledForViewers')
+            : t('common:components.mainRoomChat.joinToChat')}
         </div>
       )}
     </div>

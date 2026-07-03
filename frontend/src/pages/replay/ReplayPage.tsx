@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Badge, Card, Col, Container, ListGroup, ProgressBar, Row, Spinner, Button } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { debateService } from '@services/debateService';
 import { useSocket } from '@hooks/useSocket';
 import { clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
@@ -17,6 +18,7 @@ export default function ReplayPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { socket } = useSocket();
+  const { t } = useTranslation('replay');
 
   useEffect(() => {
     clearDebateRoomFromStorage();
@@ -49,7 +51,7 @@ export default function ReplayPage() {
       <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: '80vh' }}>
         <div className="text-center text-white">
           <Spinner animation="border" variant="info" className="mb-3" />
-          <div style={{ fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>Loading match results...</div>
+          <div style={{ fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>{t('replay.loadingMatchResults')}</div>
         </div>
       </Container>
     );
@@ -59,8 +61,8 @@ export default function ReplayPage() {
     return (
       <Container className="py-5">
         <Alert variant="warning" className="border-warning bg-dark text-warning p-4 rounded-3">
-          <h4 style={{ fontFamily: 'Orbitron' }}>MATCH NOT FOUND</h4>
-          <p className="mb-0">The requested debate session results could not be located.</p>
+          <h4 style={{ fontFamily: 'Orbitron' }}>{t('replay.matchNotFound')}</h4>
+          <p className="mb-0">{t('replay.matchNotFoundDesc')}</p>
         </Alert>
       </Container>
     );
@@ -120,11 +122,11 @@ export default function ReplayPage() {
               DEBATE ARENA CONCLUDED
             </span>
             <h1 className="m-0 text-white mt-1 text-truncate" style={{ fontFamily: 'Orbitron', fontSize: '1.6rem', fontWeight: 700 }}>
-              &ldquo;{room?.motion || 'Motion Selection'}&rdquo;
+              &ldquo;{room?.motion || t('replay.motionSelection')}&rdquo;
             </h1>
           </div>
           <div className="text-end">
-            <span className="text-muted d-block small mb-1" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>WINNER</span>
+            <span className="text-muted d-block small mb-1" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>{t('replay.winner')}</span>
             <Badge
               bg={winner === 'proposition' ? 'info' : winner === 'opposition' ? 'danger' : 'warning'}
               className="fs-6 px-3 py-2 text-uppercase"
@@ -139,7 +141,7 @@ export default function ReplayPage() {
                 color: winner === 'draw' ? '#000' : '#fff',
               }}
             >
-              {winner === 'proposition' ? 'Proposition Wins' : winner === 'opposition' ? 'Opposition Wins' : 'Draw Match'}
+            {winner === 'proposition' ? t('replay.propositionWins') : winner === 'opposition' ? t('replay.oppositionWins') : t('replay.drawMatch')}
             </Badge>
           </div>
         </div>
@@ -152,22 +154,22 @@ export default function ReplayPage() {
             <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
-                  <i className="bi bi-bar-chart-fill text-neon-cyan me-2"></i> Final Scoreboard
+                  <i className="bi bi-bar-chart-fill text-neon-cyan me-2"></i> {t('replay.finalScoreboard')}
                 </Card.Title>
 
                 {isRoundBased || verdicts.length > 0 ? (
                   <>
                     <div className="mb-4">
                       <div className="d-flex justify-content-between mb-1 small fw-bold">
-                        <span className="text-neon-cyan">PROPOSITION</span>
-                        <span className="text-white">{grandPropTotal.toFixed(1)} points</span>
+                        <span className="text-neon-cyan">{t('replay.proposition')}</span>
+                        <span className="text-white">{grandPropTotal.toFixed(1)} {t('replay.points')}</span>
                       </div>
                       <ProgressBar now={(grandPropTotal / grandTotal) * 100} className="bg-dark" style={{ height: '12px' }} variant="info" />
                     </div>
                     <div className="mb-4">
                       <div className="d-flex justify-content-between mb-1 small fw-bold">
-                        <span className="text-neon-pink">OPPOSITION</span>
-                        <span className="text-white">{grandOppTotal.toFixed(1)} points</span>
+                        <span className="text-neon-pink">{t('replay.opposition')}</span>
+                        <span className="text-white">{grandOppTotal.toFixed(1)} {t('replay.points')}</span>
                       </div>
                       <ProgressBar now={(grandOppTotal / grandTotal) * 100} className="bg-dark" style={{ height: '12px' }} variant="danger" />
                     </div>
@@ -176,15 +178,15 @@ export default function ReplayPage() {
                   <>
                     <div className="mb-4">
                       <div className="d-flex justify-content-between mb-1 small fw-bold">
-                        <span className="text-neon-cyan">PROPOSITION</span>
-                        <span className="text-white">— points</span>
+                        <span className="text-neon-cyan">{t('replay.proposition')}</span>
+                        <span className="text-white">— {t('replay.points')}</span>
                       </div>
                       <ProgressBar now={50} className="bg-dark" style={{ height: '12px' }} variant="info" />
                     </div>
                     <div className="mb-4">
                       <div className="d-flex justify-content-between mb-1 small fw-bold">
-                        <span className="text-neon-pink">OPPOSITION</span>
-                        <span className="text-white">— points</span>
+                        <span className="text-neon-pink">{t('replay.opposition')}</span>
+                        <span className="text-white">— {t('replay.points')}</span>
                       </div>
                       <ProgressBar now={50} className="bg-dark" style={{ height: '12px' }} variant="danger" />
                     </div>
@@ -193,7 +195,7 @@ export default function ReplayPage() {
 
                 {session.aiSummary && (
                   <div className="p-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-15 mt-3">
-                    <div className="text-neon-yellow text-uppercase fw-bold mb-1.5" style={{ fontSize: '9px', fontFamily: 'Orbitron' }}>AI Summary Verdict</div>
+                    <div className="text-neon-yellow text-uppercase fw-bold mb-1.5" style={{ fontSize: '9px', fontFamily: 'Orbitron' }}>{t('replay.aiSummaryVerdict')}</div>
                     <p className="m-0 text-muted small" style={{ lineHeight: 1.4 }}>{session.aiSummary}</p>
                   </div>
                 )}
@@ -204,19 +206,19 @@ export default function ReplayPage() {
             <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
-                  <i className="bi bi-people-fill text-neon-cyan me-2"></i> Match Participants
+                  <i className="bi bi-people-fill text-neon-cyan me-2"></i> {t('replay.matchParticipants')}
                 </Card.Title>
                 <ListGroup className="bg-transparent border-0 d-flex flex-column gap-2.5">
                   {hosts.map((h: any) => (
                     <div key={h.userId} className="d-flex align-items-center justify-content-between bg-dark bg-opacity-30 border border-secondary border-opacity-10 rounded-3 p-2 px-3">
                       <span className="fw-semibold text-white">{h.username}</span>
-                      <Badge bg="warning" className="text-dark font-monospace text-uppercase" style={{ fontSize: '8px' }}>Host</Badge>
+                      <Badge bg="warning" className="text-dark font-monospace text-uppercase" style={{ fontSize: '8px' }}>{t('replay.host')}</Badge>
                     </div>
                   ))}
                   {judgeList.map((j: any) => (
                     <div key={j.userId} className="d-flex align-items-center justify-content-between bg-dark bg-opacity-30 border border-secondary border-opacity-10 rounded-3 p-2 px-3">
                       <span className="fw-semibold text-white">{j.username}</span>
-                      <Badge style={{ fontSize: '8px', background: '#ffd60a', color: '#000' }} className="font-monospace text-uppercase">Judge</Badge>
+                      <Badge style={{ fontSize: '8px', background: '#ffd60a', color: '#000' }} className="font-monospace text-uppercase">{t('replay.judge')}</Badge>
                     </div>
                   ))}
                   {proDebaters.map((p: any) => (
@@ -232,7 +234,7 @@ export default function ReplayPage() {
                     </div>
                   ))}
                   {participants.length === 0 && (
-                    <div className="text-muted small text-center py-2">No participant records found.</div>
+                    <div className="text-muted small text-center py-2">{t('replay.noParticipantRecords')}</div>
                   )}
                 </ListGroup>
               </Card.Body>
@@ -240,7 +242,7 @@ export default function ReplayPage() {
 
             <div className="d-grid mt-2">
               <Button variant="outline-light" onClick={() => navigate('/matches')} className="py-2 fw-semibold" style={{ fontSize: '12px', fontFamily: 'Orbitron' }}>
-                <i className="bi bi-chevron-left me-1"></i> Back to Matches
+                <i className="bi bi-chevron-left me-1"></i> {t('replay.backToMatches')}
               </Button>
             </div>
           </Col>
@@ -250,7 +252,7 @@ export default function ReplayPage() {
             <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
-                  <i className="bi bi-chat-left-quote-fill text-neon-cyan me-2"></i> Judges Feedback & Score Breakdown
+                  <i className="bi bi-chat-left-quote-fill text-neon-cyan me-2"></i> {t('replay.judgesFeedback')}
                 </Card.Title>
 
                 <div className="d-flex flex-column gap-4">
@@ -265,7 +267,7 @@ export default function ReplayPage() {
                         </h5>
 
                         {judgeIds.length === 0 ? (
-                          <p className="text-muted small italic m-0">Chưa có điểm nào được nộp cho round này.</p>
+                          <p className="text-muted small italic m-0">{t('replay.noScoresForRound')}</p>
                         ) : (
                           <div className="d-flex flex-column gap-3">
                             {judgeIds.map((jId) => {
@@ -283,23 +285,23 @@ export default function ReplayPage() {
                                   <div className="d-flex justify-content-between align-items-center mb-3">
                                     <span className="text-white fw-bold small">{judgeName}</span>
                                     <Badge bg="secondary" style={{ fontSize: '8px', fontFamily: 'Orbitron' }}>
-                                      Round {round.num}
+                                      Round {t('replay.round', { num: round.num })}
                                     </Badge>
                                   </div>
 
                                   <Row>
                                     {/* Proposition scores */}
                                     <Col md={6} className="mb-2 mb-md-0">
-                                      <div className="text-neon-cyan small fw-bold mb-1">PROPOSITION</div>
+                                      <div className="text-neon-cyan small fw-bold mb-1">{t('replay.proposition')}</div>
                                       {hasProp ? (
                                         (() => {
                                           const pv = propV!;
                                           return (
                                             <div className="small">
                                               <div className="mb-1 text-white-50">
-                                                Speech: <strong className="text-white">{pv.score?.logic ?? 0}</strong>/20
+                                                {t('replay.speech')}: <strong className="text-white">{pv.score?.logic ?? 0}</strong>/20
                                                 {round.hasCE && (
-                                                  <> | CE: <strong className="text-white">{pv.score?.crossExam ?? 0}</strong>/20</>
+                                                  <> | {t('replay.ce')}: <strong className="text-white">{pv.score?.crossExam ?? 0}</strong>/20</>
                                                 )}
                                                 <span className="text-muted ms-2">({((Number(pv.score?.logic) || 0) + (Number(pv.score?.crossExam) || 0)).toFixed(1)}/40)</span>
                                               </div>
@@ -312,22 +314,22 @@ export default function ReplayPage() {
                                           );
                                         })()
                                       ) : (
-                                        <div className="text-muted small">Chưa nộp.</div>
+                                        <div className="text-muted small">{t('replay.notSubmitted')}</div>
                                       )}
                                     </Col>
 
                                     {/* Opposition scores */}
                                     <Col md={6}>
-                                      <div className="text-neon-pink small fw-bold mb-1">OPPOSITION</div>
+                                      <div className="text-neon-pink small fw-bold mb-1">{t('replay.opposition')}</div>
                                       {hasOpp ? (
                                         (() => {
                                           const ov = oppV!;
                                           return (
                                             <div className="small">
                                               <div className="mb-1 text-white-50">
-                                                Speech: <strong className="text-white">{ov.score?.logic ?? 0}</strong>/20
+                                                {t('replay.speech')}: <strong className="text-white">{ov.score?.logic ?? 0}</strong>/20
                                                 {round.hasCE && (
-                                                  <> | CE: <strong className="text-white">{ov.score?.crossExam ?? 0}</strong>/20</>
+                                                  <> | {t('replay.ce')}: <strong className="text-white">{ov.score?.crossExam ?? 0}</strong>/20</>
                                                 )}
                                                 <span className="text-muted ms-2">({((Number(ov.score?.logic) || 0) + (Number(ov.score?.crossExam) || 0)).toFixed(1)}/40)</span>
                                               </div>
@@ -340,7 +342,7 @@ export default function ReplayPage() {
                                           );
                                         })()
                                       ) : (
-                                        <div className="text-muted small">Chưa nộp.</div>
+                                        <div className="text-muted small">{t('replay.notSubmitted')}</div>
                                       )}
                                     </Col>
                                   </Row>

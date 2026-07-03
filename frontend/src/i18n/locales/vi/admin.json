@@ -1,0 +1,145 @@
+{
+  "dashboardTitle": "Bảng Quản Trị",
+  "dashboardSubtitle": "Tài khoản, phòng, báo cáo và kiểm duyệt nền tảng.",
+
+  "overview": {
+    "title": "Tổng quan"
+  },
+
+  "users": {
+    "title": "Người dùng",
+    "adminAccess": "Quyền quản trị",
+    "restricted": "Bị hạn chế",
+    "active": "Đang hoạt động",
+    "pending": "Đang chờ",
+    "verifiedAccount": "Tài khoản đã xác minh",
+    "emailNotVerified": "Email chưa xác minh",
+    "until": "Đến",
+    "banActive": "Đang bị cấm",
+    "banned": "Bị cấm",
+    "ban": "Cấm",
+    "unban": "Bỏ cấm",
+    "noBanned": "Không có người dùng bị cấm",
+    "allRoles": "Tất cả vai trò",
+    "allStatus": "Tất cả trạng thái",
+    "search": "Tìm kiếm",
+    "searchPlaceholder": "Tìm theo tên, email, username...",
+    "loadingError": "Không thể tải người dùng",
+    "noUsers": "Không tìm thấy người dùng",
+    "role": {
+      "admin": "Quản trị viên",
+      "user": "Người dùng",
+      "banned": "Bị cấm"
+    },
+    "columns": {
+      "user": "Người dùng",
+      "email": "Email",
+      "role": "Vai trò",
+      "provider": "Nhà cung cấp",
+      "status": "Trạng thái",
+      "ranking": "Xếp hạng",
+      "joined": "Tham gia",
+      "actions": "Hành động"
+    }
+  },
+
+  "rooms": {
+    "title": "Phòng",
+    "untitledRoom": "Phòng không tên",
+    "noMotionSet": "Chưa đặt chủ đề",
+    "openRoom": "Mở phòng",
+    "phase": "Giai đoạn",
+    "participants": "Người tham gia",
+    "muted": "Bị tắt tiếng",
+    "viewerChat": "Chat khán giả",
+    "on": "Bật",
+    "off": "Tắt",
+    "allStatus": "Tất cả trạng thái",
+    "allTypes": "Tất cả loại",
+    "allFormats": "Tất cả định dạng",
+    "search": "Tìm kiếm",
+    "searchPlaceholder": "Tìm theo tiêu đề, chủ đề...",
+    "loadingError": "Không thể tải phòng",
+    "noRooms": "Không tìm thấy phòng",
+    "private": "Riêng tư",
+    "columns": {
+      "room": "Phòng",
+      "status": "Trạng thái",
+      "type": "Loại",
+      "people": "Người",
+      "hostJudge": "Host / Giám khảo",
+      "created": "Tạo lúc",
+      "actions": "Hành động"
+    }
+  },
+
+  "reports": {
+    "title": "Báo cáo",
+    "openReports": "Báo cáo mở",
+    "toxicMessages": "Tin nhắn độc hại",
+    "noDetails": "Không có chi tiết",
+    "review": "Xem xét",
+    "noReports": "Không tìm thấy báo cáo",
+    "search": "Tìm kiếm",
+    "searchPlaceholder": "Tìm theo lý do, mục tiêu...",
+    "allStatus": "Tất cả trạng thái",
+    "allTargets": "Tất cả mục tiêu",
+    "loadingError": "Không thể tải báo cáo",
+    "reporter": "Người báo cáo",
+    "target": "Mục tiêu",
+    "columns": {
+      "report": "Báo cáo",
+      "target": "Mục tiêu",
+      "status": "Trạng thái",
+      "reporter": "Người báo cáo",
+      "created": "Tạo lúc",
+      "actions": "Hành động"
+    }
+  },
+
+  "ban": {
+    "title": "Cấm Người Dùng",
+    "account": "Tài khoản",
+    "duration": "Thời hạn",
+    "durationHours": "{{count}} giờ",
+    "durationDays": "{{count}} ngày",
+    "customDuration": "Tùy chỉnh",
+    "customPlaceholderMinutes": "Nhập số phút (tối thiểu 1).",
+    "customPlaceholderHours": "Nhập số giờ (tối thiểu 1).",
+    "customPlaceholderDays": "Nhập số ngày (tối thiểu 1).",
+    "reason": "Lý do",
+    "reasonPlaceholder": "Nhập lý do cấm...",
+    "cancel": "Hủy",
+    "confirmBan": "Xác nhận cấm",
+    "applying": "Đang áp dụng...",
+    "roomModeration": "Kiểm duyệt phòng",
+    "participant": "Người tham gia",
+    "role": "Vai trò",
+    "team": "Đội",
+    "slot": "Vị trí",
+    "state": "Trạng thái",
+    "actions": "Hành động",
+    "muted": "bị tắt tiếng",
+    "clear": "bình thường",
+    "close": "Đóng"
+  },
+
+  "reviewReport": {
+    "title": "Xem xét Báo cáo",
+    "status": "Trạng thái",
+    "resolution": "Kết quả",
+    "adminNote": "Ghi chú quản trị",
+    "adminNotePlaceholder": "Thêm ghi chú...",
+    "cancel": "Hủy",
+    "saveReview": "Lưu xem xét",
+    "saving": "Đang lưu...",
+    "pending": "Đang chờ",
+    "resolved": "Đã giải quyết",
+    "dismissed": "Đã bỏ qua"
+  },
+
+  "errors": {
+    "feedback": "phản hồi",
+    "unableToLoadOverview": "Không thể tải tổng quan quản trị"
+  }
+}

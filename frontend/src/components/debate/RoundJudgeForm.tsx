@@ -1,4 +1,5 @@
 import { Button, Form } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 import type { SpeakerTurn } from '@/types';
 
 type RoundJudgeFormProps = {
@@ -53,6 +54,8 @@ export function RoundJudgeForm({
   isPending,
   isSubmitEnabled = true,
 }: RoundJudgeFormProps) {
+  const { t } = useTranslation('debate');
+
   if (!propSpeaker || !oppSpeaker) {
     return (
       <div className="text-muted small">
@@ -97,11 +100,11 @@ export function RoundJudgeForm({
           </Form.Group>
         )}
         <Form.Group className="mb-2">
-          <Form.Label className="small text-muted mb-0">Notes</Form.Label>
+          <Form.Label className="small text-muted mb-0">{t('debate.judge.notes')}</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
-            placeholder="Notes for proposition team..."
+            placeholder={t('debate.judge.notesPlaceholder', 'Notes for proposition team...')}
             className="small"
             value={propNotes}
             onChange={(e) => onPropNotesChange(e.target.value)}
@@ -137,11 +140,11 @@ export function RoundJudgeForm({
           </Form.Group>
         )}
         <Form.Group className="mb-2">
-          <Form.Label className="small text-muted mb-0">Notes</Form.Label>
+          <Form.Label className="small text-muted mb-0">{t('debate.judge.notes')}</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
-            placeholder="Notes for opposition team..."
+            placeholder={t('debate.judge.notesOppPlaceholder', 'Notes for opposition team...')}
             className="small"
             value={oppNotes}
             onChange={(e) => onOppNotesChange(e.target.value)}
@@ -152,7 +155,7 @@ export function RoundJudgeForm({
       {!isSubmitEnabled && (
         <div className="alert alert-info py-1.5 px-2.5 small mb-2 text-white bg-info bg-opacity-10 border border-info border-opacity-20" style={{ fontSize: '10px', lineHeight: 1.4 }}>
           <i className="bi bi-info-circle me-1" />
-          Bạn có thể kéo điểm và note trước. Chỉ được ấn Submit khi đến phase chấm điểm.
+          {t('debate.judge.canPreFill')}
         </div>
       )}
 
@@ -162,7 +165,7 @@ export function RoundJudgeForm({
         onClick={onSubmit}
         disabled={isPending || !isSubmitEnabled}
       >
-        {isPending ? 'Submitting…' : 'Submit'}
+        {isPending ? t('debate.judge.submitting') : t('debate.judge.submit')}
       </Button>
     </div>
   );

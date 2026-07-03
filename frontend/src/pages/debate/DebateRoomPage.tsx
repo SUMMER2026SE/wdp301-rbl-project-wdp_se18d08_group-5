@@ -60,7 +60,9 @@ type DebateWorkflowStep = {
 
 /**
  * Human Host 3v3 workflow — mirrors backend DEBATE_FLOW_HOST_3V3.
- * Judge Feedback = free (no timer), idle between every phase.
+ * Rule order: R1(Prop→Opp→CE), R2(Prop→Opp→CE), R3(Opp→Prop,no CE)
+ * R2: "(Luồng giống Round 1)" → PRO_S2 first, OPP_S2 second
+ * R3: Opposition FIRST per rule (all 4 docs): Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -69,18 +71,20 @@ const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Extension (3 min)' },
   { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Extension (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * Human Host 1v1 workflow — mirrors backend DEBATE_FLOW_HOST_1V1.
+ * R2: OPP→PRO (per "Luồng giống Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -93,30 +97,76 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Closing speech (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
+  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
+];
+
+/**
+ * No-Host 3v3 workflow — mirrors backend DEBATE_FLOW_NOHost_3V3.
+ * R2: PRO→OPP (per "Luồng giống Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * WAITING_S1_START at index 0 aligns with backend for correct step matching.
+ */
+const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
+  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', label: 'Waiting', detail: 'Both S1 start' },
+  { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
+  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
+  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Extension (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
+  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
+];
+
+/**
+ * No-Host 1v1 workflow — mirrors backend DEBATE_FLOW_NOHost_1V1.
+ * R2: OPP→PRO (per "Luồng giống Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * WAITING_S1_START at index 0 aligns with backend for correct step matching.
+ */
+const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
+  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', label: 'Waiting', detail: 'Both S1 start' },
+  { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
+  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
+  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Closing speech (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing speech (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 export default function DebateRoomPage() {
   const { roomId = '' } = useParams();
   const { t } = useTranslation('common');
+  const { t: td } = useTranslation('debate');
   useSocket();
   useDebateSocket(roomId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
-  const debateStarted = useDebateStore((s) => Boolean(s.room?.startedAt));
-  const cameraActiveMap = useDebateStore((s) => s.cameraActive);
-  const cameraLockedByHost = useDebateStore((s) => s.cameraLockedByHost);
-  const { cameraActive, peers: videoPeers, startCamera, stopCamera, localStream } =
-    useDebateVideo({ roomId, enabled: debateStarted });
-
   // Track debate room for return-to-debate banner
   const trackedRoom = useDebateStore((s) => s.room);
   useDebateRoomTracker(roomId, trackedRoom?.title);
+  const cameraActiveMap = useDebateStore((s) => s.cameraActive);
+  const cameraLockedByHost = useDebateStore((s) => s.cameraLockedByHost);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [joinPassword, setJoinPassword] = useState('');
   const [isJoining, setIsJoining] = useState(false);
@@ -246,23 +296,36 @@ export default function DebateRoomPage() {
   // Smooth local countdown: every second, decrement the store time so the
   // timer on the host's screen never freezes between server broadcasts. The
   // server-authoritative `debate:timer-update` will re-sync the value if it
-  // drifts. We pause locally when the debate is paused.
+  // drifts. We pause locally when the debate is paused OR when transitioning
+  // between phases — when transitioning the server emits `timeRemaining: 0`
+  // and `frozen: true` so the user sees 00:00 the moment the popup appears.
   const timeRemaining = useDebateStore((s) => s.timeRemaining);
   const isPausedStore = useDebateStore((s) => s.isPaused);
+  const isTransitioningStore = useDebateStore((s) => s.isTransitioning);
   const setTimeRemainingStore = useDebateStore((s) => s.setTimeRemaining);
   useEffect(() => {
     if (isPausedStore) return;
+    if (isTransitioningStore) return;
     if (!timeRemaining || timeRemaining <= 0) return;
     const id = window.setInterval(() => {
-      const current = useDebateStore.getState().timeRemaining;
-      if (current > 0) {
-        setTimeRemainingStore(current - 1);
+      // Read state via getState() so we always see the freshest value. The
+      // dependency-driven effect re-runs after store updates, but we still
+      // guard against an interval tick that races with a freshly-received
+      // transition-start event.
+      const fresh = useDebateStore.getState();
+      if (fresh.isTransitioning) {
+        window.clearInterval(id);
+        return;
+      }
+      if (fresh.isPaused) return;
+      if (fresh.timeRemaining > 0) {
+        setTimeRemainingStore(fresh.timeRemaining - 1);
       } else {
         window.clearInterval(id);
       }
     }, 1000);
     return () => window.clearInterval(id);
-  }, [isPausedStore, timeRemaining > 0, setTimeRemainingStore]);
+  }, [isPausedStore, isTransitioningStore, timeRemaining > 0, setTimeRemainingStore]);
 
   // Store state
   const currentPhase = useDebateStore((s) => s.currentPhase);
@@ -288,6 +351,7 @@ export default function DebateRoomPage() {
     enabled: Boolean(roomId),
     refetchInterval: 8000,
   });
+  const refetchRoom = roomQuery.refetch;
 
   const sessionQuery = useQuery({
     queryKey: ['debate-session', roomId],
@@ -295,6 +359,7 @@ export default function DebateRoomPage() {
     enabled: Boolean(roomId),
     refetchInterval: 5000,
   });
+  const refetchSession = sessionQuery.refetch;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['room', roomId] });
@@ -471,6 +536,18 @@ export default function DebateRoomPage() {
   const room = roomQuery.data;
   const session = sessionQuery.data;
 
+  // Prefer the store-populated room (authoritative socket state) but fall
+  // back to the REST fetch so the camera grid + main UI still render
+  // before `room:joined` arrives. Without the fallback, an empty store
+  // makes the camera grid + post-start UI hidden even when the REST room
+  // already reports `startedAt`.
+  const debateStartedEffective = Boolean(
+    (roomFromStore && roomFromStore._id === roomId && roomFromStore.startedAt) ||
+      room?.startedAt,
+  );
+  const { cameraActive, peers: videoPeers, startCamera, stopCamera, localStream } =
+    useDebateVideo({ roomId, enabled: debateStartedEffective });
+
   // Auto redirect handled by ResultBanner (10s countdown with View Result button).
   // We only clear the debate-room storage here so the return-to-debate banner
   // doesn't appear on the replay page.
@@ -486,10 +563,14 @@ export default function DebateRoomPage() {
     });
   }, [roomId, navigate]);
 
-  const debateWorkflow = useMemo(
-    () => (roomFromStore?.format === '1v1' ? debateWorkflow1v1 : debateWorkflow3v3),
-    [roomFromStore?.format],
-  );
+  const debateWorkflow = useMemo(() => {
+    const format = roomFromStore?.format;
+    const isNoHost = roomFromStore?.hostType !== 'human';
+    if (format === '1v1') {
+      return isNoHost ? debateWorkflowNoHost1v1 : debateWorkflow1v1;
+    }
+    return isNoHost ? debateWorkflowNoHost3v3 : debateWorkflow3v3;
+  }, [roomFromStore?.format, roomFromStore?.hostType]);
 
   const isParticipant = useMemo(() => {
     return Boolean(room?.participants.some((p) => p.userId === user?._id));
@@ -697,8 +778,11 @@ export default function DebateRoomPage() {
   const speakerLabel = currentSpeaker || session?.currentTurn?.speaker || '—';
   const serverTime = session?.currentTurn?.timeRemaining ?? 0;
   const serverTotal = session?.currentTurn?.timeLimit ?? 0;
-  const displayTime = timeRemaining || serverTime;
-  const displayTotal = totalTime || serverTotal;
+  // When transitioning, the displayed timer must be 00:00 even if the local
+  // ticker or a stale server update still holds a non-zero value. The server
+  // freezes the timer at the start of the transition popup per the rules.
+  const displayTime = isTransitioning ? 0 : (timeRemaining || serverTime);
+  const displayTotal = isTransitioning ? 0 : (totalTime || serverTotal);
 
   const currentWorkflowIndex = useMemo(() => {
     const phase = currentPhase || session?.currentTurn?.phase;
@@ -724,14 +808,15 @@ export default function DebateRoomPage() {
   const isScoringAllowed = useMemo(() => {
     const phase = currentPhase || session?.currentTurn?.phase;
     const speaker = (currentSpeaker || session?.currentTurn?.speaker) as string;
+    // Round 3: accept scoring at JUDGES_FB_3 (exists in ALL 4 flows)
+    if (currentRound === 3) {
+      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_3';
+    }
     if (currentRound === 1) {
       return phase === 'judge_feedback' && speaker === 'JUDGES_FB_1';
     }
     if (currentRound === 2) {
       return phase === 'judge_feedback' && speaker === 'JUDGES_FB_2';
-    }
-    if (currentRound === 3) {
-      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_3';
     }
     return false;
   }, [currentRound, currentPhase, session?.currentTurn?.phase, currentSpeaker, session?.currentTurn?.speaker]);
@@ -808,7 +893,7 @@ export default function DebateRoomPage() {
       // Group by judge + round
       const byJudgeRound = new Map<string, Map<number, any>>();
       verdicts.forEach((v: any) => {
-        const key = v.judgeName || 'Judge';
+        const key = v.judgeName || td('debateRoom.roles.judge');
         if (!byJudgeRound.has(key)) byJudgeRound.set(key, new Map());
         const roundNum = Number(v.round) || 0;
         const existing = byJudgeRound.get(key)!.get(roundNum);
@@ -842,24 +927,48 @@ export default function DebateRoomPage() {
 
     // 3. Match completed
     if (session?.finalScores?.winner && room?.status === 'completed') {
-      list.push(`Debate has ended! Winner: ${session.finalScores.winner.toUpperCase()}`);
+      list.push(td('debateRoom.debateEnded', { winner: session.finalScores.winner.toUpperCase() }));
     }
 
     return list;
   }, [messages, session]);
 
-  // Show loading spinner until we have BOTH REST data AND socket state, or if we are actively joining
-  const isLoading =
-    roomQuery.isLoading ||
-    sessionQuery.isLoading ||
-    (isParticipant && !socketReady) ||
-    isJoining;
+  // Show loading spinner until REST room data lands. Once we have the room
+  // we render the body even if the socket is still mid-reconnect — the
+  // socket state will populate via `room:joined` and re-render incrementally.
+  // Previously we blocked on `socketReady`, which stranded users on a
+  // "Connecting..." spinner when the socket reconnect lagged behind REST.
+  const isLoading = roomQuery.isLoading || sessionQuery.isLoading || isJoining;
+
+  // Track socket readiness only for diagnostic UI, not as a render gate.
+  const socketPending = isParticipant && !socketReady;
+
+  // Surface clear diagnostics so a stuck page is easy to triage in the field.
+  useEffect(() => {
+    if (!roomQuery.isError) return;
+    // eslint-disable-next-line no-console
+    console.warn('[DebateRoom] REST room fetch failed', roomQuery.error);
+  }, [roomQuery.isError, roomQuery.error]);
+
+  useEffect(() => {
+    if (!socketPending) return;
+    const timer = window.setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.warn('[DebateRoom] Socket state still pending after 4s', {
+        roomId,
+        socketId: getSocket()?.id,
+        connected: getSocket()?.connected,
+        storeRoomId: useDebateStore.getState().room?._id,
+      });
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [socketPending, roomId]);
 
   if (isLoading) {
     return (
       <Container fluid className="py-4 text-center">
         <Spinner animation="border" />
-        <div className="mt-2 text-muted small">Connecting to debate...</div>
+        <div className="mt-2 text-muted small">{td('debateRoom.loading')}</div>
       </Container>
     );
   }
@@ -872,12 +981,12 @@ export default function DebateRoomPage() {
             <i className="bi bi-shield-lock me-2"></i>
             PHÒNG TRANH LUẬN RIÊNG TƯ
           </h3>
-          <p className="text-muted small mb-4">This debate is private. Enter the password to join as a spectator.</p>
+          <p className="text-muted small mb-4">{td('debateRoom.enterPassword')}</p>
           <Form onSubmit={handlePrivateJoin}>
             <Form.Group className="mb-3">
               <Form.Control
                 type="password"
-                placeholder="Enter password..."
+                placeholder={td('debateRoom.passwordPlaceholder')}
                 value={joinPassword}
                 onChange={(e) => setJoinPassword(e.target.value)}
                 required
@@ -887,10 +996,10 @@ export default function DebateRoomPage() {
             </Form.Group>
             <div className="d-grid gap-2">
               <Button type="submit" variant="primary" disabled={isJoining || !joinPassword.trim()}>
-                {isJoining ? 'Connecting...' : 'Enter room'}
+                {isJoining ? td('debateRoom.connecting') : td('debateRoom.enterRoom')}
               </Button>
               <Button variant="outline-light" onClick={() => navigate('/matches')} disabled={isJoining}>
-                Back to match
+                {td('debateRoom.backToMatch')}
               </Button>
             </div>
           </Form>
@@ -899,10 +1008,45 @@ export default function DebateRoomPage() {
     );
   }
 
-  if (!room || !session) {
+  if (!room) {
     return (
       <Container className="py-4">
-        <Alert variant="warning">Debate session is not ready yet.</Alert>
+        <Alert variant="warning">
+          <Alert.Heading>Debate room is loading</Alert.Heading>
+          <p className="mb-2">
+            {td('debateRoom.roomNotFound')}
+          </p>
+          <div className="d-flex gap-2">
+            <Button variant="primary" size="sm" onClick={() => refetchRoom()}>
+              {td('retry')}
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => navigate('/matches')}>
+              {td('backToMatches')}
+            </Button>
+          </div>
+        </Alert>
+      </Container>
+    );
+  }
+
+  if (!session) {
+    return (
+      <Container className="py-4">
+        <Alert variant="info">
+          <Alert.Heading>Debate session is starting</Alert.Heading>
+          <p className="mb-2">
+            {td('debateRoom.sessionStarting')}
+          </p>
+          <div className="d-flex gap-2 align-items-center">
+            <Spinner animation="border" size="sm" />
+            <Button variant="outline-primary" size="sm" onClick={() => refetchSession()}>
+              {td('debateRoom.retryNow')}
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => navigate('/matches')}>
+              {td('backToMatches')}
+            </Button>
+          </div>
+        </Alert>
       </Container>
     );
   }
@@ -910,6 +1054,11 @@ export default function DebateRoomPage() {
   const phaseLabel = t(`debate.phases.${currentPhase || session.currentTurn?.phase}`, {
     defaultValue: currentPhase || session.currentTurn?.phase || '',
   });
+
+  // Render the body even when the socket is still mid-reconnect so the user
+  // sees the workflow timeline, chat, etc. — but show a thin banner above
+  // the room so they know realtime data may be one or two ticks behind.
+  const showSocketPendingBanner = socketPending;
 
   return (
     <>
@@ -930,6 +1079,22 @@ export default function DebateRoomPage() {
         }
       `}</style>
       <ReconnectOverlay />
+      {showSocketPendingBanner && (
+        <div
+          className="position-fixed top-0 start-50 translate-middle-x mt-2 px-3 py-2 rounded-pill d-flex align-items-center gap-2"
+          style={{
+            background: 'rgba(255, 214, 10, 0.18)',
+            border: '1px solid rgba(255, 214, 10, 0.5)',
+            zIndex: 1100,
+            fontSize: '12px',
+            color: '#ffd60a',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <Spinner animation="border" size="sm" />
+          <span>{td('debateRoom.syncBanner')}</span>
+        </div>
+      )}
       <TransitionPopup />
       <ResultBanner
         roomId={roomId}
@@ -965,9 +1130,9 @@ export default function DebateRoomPage() {
           }}
         >
           <div className="text-center p-5 rounded-4 border border-info border-opacity-25" style={{ background: 'rgba(15, 15, 25, 0.65)', boxShadow: '0 0 40px rgba(0,245,255,0.1)' }}>
-            <h2 className="text-neon-pink mb-3 speaking-pulse" style={{ letterSpacing: '0.1em' }}>CHUYỂN PHASE TỰ ĐỘNG</h2>
+            <h2 className="text-neon-pink mb-3 speaking-pulse" style={{ letterSpacing: '0.1em' }}>{td('debateRoom.phaseTransition')}</h2>
             <div className="fs-1 fw-bold text-neon-cyan mb-2" style={{ textShadow: '0 0 10px #00f5ff' }}>{transitionTime}s</div>
-            <div className="text-muted small text-uppercase" style={{ letterSpacing: '0.1em' }}>Mute mic and lock chat</div>
+            <div className="text-muted small text-uppercase" style={{ letterSpacing: '0.1em' }}>{td('debateRoom.muteMicAndLockChat')}</div>
           </div>
         </div>
       )}
@@ -1053,7 +1218,7 @@ export default function DebateRoomPage() {
         </div>
 
         {/* === CAMERA GRID === */}
-        {debateStarted && !isViewer && (
+        {debateStartedEffective && !isViewer && (
           <div
             className="flex-shrink-0 p-2"
             style={{ background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(0,245,255,0.2)' }}
@@ -1081,7 +1246,7 @@ export default function DebateRoomPage() {
         )}
 
         {/* === VIEWER-ONLY CAMERA PREVIEW (read-only, when host enabled it for viewer) === */}
-        {debateStarted && isViewer && Object.values(cameraActiveMap).some(Boolean) && (
+        {debateStartedEffective && isViewer && Object.values(cameraActiveMap).some(Boolean) && (
           <div
             className="flex-shrink-0 p-2"
             style={{ background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(0,245,255,0.2)' }}
@@ -1133,14 +1298,13 @@ export default function DebateRoomPage() {
                 )}
               </Alert>
             )}
-
             <LiveTranslationCaptions
               roomId={roomId}
               captionMode={captionMode}
               onCaptionModeChange={setCaptionMode}
               onOwnSourceTranscript={handleOwnSourceTranscript}
             />
-            {ownTeamPendingDraw && <Alert variant="info" className="py-2 px-3 mb-0 small flex-shrink-0">Draw request sent. Waiting for the other team to accept.</Alert>}
+            {ownTeamPendingDraw && <Alert variant="info" className="py-2 px-3 mb-0 small flex-shrink-0">{td('debateRoom.actions.drawRequested')}</Alert>}
 
             {/* Row 1: Mirrored Teams & Motion/Timer */}
             <div className="flex-shrink-0">
@@ -1185,7 +1349,7 @@ export default function DebateRoomPage() {
                               {participant ? participant.username : `Empty (${slot})`}
                             </p>
                             <p className="mb-0 text-uppercase" style={{ fontSize: '8px', letterSpacing: '0.05em', color: isCurrent ? '#00f5ff' : 'var(--text-muted)', lineHeight: 1.2 }}>
-                              {isCurrent ? 'ĐANG NÓI' : participant ? 'ĐANG CHỜ' : 'TRỐNG'}
+                              {isCurrent ? td('debateRoom.speakerStatus.speaking') : participant ? td('debateRoom.speakerStatus.waiting') : td('debateRoom.speakerStatus.empty')}
                             </p>
                           </div>
                           {isCurrent && (
@@ -1235,7 +1399,7 @@ export default function DebateRoomPage() {
                         </span>
                         {isViewer && (
                           <Badge bg="info" className="px-1 py-0 text-uppercase d-none d-sm-inline-flex" style={{ fontSize: '8px', fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>
-                            <i className="bi bi-eye-fill me-0.5"></i> Spectator
+                            <i className="bi bi-eye-fill me-0.5"></i> {td('debateRoom.spectator')}
                           </Badge>
                         )}
                       </div>
@@ -1265,7 +1429,7 @@ export default function DebateRoomPage() {
                               variant="outline-danger"
                               onClick={stopCamera}
                               style={{ fontSize: '10px', padding: '0.15rem 0.35rem' }}
-                              title="Turn camera off"
+                              title={td('debateRoom.actions.turnCameraOff')}
                             >
                               <i className="bi bi-camera-video-off-fill" />
                             </Button>
@@ -1283,7 +1447,7 @@ export default function DebateRoomPage() {
                           )}
                         </div>
                       )}
-                      <div className="d-flex align-items-center gap-1 text-muted px-1 py-0.5 rounded bg-dark bg-opacity-35 border border-secondary border-opacity-15" title="Viewer Count" style={{ height: 'fit-content' }}>
+                      <div className="d-flex align-items-center gap-1 text-muted px-1 py-0.5 rounded bg-dark bg-opacity-35 border border-secondary border-opacity-15" title={td('debateRoom.viewerCount')} style={{ height: 'fit-content' }}>
                         <i className="bi bi-eye-fill text-neon-cyan" style={{ fontSize: '0.7rem' }}></i>
                         <span className="small fw-bold text-white" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>
                           {(room?.participants || []).filter((p: any) => {
@@ -1337,7 +1501,7 @@ export default function DebateRoomPage() {
                               {participant ? participant.username : `Empty (${slot})`}
                             </p>
                             <p className="mb-0 text-uppercase" style={{ fontSize: '8px', letterSpacing: '0.05em', color: isCurrent ? '#ff006e' : 'var(--text-muted)', lineHeight: 1.2 }}>
-                              {isCurrent ? 'ĐANG NÓI' : participant ? 'ĐANG CHỜ' : 'TRỐNG'}
+                              {isCurrent ? td('debateRoom.speakerStatus.speaking') : participant ? td('debateRoom.speakerStatus.waiting') : td('debateRoom.speakerStatus.empty')}
                             </p>
                           </div>
                           <div
@@ -1365,7 +1529,7 @@ export default function DebateRoomPage() {
               <div className="d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 p-2" style={{ width: '50%', flexShrink: 0, minHeight: 0 }}>
                 <div className="d-flex align-items-center justify-content-between mb-1 flex-shrink-0">
                   <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                    <i className="bi bi-diagram-3-fill me-1"></i> Workflow
+                    <i className="bi bi-diagram-3-fill me-1"></i> {td('debateRoom.workflow')}
                   </span>
                   <Badge bg="secondary" style={{ fontSize: '8px' }}>
                     {currentWorkflowIndex >= 0 ? `${currentWorkflowIndex + 1}/${debateWorkflow.length}` : 'Waiting'}
@@ -1374,12 +1538,12 @@ export default function DebateRoomPage() {
 
                 <div className="d-flex gap-2 mb-1 flex-shrink-0">
                   <div className="flex-fill rounded-2 border border-info border-opacity-25 bg-info bg-opacity-10 p-1.5">
-                    <div className="text-neon-cyan text-uppercase fw-bold mb-0.5" style={{ fontSize: '8px', letterSpacing: '0.05em' }}>Current</div>
+                    <div className="text-neon-cyan text-uppercase fw-bold mb-0.5" style={{ fontSize: '8px', letterSpacing: '0.05em' }}>{td('debateRoom.current')}</div>
                     <div className="fw-bold text-white text-truncate" style={{ fontSize: '11px' }}>{currentWorkflowStep?.label || phaseLabel || 'Waiting'}</div>
                     <div className="text-muted text-truncate" style={{ fontSize: '9px' }}>{activeSpeakerName}</div>
                   </div>
                   <div className="flex-fill rounded-2 border border-warning border-opacity-25 bg-warning bg-opacity-10 p-1.5">
-                    <div className="text-neon-yellow text-uppercase fw-bold mb-0.5" style={{ fontSize: '8px', letterSpacing: '0.05em' }}>Next</div>
+                    <div className="text-neon-yellow text-uppercase fw-bold mb-0.5" style={{ fontSize: '8px', letterSpacing: '0.05em' }}>{td('debateRoom.next')}</div>
                     <div className="fw-bold text-white text-truncate" style={{ fontSize: '11px' }}>{nextWorkflowStep?.label || 'Result'}</div>
                     <div className="text-muted text-truncate" style={{ fontSize: '9px' }}>{nextWorkflowStep?.detail || 'Completed'}</div>
                   </div>
@@ -1449,7 +1613,7 @@ export default function DebateRoomPage() {
               <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 p-2" style={{ minHeight: 0 }}>
                 <div className="d-flex align-items-center justify-content-between mb-1 flex-shrink-0">
                   <span className="text-neon-yellow text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                    <i className="bi bi-bell-fill me-1"></i> Notifications
+                    <i className="bi bi-bell-fill me-1"></i> {td('debateRoom.notifications')}
                   </span>
                 </div>
 
@@ -1463,7 +1627,7 @@ export default function DebateRoomPage() {
                   }}
                 >
                   {announcements.length === 0 ? (
-                    <p className="text-muted small italic text-center py-2">No notifications yet.</p>
+                    <p className="text-muted small italic text-center py-2">{td('debateRoom.noNotifications')}</p>
                   ) : (
                     announcements.slice(-8).map((ann, idx) => (
                       <div key={idx} className="p-1.5 mb-1 bg-secondary bg-opacity-10 border border-secondary border-opacity-20 rounded text-white" style={{ fontSize: '10px', lineHeight: 1.3 }}>
@@ -1480,7 +1644,7 @@ export default function DebateRoomPage() {
             <div className="flex-shrink-0 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 p-2" style={{ height: '300px', minHeight: '180px' }}>
               <div className="d-flex align-items-center justify-content-between mb-1 flex-shrink-0">
                 <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                  <i className="bi bi-chat-dots-fill me-1"></i> Match chat
+                  <i className="bi bi-chat-dots-fill me-1"></i> {td('debateRoom.matchChat')}
                 </span>
               </div>
               <div className="flex-fill overflow-hidden" style={{ minHeight: 0 }}>
@@ -1499,7 +1663,7 @@ export default function DebateRoomPage() {
             <div className="flex-shrink-0 bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 px-2 py-1">
               <div className="d-flex align-items-center justify-content-between">
                 <span className="text-muted text-uppercase fw-bold" style={{ fontSize: '9px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                  Assigned judges
+                  {td('debateRoom.judge.assigned')}
                 </span>
                 <div className="d-flex gap-1 flex-wrap">
                   {judges.length ? (
@@ -1510,7 +1674,7 @@ export default function DebateRoomPage() {
                       </Badge>
                     ))
                   ) : (
-                    <span className="text-muted" style={{ fontSize: '9px' }}>No judges yet</span>
+                    <span className="text-muted" style={{ fontSize: '9px' }}>{td('debateRoom.judge.noJudges')}</span>
                   )}
                 </div>
               </div>
@@ -1520,7 +1684,7 @@ export default function DebateRoomPage() {
             {/* Bottom: Dedicated Debater quick-actions bar - compact */}
             {canUseDebaterActions && (
               <div className="flex-shrink-0 bg-dark bg-opacity-30 border border-secondary border-opacity-20 rounded-2 p-1.5 text-center">
-                <span className="text-muted me-2" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>MATCH:</span>
+                <span className="text-muted me-2" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>{td('debateRoom.match')}:</span>
 
                 <Button
                   size="sm"
@@ -1540,7 +1704,7 @@ export default function DebateRoomPage() {
                   style={{ fontSize: '9px', fontFamily: 'Orbitron' }}
                 >
                   {room?.status === 'paused'
-                    ? 'Resume'
+                    ? td('debateRoom.actions.resume')
                     : `Pause (${3 - (currentParticipant?.team && session?.pausesUsed?.[currentParticipant.team as 'proposition' | 'opposition'] || 0)} left)`}
                 </Button>
 
@@ -1579,11 +1743,11 @@ export default function DebateRoomPage() {
                   size="sm"
                   variant="outline-danger"
                   className="py-0.5 px-2 me-1"
-                  onClick={() => { if (window.confirm('Surrender this match?')) playerActionMutation.mutate('surrender'); }}
+                  onClick={() => { if (window.confirm(td('debateRoom.actions.surrenderConfirm'))) playerActionMutation.mutate('surrender'); }}
                   disabled={playerActionMutation.isPending}
                   style={{ fontSize: '9px' }}
                 >
-                  Surrender
+                  {td('debateRoom.actions.surrender')}
                 </Button>
                 <Button
                   size="sm"
@@ -1593,7 +1757,7 @@ export default function DebateRoomPage() {
                   disabled={playerActionMutation.isPending}
                   style={{ fontSize: '9px' }}
                 >
-                  Draw
+                  {td('debateRoom.actions.draw')}
                 </Button>
               </div>
             )}
@@ -1615,7 +1779,7 @@ export default function DebateRoomPage() {
                 disabled={leaveMutation.isPending}
                 style={{ fontSize: '10px', padding: '0.2rem 0.8rem' }}
               >
-                Leave room
+                {td('debateRoom.leave.leaveRoom')}
               </Button>
             </div>
 
@@ -1647,7 +1811,7 @@ export default function DebateRoomPage() {
                 }}
                 onClick={() => setSidebarTab('scoring')}
               >
-                Score
+                {td('debateRoom.admin.score')}
               </button>
               {hasHostControl && (
                 <button
@@ -1661,7 +1825,7 @@ export default function DebateRoomPage() {
                   }}
                   onClick={() => setSidebarTab('admin')}
                 >
-                  Control panel
+                  {td('debateRoom.admin.controlPanel')}
                 </button>
               )}
               {canAccessPrivateRooms && (
@@ -1676,7 +1840,7 @@ export default function DebateRoomPage() {
                   }}
                   onClick={() => setSidebarTab('private')}
                 >
-                  Private room
+                  {td('debateRoom.admin.privateRoom')}
                 </button>
               )}
               {(isViewer || myRole === 'host' || myRole === 'owner') && (
@@ -1691,7 +1855,7 @@ export default function DebateRoomPage() {
                   }}
                   onClick={() => setSidebarTab('viewer-chat')}
                 >
-                  Chat
+                  {td('debateRoom.admin.chat')}
                 </button>
               )}
             </div>
@@ -1706,7 +1870,7 @@ export default function DebateRoomPage() {
                   {/* Standings breakdown */}
                   <div>
                     <h6 className="text-uppercase text-muted mb-3" style={{ fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: '0.05em' }}>
-                      Current standings
+                      {td('debateRoom.judge.currentStandings')}
                     </h6>
                     <ScoreBreakdown finalScores={session.finalScores} />
                     
@@ -1718,16 +1882,16 @@ export default function DebateRoomPage() {
                       style={{ fontSize: '11px', fontFamily: 'Orbitron' }}
                     >
                       <i className="bi bi-journal-text me-1" />
-                      Điểm các vòng
+                      {td('debateRoom.judge.roundScores')}
                     </Button>
 
                     {canManageScores && (
                       <div className="d-grid gap-2 mt-3">
                         <Button size="sm" variant="outline-primary" onClick={() => aggregateMutation.mutate()} disabled={aggregateMutation.isPending}>
-                          Aggregate scores
+                          {td('debateRoom.judge.aggregateScores')}
                         </Button>
                         <Button size="sm" variant="outline-success" onClick={() => winnerMutation.mutate()} disabled={winnerMutation.isPending}>
-                          Determine winner
+                          {td('debateRoom.judge.determineWinner')}
                         </Button>
                       </div>
                     )}
@@ -1735,7 +1899,7 @@ export default function DebateRoomPage() {
 
                   {/* List of Judges */}
                   <div className="border-top border-secondary border-opacity-20 pt-3">
-                    <div className="text-muted small mb-2" style={{ fontFamily: 'Orbitron', fontSize: '11px' }}>JUDGES</div>
+                    <div className="text-muted small mb-2" style={{ fontFamily: 'Orbitron', fontSize: '11px' }}>{td('debateRoom.admin.title')}</div>
                     <ListGroup>
                       {judges.length ? (
                         judges.map((j) => (
@@ -1745,7 +1909,7 @@ export default function DebateRoomPage() {
                         ))
                       ) : (
                         <ListGroup.Item className="bg-transparent text-muted border-secondary border-opacity-25 py-2 px-3 small text-center">
-                          No judges yet
+                          {td('debateRoom.judge.noJudges')}
                         </ListGroup.Item>
                       )}
                     </ListGroup>
@@ -1755,7 +1919,7 @@ export default function DebateRoomPage() {
                   {isJudge && (
                     <div className="border-top border-secondary border-opacity-20 pt-3">
                       <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
-                        Quick reaction
+                        {td('debateRoom.judge.quickReaction')}
                       </h6>
                       <div className="d-flex gap-2 mb-4">
                         <Button
@@ -1769,7 +1933,7 @@ export default function DebateRoomPage() {
                             });
                           }}
                         >
-                          👍 Agree
+                          {td('debateRoom.judge.agree')}
                         </Button>
                         <Button
                           size="sm"
@@ -1782,12 +1946,12 @@ export default function DebateRoomPage() {
                             });
                           }}
                         >
-                          👎 Disagree
+                          {td('debateRoom.judge.disagree')}
                         </Button>
                       </div>
 
                       <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
-                        Submit evaluation
+                        {td('debateRoom.judge.submitEvaluation')}
                       </h6>
                       <RoundJudgeForm
                         round={currentRound}
@@ -1812,10 +1976,12 @@ export default function DebateRoomPage() {
                             toast.error('Could not resolve speakers for this round');
                             return;
                           }
+                          // Rule: Round 3 has no Cross Examination — send ce=0
+                          const isRound3 = currentRound === 3;
                           roundScoreMutation.mutate({
                             round: currentRound as 1 | 2 | 3,
-                            proposition: { speaker: propSpeaker, speak: roundPropSpeak, ce: roundPropCe, notes: roundPropNotes },
-                            opposition: { speaker: oppSpeaker, speak: roundOppSpeak, ce: roundOppCe, notes: roundOppNotes },
+                            proposition: { speaker: propSpeaker, speak: roundPropSpeak, ce: isRound3 ? 0 : roundPropCe, notes: roundPropNotes },
+                            opposition: { speaker: oppSpeaker, speak: roundOppSpeak, ce: isRound3 ? 0 : roundOppCe, notes: roundOppNotes },
                           });
                         }}
                         isPending={roundScoreMutation.isPending}
@@ -1831,17 +1997,17 @@ export default function DebateRoomPage() {
               {sidebarTab === 'admin' && hasHostControl && (
                 <div className="p-3 d-flex flex-column gap-3">
                   <h6 className="mb-0 text-uppercase text-muted" style={{ fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: '0.05em' }}>
-                    Host control panel
+                    {td('debateRoom.admin.hostControlPanel')}
                   </h6>
 
                   {/* No-Host: S1 Start Panel */}
                   {room?.hostType === 'ai' && currentPhase === 'waiting_s1' && (
                     <div className="p-3 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-3">
                       <div className="text-success small mb-2 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>
-                        Waiting for S1 to start
+                        {td('debateRoom.noHost.waitingForS1')}
                       </div>
                       <div className="text-muted small mb-2">
-                        Both teams' S1 must press Start to begin the match.
+                        {td('debateRoom.noHost.s1MustStart')}
                       </div>
                       <div className="d-flex gap-2 align-items-center mb-2">
                         <div
@@ -1855,7 +2021,9 @@ export default function DebateRoomPage() {
                           }}
                         />
                         <span className="small text-white">
-                          You {noHostS1Ready.includes(user?._id || '') ? 'have' : 'have not'} pressed Start
+                          {noHostS1Ready.includes(user?._id || '')
+                            ? td('debateRoom.noHost.youHaveStarted')
+                            : td('debateRoom.noHost.youHaveNotStarted')}
                         </span>
                       </div>
                       {isS1Debater && (
@@ -1872,15 +2040,16 @@ export default function DebateRoomPage() {
                           onClick={() => noHostS1StartMutation.mutate()}
                           disabled={noHostS1StartMutation.isPending || noHostS1Ready.includes(user?._id || '')}
                         >
-                          {noHostS1Ready.includes(user?._id || '') ? 'Started' : 'Start'}
+                          {noHostS1Ready.includes(user?._id || '') ? td('debateRoom.noHost.started') : td('debateRoom.actions.start')}
                         </Button>
                       )}
                     </div>
                   )}
 
-                  {/* Host Phase & Timer Controls */}
+                  {/* Host Phase & Timer Controls — only shown to authorized controllers */}
+                  {hasHostControl && (
                   <div className="p-3 bg-secondary bg-opacity-5 border border-secondary border-opacity-25 rounded-3">
-                    <div className="text-muted small mb-2 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>Debate controls</div>
+                    <div className="text-muted small mb-2 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>{td('debateRoom.debateControls')}</div>
                     <div className="d-flex flex-column gap-2 w-100">
                       <div className="d-flex gap-2 w-100">
                         <Button
@@ -1888,52 +2057,28 @@ export default function DebateRoomPage() {
                           className="flex-fill py-1.5 fw-bold"
                           style={{
                             background:
-                              (turnStatus === 'waiting_to_start' ||
-                               currentPhase === 'judge_feedback' ||
-                               currentPhase === 'final_judging') &&
-                              !isJudge3
+                              turnStatus === 'waiting_to_start' && !isJudge3
                                 ? '#00ff66'
                                 : 'rgba(255,255,255,0.05)',
                             color:
-                              (turnStatus === 'waiting_to_start' ||
-                               currentPhase === 'judge_feedback' ||
-                               currentPhase === 'final_judging') &&
-                              !isJudge3
+                              turnStatus === 'waiting_to_start' && !isJudge3
                                 ? '#000'
                                 : 'rgba(255, 255, 255, 0.3)',
                             border: 'none',
                             boxShadow:
-                              (turnStatus === 'waiting_to_start' ||
-                               currentPhase === 'judge_feedback' ||
-                               currentPhase === 'final_judging') &&
-                              !isJudge3
+                              turnStatus === 'waiting_to_start' && !isJudge3
                                 ? '0 0 10px rgba(0, 255, 102, 0.4)'
                                 : 'none',
                             fontSize: '11px',
                           }}
-                          onClick={() => {
-                            // For judge_feedback / final_judging (free time), Host clicks Start
-                            // to advance to the next phase. Same UX as the rule docs.
-                            if (
-                              currentPhase === 'judge_feedback' ||
-                              currentPhase === 'final_judging'
-                            ) {
-                              controlMutation.mutate('finish');
-                            } else {
-                              startPhaseMutation.mutate();
-                            }
-                          }}
+                          onClick={() => startPhaseMutation.mutate()}
                           disabled={
                             startPhaseMutation.isPending ||
-                            controlMutation.isPending ||
                             isJudge3 ||
-                            ((turnStatus !== 'waiting_to_start' &&
-                              currentPhase !== 'judge_feedback' &&
-                              currentPhase !== 'final_judging') &&
-                              !isJudge3)
+                            turnStatus !== 'waiting_to_start'
                           }
                         >
-                          Start
+                          {td('debateRoom.actions.start')}
                         </Button>
                         <Button
                           size="sm"
@@ -1942,14 +2087,17 @@ export default function DebateRoomPage() {
                           onClick={() => controlMutation.mutate('finish')}
                           disabled={
                             controlMutation.isPending ||
-                            turnStatus !== 'active' ||
-                            currentPhase === 'judge_feedback' ||
-                            currentPhase === 'final_judging' ||
-                            isJudge3
+                            isJudge3 ||
+                            // Phase must be actively running OR in judge_feedback /
+                            // final_judging (free time per rules — Host can Skip to
+                            // advance to the next round / phase).
+                            (turnStatus !== 'active' &&
+                              currentPhase !== 'judge_feedback' &&
+                              currentPhase !== 'final_judging')
                           }
                           style={{ fontSize: '11px' }}
                         >
-                          Skip
+                          {td('debateRoom.actions.skip')}
                         </Button>
                       </div>
                       <div className="d-flex gap-2 w-100">
@@ -1961,7 +2109,7 @@ export default function DebateRoomPage() {
                           disabled={controlMutation.isPending}
                           style={{ fontSize: '11px' }}
                         >
-                          {room?.status === 'paused' ? 'Resume' : 'Pause'}
+                          {room?.status === 'paused' ? td('debateRoom.actions.resume') : td('debateRoom.actions.pause')}
                         </Button>
                         <Button
                           size="sm"
@@ -1971,24 +2119,25 @@ export default function DebateRoomPage() {
                           disabled={controlMutation.isPending}
                           style={{ fontSize: '11px' }}
                         >
-                          End
+                          {td('debateRoom.actions.end')}
                         </Button>
                       </div>
                     </div>
                   </div>
+                  )}
 
                   {/* Participant Moderation Toggles */}
                   <div className="p-3 bg-secondary bg-opacity-5 border border-secondary border-opacity-25 rounded-3 d-flex flex-column gap-2">
-                    <div className="text-muted small mb-1 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>Participant controls</div>
+                    <div className="text-muted small mb-1 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>{td('debateRoom.participantControls')}</div>
                     <div className="table-responsive" style={{ maxHeight: '320px', overflowY: 'auto' }}>
                       <table className="table table-borderless table-sm align-middle text-white mb-0" style={{ fontSize: '0.8rem' }}>
                         <thead>
                           <tr className="text-muted" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                            <th className="py-2 ps-0 fw-normal">User</th>
-                            <th className="py-2 text-center fw-normal">Role</th>
-                            <th className="py-2 text-center fw-normal">Cam</th>
-                            <th className="py-2 text-center fw-normal">Mic</th>
-                            <th className="py-2 text-center fw-normal">Chat</th>
+                            <th className="py-2 ps-0 fw-normal">{td('debateRoom.user')}</th>
+                            <th className="py-2 text-center fw-normal">{td('debateRoom.role')}</th>
+                            <th className="py-2 text-center fw-normal">{td('debateRoom.cam')}</th>
+                            <th className="py-2 text-center fw-normal">{td('debateRoom.mic')}</th>
+                            <th className="py-2 text-center fw-normal">{td('debateRoom.chat')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2001,34 +2150,34 @@ export default function DebateRoomPage() {
                               const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
                               const isSpectator = role === 'viewer';
 
-                              let roleLabel = 'Viewer';
+                              let roleLabel = td('debateRoom.roles.viewer');
                               let roleBadgeBg = 'rgba(108, 117, 125, 0.2)';
                               let roleTextColor = '#a0a0a0';
 
                               if (role === 'debater') {
                                 if (p.team === 'proposition') {
-                                  roleLabel = `PROP ${p.speakerSlot || ''}`;
+                                  roleLabel = `${td('debateRoom.roles.prop')} ${p.speakerSlot || ''}`;
                                   roleBadgeBg = 'rgba(0, 245, 255, 0.15)';
                                   roleTextColor = '#00f5ff';
                                 } else if (p.team === 'opposition') {
-                                  roleLabel = `OPP ${p.speakerSlot || ''}`;
+                                  roleLabel = `${td('debateRoom.roles.opp')} ${p.speakerSlot || ''}`;
                                   roleBadgeBg = 'rgba(255, 0, 110, 0.15)';
                                   roleTextColor = '#ff006e';
                                 } else {
-                                  roleLabel = 'Speaker';
+                                  roleLabel = td('debateRoom.roles.speaker');
                                   roleBadgeBg = 'rgba(255, 255, 255, 0.1)';
                                   roleTextColor = '#ffffff';
                                 }
                               } else if (role === 'judge') {
-                                roleLabel = 'Judge';
+                                roleLabel = td('debateRoom.roles.judge');
                                 roleBadgeBg = 'rgba(255, 214, 10, 0.15)';
                                 roleTextColor = '#ffd60a';
                               } else if (role === 'host') {
-                                roleLabel = 'Host';
+                                roleLabel = td('debateRoom.roles.host');
                                 roleBadgeBg = 'rgba(255, 165, 0, 0.15)';
                                 roleTextColor = '#ffa500';
                               } else if (p.roomRole === 'owner') {
-                                roleLabel = 'Owner';
+                                roleLabel = td('debateRoom.roles.owner');
                                 roleBadgeBg = 'rgba(255, 165, 0, 0.15)';
                                 roleTextColor = '#ffa500';
                               }
@@ -2106,7 +2255,7 @@ export default function DebateRoomPage() {
                           {(room?.participants || []).filter((p) => p.userId !== user?._id).length === 0 && (
                             <tr>
                               <td colSpan={5} className="text-center text-muted py-3">
-                                No other participants.
+                                {td('debateRoom.errors.noOtherParticipants')}
                               </td>
                             </tr>
                           )}
@@ -2122,7 +2271,7 @@ export default function DebateRoomPage() {
                 <div className="p-3">
                   <div className="d-flex align-items-center mb-2">
                     <h6 className="mb-0 text-uppercase text-muted" style={{ fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: '0.05em' }}>
-                      Private room
+                      {td('debateRoom.admin.privateRoom')}
                     </h6>
                   </div>
                   <PrivateRoomPanel roomId={roomId} />
@@ -2156,7 +2305,7 @@ export default function DebateRoomPage() {
             style={{ fontSize: '10px' }}
           >
             <i className="bi bi-star-fill d-block" style={{ fontSize: '14px' }}></i>
-            Score
+            {td('debateRoom.admin.score')}
           </button>
           {hasHostControl && (
             <button
@@ -2165,7 +2314,7 @@ export default function DebateRoomPage() {
               style={{ fontSize: '10px' }}
             >
               <i className="bi bi-shield-lock-fill d-block" style={{ fontSize: '14px' }}></i>
-              Admin
+              {td('debateRoom.admin.title')}
             </button>
           )}
           {canAccessPrivateRooms && (
@@ -2175,59 +2324,59 @@ export default function DebateRoomPage() {
               style={{ fontSize: '10px' }}
             >
               <i className="bi bi-door-closed-fill d-block" style={{ fontSize: '14px' }}></i>
-              Preparation
+              {td('debateRoom.preparation')}
             </button>
           )}
-          {(isViewer || myRole === 'host' || myRole === 'owner') && (
-            <button
-              className={`btn btn-sm ${sidebarTab === 'viewer-chat' ? 'btn-outline-info' : 'btn-outline-secondary'}`}
-              onClick={() => setSidebarTab('viewer-chat')}
-              style={{ fontSize: '10px' }}
-            >
-              <i className="bi bi-chat-dots-fill d-block" style={{ fontSize: '14px' }}></i>
-              Chat
-            </button>
-          )}
+                {sidebarTab === 'viewer-chat' && (isViewer || myRole === 'host' || myRole === 'owner') && (
+                  <button
+                    className={`btn btn-sm ${sidebarTab === 'viewer-chat' ? 'btn-outline-info' : 'btn-outline-secondary'}`}
+                    onClick={() => setSidebarTab('viewer-chat')}
+                    style={{ fontSize: '10px' }}
+                  >
+                    <i className="bi bi-chat-dots-fill d-block" style={{ fontSize: '14px' }}></i>
+                    {td('debateRoom.admin.chat')}
+                  </button>
+                )}
         </div>
       </div>
 
       {/* === RULES OVERLAY MODAL === */}
       <Modal show={showRules} onHide={() => setShowRules(false)} size="lg" centered className="dark-theme-modal">
         <Modal.Header closeButton className="border-neon bg-dark text-white border-opacity-20">
-          <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '16px' }}>Debate room rules</Modal.Title>
+          <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '16px' }}>{td('debateRoom.rules.title')}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="bg-dark text-white p-4" style={{ fontFamily: 'Rajdhani', fontSize: '16px' }}>
-          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>General structure</h5>
-          <p className="text-muted mb-3">This debate follows a formal turn-based structure with continuous judging:</p>
+          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>{td('debateRoom.rules.generalStructure')}</h5>
+          <p className="text-muted mb-3">{td('debateRoom.rules.structureDesc')}</p>
           <ul className="mb-4" style={{ paddingLeft: '20px' }}>
-            <li className="mb-2"><strong>Debate motion:</strong> Announced by the host or set before matchmaking.</li>
-            <li className="mb-2"><strong>Preparation (7 minutes):</strong> Teams discuss in their private rooms.</li>
-            <li className="mb-2"><strong>Speeches (4 minutes):</strong> Speakers take turns presenting arguments.</li>
-            <li className="mb-2"><strong>Cross-examination (3 minutes):</strong> Rapid Q&amp;A between teams.</li>
-            <li className="mb-2"><strong>Judge feedback:</strong> Judges review and submit their verdicts.</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.motion')}</strong> {td('debateRoom.rules.motionDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.prep7')}</strong> {td('debateRoom.rules.prep7Desc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.speeches')}</strong> {td('debateRoom.rules.speechesDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.crossExam')}</strong> {td('debateRoom.rules.crossExamDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.judgeFeedback')}</strong> {td('debateRoom.rules.judgeFeedbackDesc')}</li>
           </ul>
 
-          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>Speaker positions</h5>
+          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>{td('debateRoom.rules.speakerPositions')}</h5>
           <ul className="mb-4" style={{ paddingLeft: '20px' }}>
-            <li className="mb-2"><strong>S1 (Speaker 1):</strong> Focuses on framing and the line of argument.</li>
-            <li className="mb-2"><strong>S2 (Speaker 2):</strong> Extends points and rebuts the opposing case.</li>
-            <li className="mb-2"><strong>S3 (Speaker 3 - Closing):</strong> Summarizes the debate. No cross-examination after S3.</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.s1')}</strong> {td('debateRoom.rules.s1Desc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.s2')}</strong> {td('debateRoom.rules.s2Desc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.s3')}</strong> {td('debateRoom.rules.s3Desc')}</li>
           </ul>
 
-          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>Scoring criteria</h5>
-          <p className="text-muted mb-3">Judges assign points (maximum) across 6 criteria:</p>
+          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>{td('debateRoom.rules.scoringCriteria')}</h5>
+          <p className="text-muted mb-3">{td('debateRoom.rules.scoringCriteriaDesc')}</p>
           <ul className="mb-0" style={{ paddingLeft: '20px' }}>
-            <li className="mb-2"><strong>Logic (max 30):</strong> Coherence and clarity of the argument.</li>
-            <li className="mb-2"><strong>Rebuttal (max 20):</strong> Effectiveness at countering opposing claims.</li>
-            <li className="mb-2"><strong>Evidence (max 15):</strong> Use of specific data and logical proof.</li>
-            <li className="mb-2"><strong>Cross-examination (max 15):</strong> Questioning and defense skills during CE.</li>
-            <li className="mb-2"><strong>Strategy (max 10):</strong> Structure and prioritization of points.</li>
-            <li className="mb-2"><strong>Communication (max 10):</strong> Delivery, clarity, and vocal control.</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.logic', { max: 30 })}</strong> {td('debateRoom.rules.logicDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.rebuttal', { max: 20 })}</strong> {td('debateRoom.rules.rebuttalDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.evidence', { max: 15 })}</strong> {td('debateRoom.rules.evidenceDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.crossExamCriteria', { max: 15 })}</strong> {td('debateRoom.rules.crossExamCriteriaDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.strategy', { max: 10 })}</strong> {td('debateRoom.rules.strategyDesc')}</li>
+            <li className="mb-2"><strong>{td('debateRoom.rules.communication', { max: 10 })}</strong> {td('debateRoom.rules.communicationDesc')}</li>
           </ul>
         </Modal.Body>
         <Modal.Footer className="border-neon bg-dark border-opacity-20">
           <Button size="sm" variant="outline-primary" onClick={() => setShowRules(false)}>
-            Close rules
+            {td('debateRoom.rules.closeRules')}
           </Button>
         </Modal.Footer>
       </Modal>
@@ -2241,18 +2390,18 @@ export default function DebateRoomPage() {
       >
         <Modal.Header closeButton className="border-neon bg-dark text-white border-opacity-20">
           <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '16px' }}>
-            Leave debate room
+            {td('debateRoom.leave.title')}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="bg-dark text-white p-4" style={{ fontFamily: 'Rajdhani', fontSize: '16px' }}>
           <p className="mb-3">
-            You are the <strong>Room Owner</strong>. If you leave, you must transfer room ownership first.
+            {td('debateRoom.leave.ownerWarning')}
           </p>
 
           {room?.participants && room.participants.filter(p => p.userId !== user?._id).length > 0 ? (
             <>
               <p className="text-secondary small mb-3">
-                Select a successor to transfer ownership, or click "Leave now" to auto-transfer to the next participant.
+                {td('debateRoom.leave.ownerWarning2')}
               </p>
               <div className="list-group list-group-flush mb-4" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {room.participants
@@ -2284,13 +2433,13 @@ export default function DebateRoomPage() {
             </>
           ) : (
             <p className="text-secondary small mb-4">
-              Since you are the only one in the room, leaving will close the room.
+              {td('debateRoom.leave.onlyOneWarning')}
             </p>
           )}
 
           <div className="d-flex justify-content-end gap-2">
             <Button variant="outline-light" size="sm" onClick={() => setShowLeaveConfirmModal(false)}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               variant="danger"
@@ -2300,20 +2449,24 @@ export default function DebateRoomPage() {
                 leaveMutation.mutate(undefined);
               }}
             >
-              Leave now
+              {td('debateRoom.leave.leaveNow')}
             </Button>
           </div>
         </Modal.Body>
       </Modal>
 
-      {/* === 3S COUNTDOWN OVERLAY === */}
+      {/* === 3S COUNTDOWN OVERLAY (post-start countdown) === */}
+      {/* Visual style: semi-transparent so users see the underlying debate room
+          structure during the 3s countdown. The countdown number alone on a
+          fully opaque dark background reads as a "black screen" — show the
+          next phase label and the workflow stage alongside the digit. */}
       {countdownSeconds !== null && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white"
           style={{
             zIndex: 9999,
-            background: 'rgba(10, 10, 18, 0.9)',
-            backdropFilter: 'blur(8px)',
+            background: 'rgba(10, 10, 18, 0.55)',
+            backdropFilter: 'blur(4px)',
           }}
         >
           <style>{`
@@ -2327,6 +2480,14 @@ export default function DebateRoomPage() {
             }
           `}</style>
           <div className="animate-zoom-scale text-center" key={countdownSeconds}>
+            <p
+              className="mb-2 text-uppercase text-secondary"
+              style={{ fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: '4px' }}
+            >
+              {currentWorkflowStep?.label
+                ? td('debateRoom.countdown.startsIn', { label: currentWorkflowStep.label })
+                : td('debateRoom.countdown.matchStarting')}
+            </p>
             <h1
               className="m-0 text-neon-cyan"
               style={{
@@ -2339,10 +2500,10 @@ export default function DebateRoomPage() {
               {countdownSeconds}
             </h1>
             <p
-              className="mt-3 text-uppercase letter-spacing-wide text-secondary"
-              style={{ fontFamily: 'Orbitron', fontSize: '18px', letterSpacing: '4px' }}
+              className="mt-3 mb-0 text-uppercase text-secondary"
+              style={{ fontFamily: 'Orbitron', fontSize: '14px', letterSpacing: '3px' }}
             >
-              Match starting
+              {countdownSeconds === 'GO!' ? t('startNow') : t('startingSoon')}
             </p>
           </div>
         </div>
@@ -2359,7 +2520,7 @@ export default function DebateRoomPage() {
         <Modal.Header closeButton className="bg-dark text-white border-secondary border-opacity-20">
           <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '14px' }} className="text-neon-cyan text-uppercase font-weight-bold">
             <i className="bi bi-journal-text me-2" />
-            Điểm các vòng (Round Scores)
+            {td('debateRoom.judge.roundScores')}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="bg-dark text-white p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
@@ -2381,29 +2542,29 @@ export default function DebateRoomPage() {
               return (
                 <div key={rNum} className="p-3 rounded-3 bg-secondary bg-opacity-5 border border-secondary border-opacity-10">
                   <h5 className="text-neon-yellow border-bottom border-secondary border-opacity-15 pb-2 mb-3 text-uppercase font-weight-bold" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
-                    Round {rNum} ({propSpk} vs {oppSpk})
+                    {td('debateRoom.previousScores.round', { round: rNum })} ({propSpk} vs {oppSpk})
                   </h5>
                   
                   {allVectIdx.length === 0 ? (
-                    <div className="text-muted small italic">Chưa có điểm đã nộp cho round này.</div>
+                    <div className="text-muted small italic">{td('debateRoom.judge.notYetSubmitted')}</div>
                   ) : (
                     <div className="d-flex flex-column gap-3">
                       {allVectIdx.map((jId) => {
                         const propV = propVerdicts.find((v: any) => v.judgeId?.toString() === jId);
                         const oppV = oppVerdicts.find((v: any) => v.judgeId?.toString() === jId);
-                        const judgeName = propV?.judgeName || oppV?.judgeName || 'Judge';
+                        const judgeName = propV?.judgeName || oppV?.judgeName || td('debateRoom.roles.judge');
                         
                         return (
                           <div key={jId} className="bg-black bg-opacity-25 rounded p-3 border-start border-neon-cyan border-2">
                             <div className="fw-bold text-white mb-2 small">{judgeName}</div>
                             <Row>
                               <Col md={6} className="mb-2 mb-md-0">
-                                <div className="text-neon-cyan small fw-bold mb-1">Proposition</div>
+                                <div className="text-neon-cyan small fw-bold mb-1">{td('debateRoom.proposition')}</div>
                                 {propV ? (
                                   <div className="small">
-                                    <div className="mb-1 text-white-50">
-                                      Speak: <strong className="text-white">{(propV.score as any)?.logic ?? 0}</strong>/20
-                                      {rNum !== 3 && <> | CE: <strong className="text-white">{(propV.score as any)?.crossExam ?? 0}</strong>/20</>}
+                                      <div className="mb-1 text-white-50">
+                                      {td('debateRoom.scoreBreakdown.speak')} <strong className="text-white">{(propV.score as any)?.logic ?? 0}</strong>/20
+                                      {rNum !== 3 && <> | {td('debateRoom.scoreBreakdown.ce')} <strong className="text-white">{(propV.score as any)?.crossExam ?? 0}</strong>/20</>}
                                     </div>
                                     {propV.notes && (
                                       <div className="text-light italic text-opacity-80" style={{ fontSize: '10px' }}>
@@ -2412,16 +2573,16 @@ export default function DebateRoomPage() {
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="text-muted small">Chưa nộp điểm.</div>
+                                  <div className="text-muted small">{td('debateRoom.judge.noSubmitted')}</div>
                                 )}
                               </Col>
                               <Col md={6}>
-                                <div className="text-neon-pink small fw-bold mb-1">Opposition</div>
+                                <div className="text-neon-pink small fw-bold mb-1">{td('debateRoom.opposition')}</div>
                                 {oppV ? (
                                   <div className="small">
-                                    <div className="mb-1 text-white-50">
-                                      Speak: <strong className="text-white">{(oppV.score as any)?.logic ?? 0}</strong>/20
-                                      {rNum !== 3 && <> | CE: <strong className="text-white">{(oppV.score as any)?.crossExam ?? 0}</strong>/20</>}
+                                      <div className="mb-1 text-white-50">
+                                      {td('debateRoom.scoreBreakdown.speak')} <strong className="text-white">{(oppV.score as any)?.logic ?? 0}</strong>/20
+                                      {rNum !== 3 && <> | {td('debateRoom.scoreBreakdown.ce')} <strong className="text-white">{(oppV.score as any)?.crossExam ?? 0}</strong>/20</>}
                                     </div>
                                     {oppV.notes && (
                                       <div className="text-light italic text-opacity-80" style={{ fontSize: '10px' }}>
@@ -2430,7 +2591,7 @@ export default function DebateRoomPage() {
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="text-muted small">Chưa nộp điểm.</div>
+                                  <div className="text-muted small">{td('debateRoom.judge.noSubmitted')}</div>
                                 )}
                               </Col>
                             </Row>
@@ -2451,18 +2612,19 @@ export default function DebateRoomPage() {
 }
 
 function ScoreBreakdown({ finalScores }: { finalScores: any }) {
+  const { t } = useTranslation('debate');
   const pro = finalScores?.teamProposition?.total || 0;
   const opp = finalScores?.teamOpposition?.total || 0;
   const total = Math.max(pro + opp, 1);
 
   return (
     <>
-      <div className="mb-2 text-muted small">Proposition</div>
+      <div className="mb-2 text-muted small">{t('debateRoom.proposition')}</div>
       <ProgressBar now={(pro / total) * 100} label={String(Math.round(pro))} className="mb-3" />
-      <div className="mb-2 text-muted small">Opposition</div>
+      <div className="mb-2 text-muted small">{t('debateRoom.opposition')}</div>
       <ProgressBar now={(opp / total) * 100} label={String(Math.round(opp))} variant="danger" className="mb-3" />
       <Alert variant={finalScores?.winner ? 'success' : 'secondary'} className="mb-0 py-2 px-3 small border-secondary border-opacity-20 bg-dark text-white">
-        Winner: <span className="text-capitalize text-neon-cyan font-weight-bold">{finalScores?.winner || 'Waiting'}</span>
+        {t('debateRoom.winner.label')} <span className="text-capitalize text-neon-cyan font-weight-bold">{finalScores?.winner || t('debateRoom.winner.waiting')}</span>
       </Alert>
     </>
   );
@@ -2480,22 +2642,20 @@ export function resolveOppSpeakerForRound(round: number, _format?: string): Spea
   return 'OPP_S3';
 }
 
-export function getRoundForStepIndex(index: number, format?: string, hostType?: string): 1 | 2 | 3 {
+export function getRoundForStepIndex(index: number, format?: string, _hostType?: string): 1 | 2 | 3 {
+  // All 4 flows (Host/NoHost × 3v3/1v1) now have the same step order:
+  // [HOST, PREP, R1 speeches+CE+FB, R2 speeches+CE+FB, R3 speeches+FB, FINAL_JUDGING, COMPLETED]
+  // R1: indices 2-5, R2: indices 6-9, R3: indices 10-12
   if (index === -1) return 1;
   if (format === '1v1') {
-    if (index <= 5) return 1;
-    if (index <= 9) return 2;
-    return 3;
+    // 1v1: same structure but all steps are unique speakers per round
+    if (index <= 5) return 1;   // HOST,PREP,PRO_S1,OPP_S1,CE1,JUDGES_FB_1
+    if (index <= 9) return 2;   // OPP_S2,PRO_S2,CE2,JUDGES_FB_2
+    return 3;                   // OPP_S3,PRO_S3,JUDGES_FB_3
   }
-  const isNoHost = hostType === 'ai';
-  if (isNoHost) {
-    if (index <= 6) return 1;
-    if (index <= 10) return 2;
-    return 3;
-  } else {
-    if (index <= 5) return 1;
-    if (index <= 9) return 2;
-    return 3;
-  }
+  // 3v3: same step count as 1v1
+  if (index <= 5) return 1;   // HOST,PREP,PRO_S1,OPP_S1,CE1,JUDGES_FB_1
+  if (index <= 9) return 2;   // PRO_S2,OPP_S2,CE2,JUDGES_FB_2
+  return 3;                   // OPP_S3,PRO_S3,JUDGES_FB_3
 }
 

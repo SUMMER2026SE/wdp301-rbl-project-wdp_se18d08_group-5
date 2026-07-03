@@ -1,0 +1,34 @@
+{
+  "loadingMatchResults": "Loading match results...",
+  "matchNotFound": "MATCH NOT FOUND",
+  "matchNotFoundDesc": "The requested debate session results could not be located.",
+  "backToMatches": "Back to Matches",
+
+  "debateArenaConcluded": "DEBATE ARENA CONCLUDED",
+  "motionSelection": "Motion Selection",
+  "winner": "WINNER",
+  "propositionWins": "Proposition Wins",
+  "oppositionWins": "Opposition Wins",
+  "drawMatch": "Draw Match",
+
+  "finalScoreboard": "Final Scoreboard",
+  "proposition": "PROPOSITION",
+  "opposition": "OPPOSITION",
+  "points": "points",
+
+  "aiSummaryVerdict": "AI Summary Verdict",
+
+  "matchParticipants": "Match Participants",
+  "host": "Host",
+  "judge": "Judge",
+  "noParticipantRecords": "No participant records found.",
+
+  "judgesFeedback": "Judges Feedback & Score Breakdown",
+  "round": "Round {{num}}",
+  "speech": "Speech",
+  "ce": "CE",
+  "noScoresForRound": "No scores have been submitted for this round.",
+  "notSubmitted": "Not submitted.",
+
+  "viewReplay": "View replay"
+}

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Alert, Badge, Button, ButtonGroup, Card, Col, Container, Form, Modal, Row, Spinner, Table } from 'react-bootstrap';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TopicPicker, getTopicValue, type TopicInputMode } from '@components/room/TopicPicker';
 import { roomService } from '@services/roomService';
@@ -13,9 +14,9 @@ import type { RoomParticipant, SpeakerSlot, Team } from '@/types';
 
 type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
 
-function getLockState(participant: RoomParticipant) {
+function getLockState(participant: RoomParticipant, t: (key: string) => string) {
   if (!isLockable(participant)) {
-    return <Badge bg="secondary">Not required</Badge>;
+    return <Badge bg="secondary">{t('notRequired')}</Badge>;
   }
 
   return participant.positionLocked ? <i className="bi bi-lock-fill" /> : <i className="bi bi-unlock" />;
@@ -44,6 +45,7 @@ function getDisplayRole(participant: RoomParticipant) {
 export default function LobbyPage() {
   const { roomId = '' } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation('lobby');
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const [team, setTeam] = useState<Team>('proposition');
@@ -83,7 +85,7 @@ export default function LobbyPage() {
     mutationFn: (newOwnerId?: string) => roomService.leave(roomId, newOwnerId),
     onSuccess: () => {
       clearDebateRoomFromStorage();
-      toast.success('Left debate room');
+      toast.success(t('leftRoom'));
       navigate('/matches');
     },
     onError: () => {
@@ -103,10 +105,10 @@ export default function LobbyPage() {
   const selectMutation = useMutation({
     mutationFn: () => roomService.selectPosition(roomId, team, speakerSlot),
     onSuccess: () => {
-      toast.success('Position selected');
+      toast.success(t('positionSelected'));
       invalidateRoom();
     },
-    onError: () => toast.error('Only assigned debaters can select position'),
+    onError: () => toast.error(t('onlyAssignedCanSelect')),
   });
 
   const assignMutation = useMutation({
@@ -118,10 +120,10 @@ export default function LobbyPage() {
         speakerSlot: assignRole === 'debater' ? assignSlot : null,
       }),
     onSuccess: () => {
-      toast.success('Participant updated');
+      toast.success(t('participantUpdated'));
       invalidateRoom();
     },
-    onError: () => toast.error('Could not update participant'),
+    onError: () => toast.error(t('couldNotUpdate')),
   });
 
   const lockMutation = useMutation({
@@ -135,15 +137,15 @@ export default function LobbyPage() {
       if (data?.lockedCount !== undefined && data?.lockableCount !== undefined) {
         toast.success(
           data.lockedCount === 0
-            ? `No assigned positions to lock (${data.participantCount ?? 0} participants in room)`
-            : `All assigned positions locked (${data.lockedCount}/${data.lockableCount} required)`,
+            ? t('noPositionsLocked')
+            : t('positionsLocked'),
         );
       } else {
-        toast.success('All assigned positions locked');
+        toast.success(t('positionsLocked'));
       }
       invalidateRoom();
     },
-    onError: () => toast.error('Only owner can lock positions'),
+    onError: () => toast.error(t('onlyOwnerCanLock')),
   });
 
   const unlockMutation = useMutation({
@@ -152,13 +154,13 @@ export default function LobbyPage() {
       const unlocked = (response?.data?.data as { unlockedCount?: number } | undefined)
         ?.unlockedCount;
       if (unlocked === 0) {
-        toast.success('No positions were locked');
+        toast.success(t('noPositionsLocked'));
       } else {
-        toast.success(`Unlocked ${unlocked} participant${unlocked === 1 ? '' : 's'}`);
+        toast.success(t('unlockedParticipants', { n: unlocked }));
       }
       invalidateRoom();
     },
-    onError: () => toast.error('Only owner can unlock positions'),
+    onError: () => toast.error(t('onlyOwnerCanUnlock')),
   });
 
   const toggleLockMutation = useMutation({
@@ -168,11 +170,11 @@ export default function LobbyPage() {
       setLockFeedback({ userId: variables.userId, locked: variables.locked });
     },
     onSuccess: (_response, variables) => {
-      toast.success(variables.locked ? 'Position locked' : 'Position unlocked');
+      toast.success(variables.locked ? t('positionLockedToast') : t('positionUnlockedToast'));
       invalidateRoom();
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Could not update lock state';
+      const message = error?.response?.data?.message || t('couldNotUpdateLock');
       toast.error(message);
       invalidateRoom();
     },
@@ -181,10 +183,10 @@ export default function LobbyPage() {
   const startMutation = useMutation({
     mutationFn: () => roomService.start(roomId),
     onSuccess: () => {
-      toast.success('Debate is starting...');
+      toast.success(t('debateStarting'));
       navigate(`/debate/${roomId}`);
     },
-    onError: () => toast.error('Assign host, choose topic, fill debaters, then lock positions first'),
+    onError: () => toast.error(t('mustLockFirst')),
   });
 
   const viewerChatEnabled = room?.viewerChatEnabled ?? true;
@@ -203,9 +205,9 @@ export default function LobbyPage() {
 
   const canStartDebate = useMemo(() => {
     if (!room || !user || !currentParticipant) return false;
-    if (isOwner) return true; // Room Owner can always start the match!
-    
+
     if (room.hostType !== 'human') {
+      // No-Host mode: owner has NO special override — only S1 debaters or Judge S1 can start
       if (room.judgeType === 'ai') {
         // No-host + AI judge: S1 debaters start
         return myEffectiveRole === 'debater' && mySlot === 'S1';
@@ -214,8 +216,8 @@ export default function LobbyPage() {
         return myEffectiveRole === 'judge' && mySlot === 'S1';
       }
     } else {
-      // Host-led: Host can start
-      return myEffectiveRole === 'host';
+      // Host mode: owner or host can start
+      return isOwner || myEffectiveRole === 'host';
     }
   }, [room, user, currentParticipant, myEffectiveRole, mySlot, isOwner]);
   const isAssignedDebater =
@@ -225,6 +227,15 @@ export default function LobbyPage() {
 
   useEffect(() => {
     if (!room) return;
+
+    // Auto-redirect to the live debate page if the debate is already in
+    // progress (e.g. another tab opened LobbyPage, or socket missed the
+    // `debate:started` event because the participant wasn't in the lobby
+    // channel at the moment of broadcast).
+    if (['active', 'paused'].includes(room.status)) {
+      navigate(`/debate/${roomId}`, { replace: true });
+      return;
+    }
 
     if (!room.motion) {
       setTopicMode('preset');
@@ -243,24 +254,24 @@ export default function LobbyPage() {
     setTopicMode('custom');
     setSelectedTopic('');
     setCustomTopic(room.motion);
-  }, [room?._id, room?.motion]);
+  }, [room?._id, room?.motion, room?.status, roomId, navigate]);
 
   const viewerChatMutation = useMutation({
     mutationFn: () => roomService.setViewerChat(roomId, !viewerChatEnabled),
     onSuccess: () => {
-      toast.success(`Viewer chat ${viewerChatEnabled ? 'disabled' : 'enabled'}`);
+      toast.success(viewerChatEnabled ? t('viewerChatDisabled') : t('viewerChatEnabled'));
       invalidateRoom();
     },
-    onError: () => toast.error('Could not update viewer chat'),
+    onError: () => toast.error(t('couldNotUpdateChat')),
   });
 
   const topicMutation = useMutation({
     mutationFn: () => roomService.updateMotion(roomId, topicValue),
     onSuccess: () => {
-      toast.success('Topic saved');
+      toast.success(t('topicSaved'));
       invalidateRoom();
     },
-    onError: () => toast.error('Choose or type a debate topic'),
+    onError: () => toast.error(t('chooseOrTypeTopic')),
   });
 
   if (roomQuery.isLoading) {
@@ -268,15 +279,15 @@ export default function LobbyPage() {
   }
 
   if (!room) {
-    return <Container className="py-4"><Alert variant="warning">Room not found.</Alert></Container>;
+    return <Container className="py-4"><Alert variant="warning">{t('roomNotFound')}</Alert></Container>;
   }
 
   return (
     <Container className="py-4">
       <div className="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
         <div>
-          <h2 className="mb-1">{room.title || 'Debate Lobby'}</h2>
-          <div className="text-muted">{room.motion || 'Motion will be announced by the host.'}</div>
+          <h2 className="mb-1">{room.title || t('debateLobby')}</h2>
+          <div className="text-muted">{room.motion || t('motionWillBeAnnounced')}</div>
         </div>
         <div className="d-flex align-items-center gap-2">
           <Badge bg={room.status === 'ready' ? 'success' : 'secondary'} className="fs-6">
@@ -297,7 +308,7 @@ export default function LobbyPage() {
             }}
             disabled={leaveMutation.isPending}
           >
-            <i className="bi bi-box-arrow-right me-1"></i> Leave Room
+            <i className="bi bi-box-arrow-right me-1"></i> {t('leaveRoom')}
           </Button>
         </div>
       </div>
@@ -306,15 +317,15 @@ export default function LobbyPage() {
         <Col xl={8}>
           <Card>
             <Card.Body>
-              <Card.Title>Participants</Card.Title>
+              <Card.Title>{t('participants')}</Card.Title>
               <Table responsive hover className="align-middle mb-0">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Role</th>
-                    <th>Team</th>
-                    <th>Slot</th>
-                    <th>Locked</th>
+                    <th>{t('name')}</th>
+                    <th>{t('role')}</th>
+                    <th>{t('team')}</th>
+                    <th>{t('slot')}</th>
+                    <th>{t('locked')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -327,7 +338,7 @@ export default function LobbyPage() {
                           {participant.username}
                           {isRoomCreator && (
                             <Badge bg="warning" text="dark" className="ms-2" pill>
-                              owner
+                              {t('owner')}
                             </Badge>
                           )}
                         </td>
@@ -346,7 +357,7 @@ export default function LobbyPage() {
                                 })
                               }
                               disabled={toggleLockMutation.isPending}
-                              title={participant.positionLocked ? 'Click to unlock' : 'Click to lock'}
+                              title={participant.positionLocked ? t('clickToUnlock') : t('clickToLock')}
                             >
                               <i
                                 className={`bi ${
@@ -359,10 +370,10 @@ export default function LobbyPage() {
                                     : ''
                                 } me-1`}
                               />
-                              {participant.positionLocked ? 'Unlock' : 'Lock'}
+                              {participant.positionLocked ? t('unlock') : t('lock')}
                             </Button>
                           ) : (
-                            getLockState(participant)
+                            getLockState(participant, t)
                           )}
                         </td>
                       </tr>
@@ -378,7 +389,7 @@ export default function LobbyPage() {
           {canManageTopic && ['waiting', 'ready'].includes(room.status) && (
             <Card className="mb-3">
               <Card.Body>
-                <Card.Title>Debate Topic</Card.Title>
+                <Card.Title>{t('debateTopic')}</Card.Title>
                 <TopicPicker
                   mode={topicMode}
                   selectedTopic={selectedTopic}
@@ -394,7 +405,7 @@ export default function LobbyPage() {
                   disabled={!topicValue || topicMutation.isPending}
                 >
                   <i className="bi bi-check2-circle me-2" />
-                  Save Topic
+                  {t('saveTopic')}
                 </Button>
               </Card.Body>
             </Card>
@@ -403,11 +414,11 @@ export default function LobbyPage() {
           {isOwner && (
             <Card className="mb-3">
               <Card.Body>
-                <Card.Title>Assign Participant</Card.Title>
+                <Card.Title>{t('assignParticipant')}</Card.Title>
                 <Form.Group className="mb-3">
                   <Form.Label>User</Form.Label>
                   <Form.Select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>
-                    <option value="">Select user</option>
+                    <option value="">{t('selectUser')}</option>
                     {room.participants.map((participant) => (
                       <option key={participant.userId} value={participant.userId}>
                         {participant.username} ({getDisplayRole(participant)})
@@ -416,7 +427,7 @@ export default function LobbyPage() {
                   </Form.Select>
                 </Form.Group>
                 <Form.Group className="mb-3">
-                  <Form.Label>Role</Form.Label>
+                  <Form.Label>{t('role')}</Form.Label>
                   <Form.Select value={assignRole} onChange={(event) => setAssignRole(event.target.value as AssignableRole)}>
                     <option value="debater">Debater</option>
                     <option value="host">Host</option>
@@ -427,7 +438,7 @@ export default function LobbyPage() {
                 {assignRole === 'debater' && (
                   <>
                     <Form.Group className="mb-3">
-                      <Form.Label>Team</Form.Label>
+                      <Form.Label>{t('team')}</Form.Label>
                       <ButtonGroup className="w-100">
                         {(['proposition', 'opposition'] as Team[]).map((item) => (
                           <Button
@@ -436,13 +447,13 @@ export default function LobbyPage() {
                             variant={assignTeam === item ? 'primary' : 'outline-primary'}
                             onClick={() => setAssignTeam(item)}
                           >
-                            {item}
+                            {item === 'proposition' ? t('teamPro') : t('teamOpp')}
                           </Button>
                         ))}
                       </ButtonGroup>
                     </Form.Group>
                     <Form.Group className="mb-3">
-                      <Form.Label>Speaker</Form.Label>
+                      <Form.Label>{t('speaker')}</Form.Label>
                       <Form.Select value={assignSlot} onChange={(event) => setAssignSlot(event.target.value as SpeakerSlot)}>
                         {slots.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
                       </Form.Select>
@@ -454,7 +465,7 @@ export default function LobbyPage() {
                   disabled={!selectedUserId || assignMutation.isPending}
                   onClick={() => assignMutation.mutate()}
                 >
-                  Save Assignment
+                  {t('saveAssignment')}
                 </Button>
               </Card.Body>
             </Card>
@@ -462,15 +473,15 @@ export default function LobbyPage() {
 
           <Card className="mb-3">
             <Card.Body>
-              <Card.Title>My Debater Position</Card.Title>
+              <Card.Title>{t('myDebaterPosition')}</Card.Title>
               {!isAssignedDebater && (
-                <Alert variant="info">Wait for the owner to assign you as a debater.</Alert>
+                <Alert variant="info">{t('waitForOwnerAssign')}</Alert>
               )}
               {currentParticipant?.positionLocked && (
-                <Alert variant="success">Your position is locked.</Alert>
+                <Alert variant="success">{t('positionLocked')}</Alert>
               )}
               <Form.Group className="mb-3">
-                <Form.Label>Team</Form.Label>
+                <Form.Label>{t('team')}</Form.Label>
                 <ButtonGroup className="w-100">
                   {(['proposition', 'opposition'] as Team[]).map((item) => (
                     <Button
@@ -480,13 +491,13 @@ export default function LobbyPage() {
                       onClick={() => setTeam(item)}
                       disabled={!isAssignedDebater || currentParticipant?.positionLocked}
                     >
-                      {item}
+                      {item === 'proposition' ? t('teamPro') : t('teamOpp')}
                     </Button>
                   ))}
                 </ButtonGroup>
               </Form.Group>
               <Form.Group className="mb-3">
-                <Form.Label>Speaker</Form.Label>
+                <Form.Label>{t('speaker')}</Form.Label>
                 <Form.Select
                   value={speakerSlot}
                   disabled={!isAssignedDebater || currentParticipant?.positionLocked}
@@ -500,7 +511,7 @@ export default function LobbyPage() {
                 onClick={() => selectMutation.mutate()}
                 disabled={!isAssignedDebater || Boolean(currentParticipant?.positionLocked) || selectMutation.isPending}
               >
-                Save My Position
+                {t('saveMyPosition')}
               </Button>
             </Card.Body>
           </Card>
@@ -508,12 +519,12 @@ export default function LobbyPage() {
           {isOwner && (
             <Card>
               <Card.Body>
-                <Card.Title>Room Setup</Card.Title>
+                <Card.Title>{t('roomSetup')}</Card.Title>
                 <div className="d-grid gap-2">
                   <div className="d-flex align-items-center justify-content-between rounded border border-info px-3 py-2">
-                    <span>Viewer Chat</span>
+                    <span>{t('viewerChat')}</span>
                     <Badge bg={viewerChatEnabled ? 'success' : 'secondary'}>
-                      {viewerChatEnabled ? 'On' : 'Off'}
+                      {viewerChatEnabled ? t('on') : t('off')}
                     </Badge>
                   </div>
                   <Button
@@ -522,7 +533,7 @@ export default function LobbyPage() {
                     disabled={viewerChatMutation.isPending}
                   >
                     <i className={`bi ${viewerChatEnabled ? 'bi-chat-square-x' : 'bi-chat-square-text'} me-2`} />
-                    {viewerChatEnabled ? 'Disable Viewer Chat' : 'Enable Viewer Chat'}
+                    {viewerChatEnabled ? t('disableViewerChat') : t('enableViewerChat')}
                   </Button>
                   <div className="d-flex gap-2">
                     <Button
@@ -532,7 +543,7 @@ export default function LobbyPage() {
                       disabled={lockMutation.isPending}
                     >
                       <i className="bi bi-lock me-2" />
-                      Lock All
+                      {t('lockAll')}
                     </Button>
                     <Button
                       variant="outline-success"
@@ -541,13 +552,13 @@ export default function LobbyPage() {
                       disabled={unlockMutation.isPending}
                     >
                       <i className="bi bi-unlock me-2" />
-                      Unlock All
+                      {t('unlockAll')}
                     </Button>
                   </div>
                   {canStartDebate && (
                     <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
                       <i className="bi bi-play-fill me-2" />
-                      Start Debate
+                      {t('startDebate')}
                     </Button>
                   )}
                 </div>
@@ -559,16 +570,16 @@ export default function LobbyPage() {
             <Card className="mb-3 border-success border-opacity-30">
               <Card.Body className="d-grid gap-2">
                 <Card.Title className="text-success font-monospace" style={{ fontSize: '14px' }}>
-                  Action Required
+                  {t('actionRequired')}
                 </Card.Title>
                 <p className="text-secondary small mb-2">
                   {room?.hostType !== 'human' && room?.judgeType === 'ai'
-                    ? 'Both S1 debaters must click Start Debate to begin the match.'
-                    : 'As Judge S1, you are responsible for starting the match.'}
+                    ? t('s1MustStart')
+                    : t('judgeS1Responsible')}
                 </p>
                 <Button variant="success" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
                   <i className="bi bi-play-fill me-2" />
-                  Start Debate
+                  {t('startDebate')}
                 </Button>
               </Card.Body>
             </Card>
@@ -585,18 +596,18 @@ export default function LobbyPage() {
       >
         <Modal.Header closeButton className="border-neon bg-dark text-white border-opacity-20">
           <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '16px' }}>
-            Leave Debate Room
+            {t('leaveDebateRoom')}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="bg-dark text-white p-4" style={{ fontFamily: 'Rajdhani', fontSize: '16px' }}>
           <p className="mb-3">
-            You are the <strong>Room Owner</strong>. If you leave, you must transfer room ownership.
+            {t('ownerLeaveWarning')}
           </p>
           
           {room?.participants && room.participants.filter(p => p.userId !== user?._id).length > 0 ? (
             <>
               <p className="text-secondary small mb-3">
-                Select a successor to transfer ownership to, or click "Leave directly" to automatically transfer ownership to the next participant.
+                {t('ownerLeaveWarning2')}
               </p>
               <div className="list-group list-group-flush mb-4" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {room.participants
@@ -626,13 +637,13 @@ export default function LobbyPage() {
             </>
           ) : (
             <p className="text-secondary small mb-4">
-              Since you are the only one in the room, leaving will close the room.
+              {t('onlyOneInRoom')}
             </p>
           )}
 
           <div className="d-flex justify-content-end gap-2">
             <Button variant="outline-light" size="sm" onClick={() => setShowLeaveConfirmModal(false)}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button
               variant="danger"
@@ -642,7 +653,7 @@ export default function LobbyPage() {
                 leaveMutation.mutate(undefined);
               }}
             >
-              Leave directly
+              {t('leaveDirectly')}
             </Button>
           </div>
         </Modal.Body>

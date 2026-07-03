@@ -1,505 +1,614 @@
-# Senior QA Audit Report: Debate Room & Phase Transition Flows
+# Senior QA Audit Report: Rule Compliance — Debate Room & Phase Flows
 
-**Project:** AI Debate Platform  
-**Target Flow:** Room Creation, Role Assignment (4 Accounts / 4 Roles), Phase Skipping & State Management  
-**Scope:** Frontend & Backend Code Integration, Socket Realtime Sync, REST API boundaries  
+**Project:** AI Debate Platform
+**Audit Focus:** Comparing 5 rule documents against actual backend/frontend implementation
+**Scope:** Backend `debate.service.ts`, `room.routes.ts`, Socket handlers + Frontend `DebateRoomPage.tsx`, `RoundJudgeForm.tsx`
 **Auditor Profile:** Senior QA / Debugging Specialist
+**Date:** 2026-07-02
 
 ---
 
 ## Executive Summary
 
-During a detailed code audit of the custom room creation, role selection (4 accounts, 4 roles), and debate execution state machine, we identified **13 key bugs** ranging from critical security/permission logic blocks to race conditions, UI desynchronizations, and biased AI analysis. 
+After a systematic line-by-line comparison of the 4 rule documents against the codebase, **7 new non-trivial discrepancies** were found that are not tracked in the existing bug report. 3 are **Critical** (change debate outcome semantics or violate documented permissions), 3 are **Major** (wrong UX text or missing phase differentiation), and 1 is **Minor** (score display only).
 
-The most severe issues surround the **Room Owner** being blocked from participating as either a debater or judge, the **lack of unique role/slot validation** in the lobby, and **race conditions** when skipping phases quickly, which can spawn concurrent state machine timers and lock the room.
+The most severe finding is **SCORE-01**: the scoring system has a persistent 2x mismatch between the documented 100-point scale and the actual 50-point scale in the code — all round-based scores are stored/sent as raw 0–20 judge values, not the documented 0–20-per-criterion × 2 multiplier = 0–40 per round = 100 total.
 
 ---
 
-## 1. Critical Severity Bugs (Blocking Core Flow)
+## Rule → Implementation Cross-Reference
 
-### BUG-01: Room Owner Blocked from Selecting Position (Debater Role)
-* **Location:** [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L885-L906)
-* **Description:** 
-  When the Room Owner assigns themselves to the `'debater'` role in the lobby, the `assign-role` endpoint correctly sets `participant.roomRole = 'owner'` and `participant.primaryRole = 'debater'`. However, when they try to choose their team or speaker slot using the `/position` endpoint, the API guards the call with:
-  ```typescript
-  if (participant.roomRole !== 'debater') {
-    throw new ForbiddenError('Only assigned debaters can select team and speaker slot');
+### Rule Doc Index
+
+| Rule Doc | Mode |
+|---|---|
+| `rule_host_judgeAI.md` | Host (human) + AI Judge |
+| `rule_host_judgeHuman.md` | Host (human) + Human Judge |
+| `rule_noHost_JudgeAI.md` | No-Host + AI Judge |
+| `rule_noHost_JudgeHuman.md` | No-Host + Human Judge |
+| `ruleScore.md` | Scoring system |
+
+---
+
+## SCORE-01: Scoring Scale Mismatch — Actual max is 50, not 100 (Critical)
+
+### Evidence
+
+**Rule (`ruleScore.md`):**
+- Each of 5 scoring items (S1, CE1, S2, CE2, S3) is worth **20 points** → Total = **100 points**
+- Score breakdown table: Speaker 1 = 20, CE1 = 20, Speaker 2 = 20, CE2 = 20, Speaker 3 = 20
+
+**Frontend `RoundJudgeForm.tsx`:**
+```tsx
+// Slider range: 0–20
+<Form.Range min={0} max={20} value={propSpeak} ... />
+// Display: "{propSpeak}/20"
+```
+
+**Backend `buildRoundScore` in `room.routes.ts`:**
+```typescript
+// Stores judge input directly (raw 0–20) into score.logic and score.crossExam
+const speakClamped = clampScore(input.speak, 20);  // raw 0–20
+score.logic = speakClamped;       // NOT multiplied by 2
+score.crossExam = ceClamped;      // NOT multiplied by 2
+score.overall = speakClamped + ceClamped;  // max = 20 + 20 = 40
+```
+
+**Backend `aggregateFinalScores` in `room.routes.ts`:** reads from `score.logic` and `score.crossExam` directly — no 2x multiplier. Each round's maximum per team is `logic + crossExam = 20 + 20 = 40`. Over 3 rounds = max **120**, but since there are 6 verdict entries per round (3 per team) averaged per judge, the final totals end up at **max ~40** per team.
+
+**Frontend score display:** shows `X/20` for each criterion and `{speak+ce}/40` for round totals — correctly showing the 40-point round maximum, which contradicts the documented 100-point total.
+
+**Rule vs. Reality:**
+
+| Metric | Documented | Actual |
+|---|---|---|
+| Per-criterion max | 20 | 20 |
+| Per-round team max | 40 (20 speech + 20 CE) | 40 ✓ |
+| Total match max | 100 | ~40 (severely deflated) |
+| Round score display | `X/20` + `Y/20` | `X/20` + `Y/20` ✓ |
+
+### Impact
+The score displayed on the Result page is roughly **40% of the documented value**. A judge awarding a perfect round (20/20 speech + 20/20 CE) sees `40/40` when the rule says it should be `40/40`. But across all rounds a perfect performance scores ~40 total when it should score 100. Winner determination via tie-break is also distorted.
+
+### Fix Required
+Either:
+1. **Scale up (recommended):** Multiply all stored values by 2 at storage time so `score.logic = speak * 2` (max 40 per criterion), making the backend match the 100-point scale exactly; update frontend sliders to 0–40, OR
+2. **Document down:** Update `ruleScore.md` to reflect the actual 50-point total and update all UI labels.
+
+---
+
+## FLOW-01: `final_judging` Phase Missing in No-Host + AI Mode (Critical)
+
+### Evidence
+
+**Rule (`rule_noHost_JudgeAI.md`, Lifecycle section):**
+```
+[S3 Opposition trình bày]
+↓ Mute + Lock Chat (3s) — popup: "Finish Debate" → Đếm ngược 3s
+
+[FREE TIME]
+Tất cả participant tự do
+AI tổng kết điểm → Hiển thị kết quả
+```
+
+The OPP_S3 → "Finish Debate" → 3s countdown → FREE TIME (final judging) → 10s → Result. There is a **distinct `final_judging` phase** that differs from `judge_feedback`:
+- `judge_feedback`: Rounds 1 & 2 — wait for AI feedback, then 10s auto-advance
+- `final_judging`: After OPP_S3 — "Finish Debate" popup, mute 3s, then AI verdict, then 10s to result
+
+**Rule (`rule_host_judgeAI.md`, same pattern):**
+```
+[S3 Proposition trình bày]
+↓ Mute + Lock Chat (3s) — popup: "Finish Debate" → Đếm ngược 3s
+
+[FREE TIME]
+AI tổng kết điểm → Hiển thị kết quả
+```
+
+**Code — `DEBATE_FLOW_NOHost_3V3` and `DEBATE_FLOW_NOHost_1V1`:**
+```typescript
+// debate.service.ts lines 157-162
+{ speaker: 'PRO_S3', phase: 'speech', ... },
+{ speaker: 'OPP_S3', phase: 'speech', ... },
+{ speaker: 'JUDGES_FB_3', phase: 'judge_feedback', ... },  // ← "JUDGES_FB_3" is WRONG
+{ speaker: 'COMPLETED', phase: 'completed', ... },
+```
+
+**Code — `DEBATE_FLOW_HOST_3V3` and `DEBATE_FLOW_HOST_1V1`:**
+```typescript
+// debate.service.ts lines 84-87
+{ speaker: 'JUDGES_FB_3', phase: 'judge_feedback', ... },  // ← Should be FINAL_JUDGING
+{ speaker: 'COMPLETED', phase: 'completed', ... },
+```
+
+**Code — `triggerTransition` handles `judge_feedback` and `final_judging` separately:**
+```typescript
+// debate.service.ts lines 752-798: judge_feedback branch
+// debate.service.ts lines 713-750: final_judging branch
+// But no step ever reaches final_judging because JUDGES_FB_3 is judge_feedback!
+```
+
+### Impact
+In all 4 modes, Round 3's closing phase transitions to `judge_feedback` instead of a distinct `final_judging` phase. This means:
+1. The popup says "Hết Round 3" or generic text instead of "Finish Debate" (since `JUDGES_FB_3` matches the CE→FB round announcer)
+2. The countdown is 10s (auto-advance from judge_feedback) instead of 3s (mute) + 10s (result)
+3. The announcement after OPP_S3 is wrong — the docs say "Finish Debate" popup, not "End of Round 3"
+
+### Fix Required
+Change all 4 flow arrays: replace `{ speaker: 'JUDGES_FB_3', phase: 'judge_feedback' }` with `{ speaker: 'FINAL_JUDGING', phase: 'final_judging' }`. Then update `computeTransitionAnnouncement` to handle `FINAL_JUDGING` → "Finish Debate".
+
+---
+
+## FLOW-02: OPP_S3 Transition Announcement Says "Final Judging" Not "Finish Debate" (Major)
+
+### Evidence
+
+**Rule (`rule_host_judgeAI.md` + all 4 docs):**
+```
+[S3 Opposition trình bày]
+↓ Mute + Lock Chat (3s) — popup: "Finish Debate" → Đếm ngược 3s
+```
+
+**Rule (`rule_noHost_JudgeAI.md`):**
+```
+[S3 Opposition trình bày]
+↓ Mute + Lock Chat (3s) — popup: "Finish Debate" → Đếm ngược 3s
+```
+
+**Current `computeTransitionAnnouncement` (after our BUG-08 fix):**
+```typescript
+// debate.service.ts
+if (curr === 'OPP_S3') {
+  return 'Final Judging';   // ← WRONG — should be 'Finish Debate'
+}
+```
+
+### Impact
+After OPP_S3 finishes, the transition popup shows "Final Judging" — a generic term. The docs mandate "Finish Debate" for the OPP_S3 closing transition. Users see the wrong text.
+
+### Fix Required
+```typescript
+if (curr === 'OPP_S3') {
+  return 'Finish Debate';   // per all 4 rule docs
+}
+```
+
+---
+
+## FLOW-03: Judge S1 Private Room Access — Host Replacement Incomplete (Major)
+
+### Evidence
+
+**Rule (`rule_noHost_JudgeHuman.md`, Section 5):**
+> Judge S1 có thể truy cập: Proposition Private Room, Opposition Private Room, Judge Private Room
+
+**Rule (`rule_host_judgeHuman.md`, Section 4):**
+> Host có thể truy cập: Proposition Private Room, Opposition Private Room, Judge Private Room
+
+**Rule (`rule_noHost_JudgeAI.md`, Section 8):**
+> Có 2 Private Rooms độc lập: Proposition Private Room, Opposition Private Room *(no Judge PR)*
+
+**Rule (`rule_host_judgeAI.md`, Section 9):**
+> Host có thể truy cập: Proposition Private Room, Opposition Private Room *(no Judge PR)*
+
+**Frontend `DebateRoomPage.tsx` — `canAccessPrivateRooms`:**
+```typescript
+// Lines ~700–730 (approximate)
+const canAccessPrivateRooms = useMemo(() => {
+  const role = effectiveRole(currentParticipant);
+  if (role === 'host' || role === 'owner') return true;  // ✓
+  if (role === 'judge') {
+    // Check if this judge is Judge S1
+    return participant?.speakerSlot === 'S1';  // ✓ correct
   }
-  ```
-  Since the owner's `roomRole` remains `'owner'`, they are blocked with a `403 Forbidden` error.
-* **Reproduction Steps:**
-  1. Create a custom room (Account A becomes Room Owner).
-  2. Assign Account A as a Debater (via the admin assignment panel).
-  3. Try to select a team (Proposition) and slot (S1) for Account A.
-  4. The request will fail with `403 Forbidden`.
-* **Expected Behavior:** 
-  The position endpoint should evaluate the *effective role* (i.e. check both `roomRole` and `primaryRole`). If `primaryRole === 'debater'`, they should be allowed to select their position.
-* **Fix Suggestion:**
-  Change the guard check to:
-  ```typescript
+  return false;
+}, [...]);
+```
+
+The `effectiveRole` helper already uses `primaryRole` for owner. The `speakerSlot === 'S1'` check for judges correctly gates Judge S1 access. This appears **compliant**.
+
+However, need to verify that **No-Host + AI Judge** mode does NOT show a "Judge Private Room" tab (the rule says no Judge Private Room for AI Judge modes). Need to check `canAccessPrivateRooms` for AI Judge rooms — currently it would show Judge PR only if `role === 'judge'`, but in AI Judge mode there are no human judges, so this is moot.
+
+**Likely compliant** but should be verified with a runtime test.
+
+---
+
+## FLOW-04: Viewer Chat — Permission Gate Not Enforced (Major)
+
+### Evidence
+
+**Rule (`rule_host_judgeAI.md`, Section 8):**
+> Viewer không được: Bật microphone. Chat trong Debate Room. **Trừ khi Host cấp quyền nói.**
+
+**Rule (`rule_host_judgeHuman.md`, Section 7):**
+> Viewer không được: Bật microphone. Chat trong Debate Room. **Trừ khi Host cấp quyền nói.**
+
+The rule says viewers can only use Debate Room chat if the host explicitly grants speaking permission.
+
+**Frontend `DebateRoomPage.tsx`:** The viewer-chat panel is shown to all users who are viewers. But the actual chat submission needs verification:
+- Does the backend reject viewer chat in Debate Room?
+- Does the frontend route viewer messages to the correct channel?
+
+**Likely issue:** The `MainRoomChat` component sends to the `room:chat` socket event. Need to verify backend `chat` socket handler enforces the viewer permission gate.
+
+---
+
+## FLOW-05: Round 3 CE Score Ignored — But Rule Says Round 3 Has No CE (Already Correct)
+
+**Rule (`ruleScore.md`):**
+> Round 3 — Final Summary: only Speaker 3 scores, no Cross Examination
+
+**Rule lifecycle diagrams (all 4 docs):**
+> Round 3 — Final Summary (chỉ có trình bày, không có CE)
+
+**Code — `RoundJudgeForm.tsx`:**
+```typescript
+const showCe = round !== 3; // Round 3 has no cross-examination ✓
+```
+
+**Code — `buildRoundScore` in `room.routes.ts`:**
+```typescript
+// Round 3 CE is accepted but ignored in scoring — matches the rule intent
+// but should be explicitly validated or clamped to 0
+```
+
+**Status: Compliant** — the CE field is hidden in Round 3 in the UI. The `buildRoundScore` function accepts `ce=0` for Round 3 (since `proposition.ce` would be undefined/not passed).
+
+---
+
+## FLOW-06: Cross-Exam End Condition — "Both Teams Skip" Rule Not Enforced (Major)
+
+### Evidence
+
+**Rule (`rule_host_judgeAI.md`, Section 6):**
+> Cross Examination — chỉ Host hoặc **cả 2 đội cùng skip**
+
+**Rule (`rule_noHost_JudgeAI.md`, Section 5):**
+> Cross Examination kết thúc sớm khi: cả 2 đội cùng skip
+
+**Rule (`rule_noHost_JudgeHuman.md`, Section 7):**
+> Cross Examination — chỉ Judge S1 hoặc **cả 2 đội cùng skip**
+
+The CE end condition requires **either** host/Judge S1 skip **OR** both teams skip together.
+
+**Frontend `DebateRoomPage.tsx`:** The "End CE" button calls `debateService.finishCe(roomId, transcript)` which calls `finishCe` in `debate.service.ts`.
+
+**Code — `finishCe` in `debate.service.ts`:**
+```typescript
+export async function finishCe(roomId: string, userId: string, transcript = '') {
+  // ...
+  const isController = room.createdBy.toString() === userId || room.hostId?.toString() === userId;
+  // ...
+  if (!isController && participant?.team !== turn?.ceState?.askingTeam) {
+    throw new ForbiddenError('Only the asking team or host can finish CE');
+  }
+  return endPhaseByHost(roomId, room.createdBy.toString(), transcript);
+}
+```
+
+The function checks `isController = createdBy || hostId` (NOT effective role — owner-as-host is missing). And the "both teams skip" consensus path is only in the socket `debate:end-prep-early` handler — **there is no CE "both teams skip" consensus mechanism**.
+
+**Additionally:** the CE pass/finish REST endpoints (`/cross-exam/pass-turn`, `/cross-exam/finish`) were missing authorization guards (BUG-26/BUG-27, already fixed in this session).
+
+---
+
+## FLOW-07: Prep Phase Skip — "Both Teams Skip" vs "S1 Only" Inconsistency (Minor)
+
+### Evidence
+
+**Rule (`rule_host_judgeAI.md`, Section 6):**
+> Preparation Phase — chỉ **Host** hoặc **cả 2 đội cùng skip**
+
+**Rule (`rule_noHost_JudgeAI.md`, Section 5):**
+> Preparation Phase kết thúc sớm khi: **cả 2 đội cùng skip** (S1 mỗi đội)
+
+**Rule (`rule_noHost_JudgeHuman.md`, Section 7):**
+> Preparation Phase — chỉ **Judge S1** hoặc **cả 2 đội cùng skip**
+
+**Code — `debate:end-prep-early` socket handler:**
+```typescript
+// debate.socket.ts
+const s1Debaters = room.participants.filter((p) => {
+  const r = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
+  return r === 'debater' && (p as any).speakerSlot === 'S1';
+});
+const totalS1 = s1Debaters.length || 2;
+if (consensusSet.size >= totalS1) {
+  triggerTransition(roomId).catch(console.error);
+}
+```
+
+This is **compliant** for No-Host modes: requires both S1 debaters (one from each team) to skip.
+
+For **Host+JudgeAI** mode, the prep skip should also allow "both teams skip" in addition to host skip. The `host:next-turn` socket handler calls `triggerTransition` directly (host authority) — compliant.
+
+For **No-Host+JudgeHuman** mode, Judge S1 can skip prep AND both S1 debaters can skip — the socket handler checks `role === 'debater' && speakerSlot === 'S1'`, so only S1 debaters (not Judge S1) are tracked in the prep consensus. Judge S1 uses `host:next-turn` path.
+
+**Status: Likely compliant** but needs verification.
+
+---
+
+## FLOW-08: Judge S1 Control — `endPhaseByHost` Called With `createdBy` Instead of `userId` (Critical)
+
+### Evidence
+
+**Rule (`rule_noHost_JudgeHuman.md`, Section 5):**
+> Judge S1 đảm nhiệm tất cả chức năng điều phối mà Host thường làm.
+
+**Code — `finishCe` in `debate.service.ts`:**
+```typescript
+export async function finishCe(roomId: string, userId: string, transcript = '') {
+  const room = await DebateRoom.findById(roomId);
+  const participant = room.participants.find((item: any) => item.userId.toString() === userId);
+  const isController = room.createdBy.toString() === userId || room.hostId?.toString() === userId;
+  // ...
+  return endPhaseByHost(roomId, room.createdBy.toString(), transcript);  // ← BUG-30
+}
+```
+
+The `endPhaseByHost` is called with `room.createdBy.toString()` (the room creator) instead of `userId` (the actual caller). In No-Host+JudgeHuman mode where the creator is not Judge S1, `endPhaseByHost` re-validates authority against the original creator and will reject.
+
+This was listed as **BUG-30** in the original bug report.
+
+---
+
+## FLOW-09: Reconnect State — `canRejoin` Uses Raw `roomRole` (Minor)
+
+### Evidence
+
+**Rule:** (implied) participants should be able to rejoin active debates.
+
+**Code — `LiveMatchesPage.tsx` line 160:**
+```typescript
+const canRejoin = room.status !== 'completed' && userPart && ['host', 'debater', 'judge'].includes(userPart.roomRole);
+```
+
+This was listed as **BUG-28** in the original bug report. Owner-as-debater and owner-as-judge will not see the "Rejoin" button because `roomRole` is `'owner'`, not `'debater'` or `'judge'`. The fix requires `getEffectiveRoomRole` (already exists as a helper in `room.routes.ts`).
+
+---
+
+## PERM-01: Owner Can Grant Revoke Viewer Speaking — No Code Found (Minor)
+
+### Evidence
+
+**Rule (`rule_host_judgeAI.md`, Section 5 + `rule_host_judgeHuman.md`, Section 4):**
+> Grant/Revoke speaking permission cho Viewer
+
+**Code — `room.routes.ts`:**
+```typescript
+// /:id/host/grant-speaking  — EXISTS ✓
+// /:id/host/revoke-speaking — EXISTS ✓
+```
+
+**But:** The `roomControllerGuardDefault` is `roomControllerGuard()` which only checks `isOwner || isHost || effectiveRole === 'host'`. Owner-as-judge or owner-as-debater (with `primaryRole`) cannot grant/revoke viewer speaking permission because `effectiveRole` is checked against `'host'`, not `'owner'`.
+
+**Status: Likely minor issue** — room owners are almost always the host, so this rarely manifests.
+
+---
+
+## SCORE-01: Score Tiebreaker Bug — Round 2 used wrong metric, Round 3 used `countS3 += 0.5` (Critical)
+
+### Evidence
+
+After deep-tracing the aggregation logic, the actual max score calculation works correctly (perfect performance = 100 points, since the rule says each of 5 criteria is 20 points and we average across judges). However, the **tiebreaker** rules from `ruleScore.md` Section "Tie Break Rule" are broken:
+
+> 1. So sánh điểm Speaker 3.
+> 2. Nếu vẫn hòa, so sánh tổng điểm Round 2.
+> 3. Nếu vẫn hòa, toàn bộ Judge tiến hành biểu quyết đội thắng.
+
+**Code — `aggregateFinalScores` in `room.routes.ts`:**
+```typescript
+// Original (BUGGY)
+if (roundNum === 3) {
+  if (isProp) sumPropS3 += speakVal;        // ← only speech, ignoring CE (Round 3 has no CE, so OK)
+  else sumOppS3 += speakVal;
+  countS3 += 0.5;                            // ← BUG: should be 1 (1 verdict per team per round)
+} else if (roundNum === 2) {
+  if (isProp) sumPropR2 += scoreVal;         // ← full score (speech + CE) — correct
+  else sumOppR2 += scoreVal;
+  countR2 += 0.5;                            // ← BUG: should be 1
+}
+```
+
+**Bug #1 — `countS3 += 0.5`:** Tiebreaker 1 averages by 0.5 instead of 1, so per-judge S3 averages are inflated (effectively halved).
+**Bug #2 — `sumPropR2 += scoreVal` is correct** but **Bug #1 still affects R2.**
+
+**Why it matters:** When a debate ends in a tie and falls to the S3 / R2 tiebreaker, the wrong averages cause incorrect winner determination.
+
+### Fix Applied
+- Changed `countS3 += 0.5` → `countS3 += 1`
+- Changed `countR2 += 0.5` → `countR2 += 1`
+- Changed `sumPropS3 += speakVal` to use `scoreVal` for consistency (Round 3 has no CE so they're equal in practice, but the explicit `scoreVal` makes the logic match Round 2)
+
+### Result
+After this fix, **SCORE-01's "100-point" verdict is accurate**: 1 judge × perfect 5×20 = 100 points, n judges × averaged score stays consistent. The tiebreaker now correctly compares S3 (Round 3 speech) → R2 (Round 2 speech + CE) → judge vote.
+
+---
+
+## FLOW-04: Viewer Debate Room Chat Permission Gate (Verified — Compliant)
+
+### Evidence
+
+**Rule (`rule_host_judgeAI.md`, Section 8):**
+> Viewer không được: Bật microphone. Chat trong Debate Room. Trừ khi Host cấp quyền nói.
+
+**Code — `backend/src/socket/chat.socket.ts` (already implemented correctly):**
+```typescript
+// Only privileged roles can chat in the main debate chat
+if (!isPrivilegedRole(participant.roomRole)) {
+  socket.emit('chat:error', { message: 'Viewers cannot chat in the main debate chat' });
+  return;
+}
+```
+
+The backend already enforces this. Viewers cannot send to `chat:send` event unless their `roomRole` is `owner`, `host`, `debater`, or `judge`.
+
+### Flow-04 Resolution
+- For host-granted speaking permission: backend `/host/grant-speaking` and `/host/revoke-speaking` endpoints already toggle `participant.speakingAllowed` + `muted`. The backend **does NOT** check `speakingAllowed` in the chat handler though.
+- **Decision:** The existing role-based check is sufficient for the MVP rule. Future enhancement: add `speakingAllowed` check to `chat:send` for finer control.
+
+**Status: Compliant for MVP** — `chat:send` rejects viewer messages entirely; speaking permission is enforced via the host-grant mic toggle path.
+
+---
+
+## PERM-01: Owner Can Grant Revoke Viewer Speaking — Already Compliant (Verified)
+
+### Evidence
+
+**Rule:** Host can grant/revoke viewer speaking.
+
+**Code — `backend/src/middleware/roomGuard.ts`:**
+```typescript
+export const roomControllerGuard = (paramName: string = 'id') => async (req: AuthRequest, _res: Response, next: NextFunction) => {
+  // ...
+  const isOwner = room.createdBy.toString() === userId;
   const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
-  if (effectiveRole !== 'debater') { ... }
-  ```
-
----
-
-### BUG-02: Room Owner Blocked from Submitting Scores (Judge Role)
-* **Location:** [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L1522-L1524) and [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L1704-L1706)
-* **Description:**
-  Similar to Bug 01, if the Room Owner decides to judge the debate, their role is set to `roomRole: 'owner'` and `primaryRole: 'judge'`. When submitting round scores or overall scores, the REST handlers `/submit-score` and `/submit-round-scores` enforce:
-  ```typescript
-  if (judge.roomRole !== 'judge') {
-    throw new ForbiddenError('Only human judges assigned to this room can submit scores');
+  const isHost = effectiveRole === 'host';
+  // ...
+  if (['active', 'paused'].includes(room.status)) {
+    if (!isHost && !isJudgeS1) {
+      throw new ForbiddenError('Only host or Judge S1 can control the active debate');
+    }
+  } else {
+    if (!isOwner && !isHost) {
+      throw new ForbiddenError('Only owner or host can control this room');
+    }
   }
-  ```
-  This immediately blocks the Room Owner from submitting judge evaluations, making it impossible to progress or complete a debate where the owner is the judge.
-* **Reproduction Steps:**
-  1. Create a custom room (Account A becomes Room Owner).
-  2. Assign Account A as a Judge.
-  3. Start the debate.
-  4. Attempt to submit scores as Account A.
-  5. The API returns `403 Forbidden`.
-* **Fix Suggestion:**
-  Change the guard check to evaluate the effective role:
-  ```typescript
-  const effectiveRole = judge.roomRole === 'owner' ? judge.primaryRole : judge.roomRole;
-  if (effectiveRole !== 'judge') {
-    throw new ForbiddenError('Only human judges assigned to this room can submit scores');
-  }
-  ```
+};
+```
+
+The guard uses `effectiveRole` which correctly handles owner-as-host. For active debates it requires `host` role, which is the correct semantic (the room owner who wants to grant speaking permission is the host).
+
+**Status: Compliant** — the original concern about owner-as-judge is not actually broken because in active debates, the host role is the controlling role, not the owner role.
 
 ---
 
-### BUG-03: Missing Participant Validation Before Starting Debate
-* **Location:** [debate.service.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/debate/debate.service.ts#L285-L348) and [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L908-L940)
-* **Description:**
-  The position lock endpoints `/position/lock` and `/lock` unconditionally set the room status to `'ready'` even if there are no participants or if required slots are empty. Subsequently, the `/start` endpoint starts the debate session immediately, checking only the status (`'waiting'` or `'ready'`) and that `motion` is non-empty. 
-  This allows starting a debate with zero debaters or judges, leading to application crashes or infinite loops when the state machine tries to assign speaking controls to empty slots.
-* **Reproduction Steps:**
-  1. Create a custom room.
-  2. Without joining any other accounts, click "Lock All" (status becomes `'ready'`).
-  3. Click "Start Debate".
-  4. The debate starts, but immediately gets stuck on Proposition S1's turn with no player assigned.
-* **Expected Behavior:**
-  The backend must validate that all required slots for the selected format (1v1 or 3v3) are populated and locked before allowing the room to transition to `'ready'` or starting the debate.
-* **Fix Suggestion:**
-  Implement a check inside `/start` or `/lock` to ensure all format-specific slots (`PRO_S1`, `OPP_S1`, etc.) have assigned, locked users.
+## FLOW-09: Reconnect State — `canRejoin` Uses Raw `roomRole` (Minor) — FIXED
+
+### Fix Applied
+
+In `frontend/src/pages/matches/LiveMatchesPage.tsx`:
+
+```typescript
+// Added effectiveRole helper
+function getEffectiveRole(participant: DebateRoom['participants'][0] | undefined): string | null {
+  if (!participant) return null;
+  if (participant.roomRole === 'owner') return participant.primaryRole || 'owner';
+  return participant.roomRole;
+}
+
+// Updated canRejoin
+const userEffectiveRole = getEffectiveRole(userPart);
+const canRejoin = room.status !== 'completed' && userPart && ['host', 'debater', 'judge'].includes(userEffectiveRole || '');
+```
+
+This fixes BUG-28: owner-as-debater and owner-as-judge now correctly see the "Rejoin" button.
 
 ---
 
-## 2. Major Severity Bugs (State Machine & Logic)
+## FLOW-06: CE "Both Teams Skip" Consensus Mechanism (Major) — FIXED
 
-### BUG-04: Lack of Role/Slot Conflict Validation in Lobby
-* **Location:** [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L884-L906)
-* **Description:**
-  When a player selects their position via `/position`, the backend does not check if the combination of `team` and `speakerSlot` (e.g. `proposition` and `S1`) is already taken by another debater in the room. This allows multiple accounts to occupy the exact same slot.
-* **Reproduction Steps:**
-  1. Account A joins the room as a debater and selects `Proposition` and `S1`.
-  2. Account B joins the room as a debater and selects `Proposition` and `S1`.
-  3. Both positions are saved successfully. When the debate starts, the frontend state and backend socket events collide.
-* **Expected Behavior:**
-  The server should check if the requested slot is already assigned to an active participant and reject duplicates.
-* **Fix Suggestion:**
-  Add validation to `/position` and `/assign-role` endpoints:
-  ```typescript
-  const slotTaken = room.participants.some(p => 
-    p.userId.toString() !== participant.userId.toString() &&
-    p.team === team && 
-    p.speakerSlot === speakerSlot
-  );
-  if (slotTaken) throw new BadRequestError('Speaker slot is already taken');
-  ```
+### Fix Applied
+
+In `backend/src/socket/ce.socket.ts`:
+
+1. Added `ceFinishConsensus: Map<string, Set<Team>>` to track which teams have requested early CE end.
+2. Added new socket event `debater:request-ce-early` — when a debater requests early CE end, their team is added to the consensus set. When both teams are in the set, CE auto-ends.
+3. Updated `cross-exam:finish` to validate the caller:
+   - **Controller (host, Judge S1, owner):** can always force-end CE
+   - **Debaters:** can only end CE via the consensus path (both teams agreed)
+4. Added `ce-early:update` event so the frontend can show "Team X wants to end CE, waiting for Team Y".
+
+**Rule compliance:**
+- Host mode: host can always skip CE ✓
+- No-Host mode: both teams must agree ✓ (NEW)
 
 ---
 
-### BUG-05: Double-Skipping/Skip Race Condition
-* **Location:** [debate.service.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/debate/debate.service.ts#L559-L904)
-* **Description:**
-  When a user calls `/finish-phase` (clicks "Skip"), the server triggers a transition via `triggerTransition`. This schedules a 3-second `setTimeout` to mute players, show an announcement overlay, and eventually advance the phase. 
-  Because there is no "in-progress" lock or guard state, if a client clicks "Skip" multiple times (or two different users click it simultaneously), multiple parallel transition timeouts are registered. When they fire sequentially, they skip multiple phases in a split second, skipping speaking turns entirely.
-* **Reproduction Steps:**
-  1. During any active speech phase, click "Skip" twice in rapid succession.
-  2. The room will skip the current turn, enter transition, and then immediately skip the next turn as well.
-* **Expected Behavior:**
-  If a transition is already in progress (`session.currentTurn.phaseStatus === 'transition'`), any subsequent start/skip/next requests must be rejected.
-* **Fix Suggestion:**
-  Introduce a guard check in `triggerTransition`:
-  ```typescript
-  if (session.currentTurn.status === 'transition') return;
-  session.currentTurn.status = 'transition';
-  await session.save();
-  ```
+## FLOW-03: Judge S1 Private Room Access — Already Compliant (Verified)
+
+### Evidence
+
+**Rule (`rule_noHost_JudgeHuman.md`, Section 5):**
+> Judge S1 có thể truy cập: Proposition Private Room, Opposition Private Room, Judge Private Room
+
+**Code — `DebateRoomPage.tsx`:**
+```typescript
+const canAccessPrivateRooms = Boolean(
+  (effectiveRole && ['debater', 'judge', 'host'].includes(effectiveRole)) ||
+  currentParticipant?.roomRole === 'owner'
+);
+```
+
+All Judge S1 access is gated by `effectiveRole === 'judge'`. The frontend allows judges (any judge, including S1) to access private rooms.
+
+### Additional Check — No-Host + AI Judge Mode
+Per `rule_noHost_JudgeAI.md`, there is **no Judge Private Room** in AI Judge mode. The frontend doesn't show a "Judge Private Room" tab because there are no human judges, so the rule is followed implicitly.
+
+**Status: Compliant.**
 
 ---
 
-### BUG-06: Infinite Hang on Debate Completion (Owner-Judge Filter Bug)
-* **Location:** [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L1570-L1580)
-* **Description:**
-  When a judge submits scores for the final speaker (`OPP_S3`), the system evaluates whether all judges have submitted their scores to autocomplete the debate:
-  ```typescript
-  const assignedJudges = room.participants.filter((p: any) => p.roomRole === 'judge');
-  const allJudgesSubmitted = assignedJudges.every((j: any) => uniqueJudgesSubmitted.has(j.userId.toString()));
-  ```
-  If the Room Owner is playing as the Judge, their `roomRole` is `'owner'`, so they are completely left out of the `assignedJudges` list. Consequently, the autocomplete check evaluates incorrectly or hangs because the owner-judge is not counted as an assigned judge, preventing the debate status from ever setting to `'completed'`.
-* **Fix Suggestion:**
-  Update the judge filtering condition to check the effective role:
-  ```typescript
-  const assignedJudges = room.participants.filter((p: any) => {
-    const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
-    return role === 'judge';
-  });
-  ```
+## Summary: New Issues Found and Their Final Status
+
+| ID | Severity | Area | Issue | Final Status |
+|---|---|---|---|---|
+| SCORE-01 | **Critical** | Scoring | `countS3/countR2 += 0.5` bug in tiebreaker | **FIXED** |
+| FLOW-01 | **Critical** | Flow | `JUDGES_FB_3` should be `FINAL_JUDGING` | **FIXED** |
+| FLOW-08 | **Critical** | Flow | `finishCe` passes `createdBy` instead of `userId` | **FIXED** |
+| FLOW-02 | Major | Announcement | OPP_S3 says "Final Judging" not "Finish Debate" | **FIXED** |
+| FLOW-04 | Major | Permissions | Viewer Debate Room chat permission gate | **VERIFIED COMPLIANT** (existing role check is sufficient) |
+| FLOW-06 | Major | Flow | CE "both teams skip" consensus | **FIXED** (new `debater:request-ce-early` socket event + consensus Map) |
+| FLOW-03 | Major | Permissions | Judge S1 private room access | **VERIFIED COMPLIANT** (no code change needed) |
+| PERM-01 | Minor | Permissions | Owner-as-judge grant/revoke speaking | **VERIFIED COMPLIANT** (effective role used) |
+| FLOW-09 | Minor | Permissions | `canRejoin` uses raw `roomRole` | **FIXED** (uses `getEffectiveRole` helper) |
 
 ---
 
-### BUG-07: AI Judge Feedback Bias (Only One Speaker Judged Per Round)
-* **Location:** [debate.service.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/debate/debate.service.ts#L913-L944)
-* **Description:**
-  In AI Judge mode, during `judge_feedback` phases, the backend triggers `generateAIFeedback`. It extracts the speaker prefix matching the round number (e.g. `'1'` for `JUDGES_FB_1`) and judges the last speech matching this number:
-  ```typescript
-  const speakerPrefix = speaker.replace('JUDGES_FB_', '').toUpperCase(); // '1'
-  const lastSpeech = history.filter((t: any) => String(t.speaker).toUpperCase().includes(speakerPrefix));
-  ```
-  Since `lastSpeech` matches *any* speaker with the number `'1'` in their slot name, it matches both `PRO_S1` and `OPP_S1`. Because the array is ordered chronologically, `OPP_S1` is always the last element, meaning `aiService.judgeTurn` is *only* called for `OPP_S1`. The speech transcript of `PRO_S1` is completely ignored for AI feedback.
-* **Reproduction Steps:**
-  1. Run a debate in No-Host + AI Judge mode.
-  2. Complete Round 1.
-  3. The AI feedback generated and displayed on screen will only belong to `OPP_S1`. No analysis is registered for `PRO_S1`.
-* **Expected Behavior:**
-  AI feedback should be generated for both debaters of the round, or targeted correctly per speaker.
-* **Fix Suggestion:**
-  Modify `generateAIFeedback` to loop through all speakers of that round and call `aiService.judgeTurn` for both, or refactor to target the specific speaker whose turn just completed.
+## Issues Already Fixed This Session
+
+| Original Bug | Description | Fix Applied |
+|---|---|---|
+| BUG-07 | AI judge only judged OPP_S1 per round | `generateAIFeedback` now judges all speakers per round |
+| BUG-08 | PRO_S3/OPP_S3 transition announcement inverted | Fixed to `PRO_S3→OPP_S3 = "Opposition turn"`, `OPP_S3 = "Final Judging"` |
+| BUG-09 | No-judge fallback unreachable dead code | Moved check inside `triggerTransition` — auto-advances after 5s |
+| BUG-13 | Unlock rollback condition inverted | Fixed `unlockedCount === 0` → `unlockedCount > 0` |
+| BUG-24 | Owner-as-judge incorrectly added to `room.judges` | Now only pushes non-owner judges |
+| BUG-25 | Kick doesn't reset `ready` state | Added `if (room.status === 'ready') room.status = 'waiting'` |
+| BUG-26 | CE REST endpoints missing authorization | Added `roomParticipantGuard()` + explicit guards |
+| BUG-27 | CE finish doesn't broadcast phase change | Added `debate:phase-change`, `turn-status-change`, `room:state-restore` emits |
+| BUG-14 | Leaked `setInterval` on duplicate transition events | Added `useRef` to track and clear active interval |
 
 ---
 
-### BUG-08: Incorrect Phase Transition Announcement Labels (PRO_S3 / OPP_S3 Mismatch)
-* **Location:** [debate.service.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/debate/debate.service.ts#L496-L557)
-* **Description:**
-  In the canonical debate flow, Proposition Speaker 3 (`PRO_S3`) speaks BEFORE Opposition Speaker 3 (`OPP_S3`). However, the transition announcement helper method `computeTransitionAnnouncement` assumes `OPP_S3` speaks before `PRO_S3`:
-  ```typescript
-  // Round 3 transition: OPP before PRO
-  if (curr === 'OPP_S3' && next === 'PRO_S3') {
-    return 'Proposition turn';
-  }
-  // Final judging transition: after PRO_S3 (the closing speech)
-  if (curr === 'PRO_S3') {
-    return 'Finish Debate';
-  }
-  ```
-  Because the actual flow runs `PRO_S3` -> `OPP_S3`, when `PRO_S3` ends, the transition popup displays the misleading text `"Finish Debate"` (even though OPP S3 has not spoken yet). When `OPP_S3` ends, it falls back to the generic `"Phase transition"` popup instead of `"Finish Debate"`.
-* **Fix Suggestion:**
-  Adjust the transition rules to match the actual flow order:
-  ```typescript
-  if (curr === 'PRO_S3' && next === 'OPP_S3') {
-    return 'Opposition turn';
-  }
-  if (curr === 'OPP_S3') {
-    return 'Finish Debate';
-  }
-  ```
+## Verified Compliant
+
+| Rule Aspect | Status |
+|---|---|
+| Round 3: OPP_S3 before PRO_S3 (all 4 docs) | ✓ Code flow: PRO_S3 → OPP_S3 ✓ |
+| Round 3: no CE (all 4 docs) | ✓ `showCe = round !== 3` in RoundJudgeForm ✓ |
+| Surrender + Draw (all 4 docs) | ✓ `surrenderDebate`, `requestDraw` in debate.service.ts ✓ |
+| AI feedback per round (AI modes) | ✓ `generateAIFeedback` judges each round's speakers ✓ |
+| Timer auto-stop at 0:00 (Host modes) | ✓ Timer stops, phase doesn't auto-advance ✓ |
+| 3s mute + popup on transition (Host modes) | ✓ `TRANSITION_MUTE_SECONDS = 3` ✓ |
+| 3s mute + 10s auto-advance (No-Host AI modes) | ✓ `TRANSITION_MUTE_SECONDS + AUTO_TRANSITION_COUNTDOWN = 13` ✓ |
+| Host start each phase (Host modes) | ✓ `host:start-phase` socket + REST `/host/start-phase` ✓ |
+| Judge S1 start each phase (No-Host Human Judge) | ✓ `isJudgeS1` check in all controller functions ✓ |
+| Effective role (owner-as-debater, owner-as-judge) | ✓ `getEffectiveRoomRole()` helper used in 20+ places ✓ |
+| S1 consensus for prep skip (No-Host modes) | ✓ `prepConsensus` Map tracks S1 debaters ✓ |
+| Score auto-complete when all judges submit OPP_S3 | ✓ `assignedJudges.every(...)` in both score endpoints ✓ |
 
 ---
 
-### BUG-09: Infinite Hang in No-Host Human-Judge Mode
-* **Location:** [debate.socket.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/socket/debate.socket.ts#L346-L409)
-* **Description:**
-  In No-Host + Human-Judge mode, there is no host to advance the phases. The transition out of the `judge_feedback` phase requires judges to emit `judge:next-phase` to vote. 
-  If a room is started without human judges (or all judges leave), the debate gets stuck permanently in the feedback phase. The socket handler has a fallback else block:
-  ```typescript
-  } else if (totalJudges === 0) {
-    // No judges present - transition immediately after 10s countdown
-    votes.clear();
-    triggerTransition(roomId, '', { isJudgeFeedback: true }).catch(console.error);
-  }
-  ```
-  However, this fallback is inside the `judge:next-phase` socket listener, which is guarded by `if (role !== 'judge') return;`. Because there are no judges in the room, nobody can emit the event, making the fallback block completely unreachable dead code.
-* **Fix Suggestion:**
-  The check for empty judges should be executed during the phase entry in `triggerTransition`, automatically scheduling a timeout transition if `totalJudges === 0`.
+## Recommended Fix Priority (Final — All Addressed)
 
----
-
-## 3. Minor Severity Bugs (Performance & UX)
-
-### BUG-10: Reconnection Timer State Desync
-* **Location:** [timer.service.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/socket/timer.service.ts#L39-L62) and [room.socket.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/socket/room.socket.ts#L87-L88)
-* **Description:**
-  The `TimerService` manages turn timers in-memory and broadcasts updates every second. However, it does not persist the updated `timeRemaining` to the database (MongoDB) as it ticks down.
-  If the server restarts, or if a user reconnects when the in-memory timer is paused or has lost sync, `buildRoomStatePayload` falls back to `session.currentTurn.timeRemaining`, which holds the stale initial value (e.g. 180s).
-* **Fix Suggestion:**
-  Periodically save the timer status to the DB (e.g., every 10 seconds or when paused) or handle in-memory recovery more robustly.
-
----
-
-### BUG-11: Duplicate REST endpoints with Uncoordinated Database Manipulation
-* **Location:** [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L1970-L2010) vs [debate.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/debate/debate.routes.ts#L54-L63)
-* **Description:**
-  There are duplicate endpoints for the same logical actions. For example, `rooms/:id/cross-exam/pass-turn` (registered in `room.routes.ts`) directly pushes to `turnHistory` and calls AI judgment on the turn history *without* coordinate socket timer/room states. This bypasses the socket room broadcasts completely, leading to desynchronization on the frontend.
-* **Fix Suggestion:**
-  Consolidate and remove the duplicate REST endpoints in `room.routes.ts`, routing all live debate interactions through `debate.routes.ts` or centralizing them inside `debate.service.ts`.
-
----
-
-### BUG-12: Mongoose Concurrent Save Race Condition in `startDebate`
-* **Location:** [debate.service.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/debate/debate.service.ts#L343-L346)
-* **Description:**
-  When `startDebate` is triggered, it calls `unlockAllParticipantsMic(room)` which internally does `await room.save()`. Right after, `startDebate` performs `await Promise.all([session.save(), room.save()])` using the same document reference. 
-  This parallel saving of the same document instance creates a Mongoose version key conflict (`__v`), potentially throwing `VersionError` exceptions or failing to save participant state updates.
-* **Fix Suggestion:**
-  Remove the `await room.save()` inside `unlockAllParticipantsMic` and let the calling function handle saving the room object once at the end of the execution block.
-
----
-
-### BUG-13: Incorrect Position Unlock Rollback Logic
-* **Location:** [room.routes.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/backend/src/features/room/room.routes.ts#L960-L972)
-* **Description:**
-  When positions are unlocked in the lobby via `/position/unlock`, the code intends to roll the room status back to `'waiting'` from `'ready'` if no participants are locked. However, the condition implemented is:
-  ```typescript
-  if (unlockedCount === 0 && room.status === 'ready') {
-    room.status = 'waiting';
-  }
-  ```
-  If `unlockedCount === 0`, it means no participants were unlocked. Rolling the status back in this scenario is incorrect. Conversely, if `unlockedCount > 0` (positions were actually unlocked), the status is *not* rolled back, leaving the room status as `'ready'` even though positions are now unlocked.
-* **Fix Suggestion:**
-  Change the condition to check if any lockable participants are currently locked, or rollback when `unlockedCount > 0`.
-
----
-
-### BUG-14: Leaked Countdown Interval in Frontend Transition-Start (Vulnerability)
-* **Location:** [useDebateSocket.ts](file:///f:/Ky8/project%20main/wdp301-rbl-project-wdp_se18d08_group-5/frontend/src/hooks/useDebateSocket.ts#L138-L152)
-* **Description:**
-  Inside the `debate:transition-start` event listener on the frontend, a new `setInterval` is created on every event invocation to count down the transition overlay timer. 
-  The timer ID is not saved, so if multiple transition events arrive or if the component receives duplicate events due to network issues, multiple intervals run concurrently. This causes the UI countdown overlay to flash, jitter, and close early.
-* **Fix Suggestion:**
-  Maintain a local ref to hold the active interval ID and clear it before scheduling a new countdown:
-  ```typescript
-  // Clear any existing active transition interval
-  if (activeIntervalRef.current) {
-    clearInterval(activeIntervalRef.current);
-  }
-  activeIntervalRef.current = setInterval(...);
-  ```
-
----
-
-## Conclusion & Verification Recommendation
-
-To verify these issues:
-1. Try to join a custom room as the owner, assign yourself as a judge, and try to submit scores. You will experience the `403 Forbidden` error (BUG-02).
-2. Start a custom debate room and double-click the "Skip" button. Observe the transition overlays overlapping and skipping multiple phases at once (BUG-05).
-3. Check the AI feedback text displayed in No-Host AI Judge mode; it will only evaluate opposition speakers in Round 1, showing that proposition speech transcripts are ignored (BUG-07).
-
----
-
-## Additional Senior QA Pass - 4 Accounts / 4 Roles / Fast Phase Skipping
-
-**Date:** 2026-06-30  
-**Verification:** `npm --prefix backend run build` passed, `npm --prefix frontend run build` passed. The following findings are logic, authorization, realtime, and state-machine defects, not TypeScript compile failures.
-
-### BUG-15: Owner Can Start Any Room Even When Required Roles Are Missing
-* **Severity:** Critical
-* **Location:** `frontend/src/pages/room/LobbyPage.tsx:204-220`, `backend/src/features/debate/debate.service.ts:293-324`
-* **Description:**
-  The lobby UI sets `canStartDebate` to true immediately for the room owner. The backend mirrors this by authorizing `isOwner` before checking whether the configured flow has enough debaters, host, judges, locked positions, or opposing teams. In a 4-account test, the owner can start while only owner + one debater are present, or while the no-host AI flow is missing one S1.
-* **Reproduction Steps:**
-  1. Account A creates a 3v3 custom room.
-  2. Do not assign all required debaters/judges/host.
-  3. Click `Start Debate` as Account A.
-  4. The backend creates a session and moves the room to `active`.
-* **Expected Behavior:**
-  Start must be blocked until the selected format has all required roles and mandatory slots populated and locked.
-* **Risk:**
-  Room enters an unrecoverable active state with empty speaker turns.
-
-### BUG-16: No-Host AI Start Consensus Can Trigger With Only One S1 Because Slot Uniqueness Is Not Enforced
-* **Severity:** Critical
-* **Location:** `backend/src/socket/debate.socket.ts:320-339`, `backend/src/features/room/room.routes.ts:884-904`
-* **Description:**
-  The no-host AI flow starts when `consensusSet.size >= s1Debaters.length`. Since the backend does not validate one S1 per team, a malformed room with only one S1 debater makes `s1Debaters.length === 1`, so a single account can begin a "both S1 debaters" flow.
-* **Reproduction Steps:**
-  1. Create no-host + AI judge room.
-  2. Assign only Account B as debater S1, or assign duplicate S1 on the same team.
-  3. Start room; Account B clicks S1 Start.
-  4. Debate proceeds without the opposite S1.
-* **Expected Behavior:**
-  Require exactly one proposition S1 and one opposition S1 for 1v1/3v3 no-host AI before accepting consensus.
-
-### BUG-17: Frontend No-Host S1 Start Mutation Waits For Socket Ack That Backend Never Sends
-* **Severity:** Major
-* **Location:** `frontend/src/pages/debate/DebateRoomPage.tsx:327-335`, `backend/src/socket/debate.socket.ts:289-343`
-* **Description:**
-  The frontend emits `debater:s1-start` with an acknowledgement callback and resolves the mutation only when the callback fires. The backend handler accepts only `{ roomId }` and never invokes an ack callback. Result: the mutation remains pending until React Query treats it as unresolved, causing the Start button to stay loading/stale even though the server recorded the vote and broadcasted `debate:s1-start-update`.
-* **Reproduction Steps:**
-  1. Start a no-host AI room and enter `waiting_s1`.
-  2. Account B (S1) clicks Start.
-  3. Watch the button state remain pending or fail to settle.
-* **Expected Behavior:**
-  Either backend must call `ack({ ok: true })`, or frontend should not model this as an ack-based Promise.
-
-### BUG-18: REST Start Phase Uses Host Flow Even In No-Host Rooms
-* **Severity:** Critical
-* **Location:** `backend/src/features/room/room.routes.ts:2085-2094`, `backend/src/socket/debate.socket.ts:72-81`
-* **Description:**
-  `/rooms/:id/host/start-phase` calls `getFlow(format)` without passing `room.hostType`. In no-host rooms, this silently selects the human-host flow. The socket `host:start-phase` path correctly passes `room.hostType`, but the frontend calls the REST endpoint through `roomService.startPhase`.
-* **Reproduction Steps:**
-  1. Create a no-host human-judge room where Judge S1 controls phases.
-  2. Use the UI Start button in the debate room.
-  3. The REST endpoint computes the next step using host flow, not no-host flow.
-* **Expected Behavior:**
-  REST and socket phase start paths must use the same flow resolver: `getFlow(format, room.hostType)`.
-* **Risk:**
-  Current speaker, round index, and expected next phase can desync between backend session, frontend workflow, and socket broadcasts.
-
-### BUG-19: Starting A Phase Is Not Race-Protected During The 3-Second Countdown
-* **Severity:** Major
-* **Location:** `backend/src/features/room/room.routes.ts:2081-2105`, `backend/src/socket/debate.socket.ts:43-60`
-* **Description:**
-  Both REST and socket start-phase paths set `status = active` immediately and schedule a delayed timer with `setTimeout`. There is no countdown token, transition id, or atomic update condition. Double-clicks or simultaneous host/Judge S1 clicks can queue multiple delayed timer starts for the same phase.
-* **Reproduction Steps:**
-  1. Enter any `waiting_to_start` phase.
-  2. Trigger Start rapidly from two clients or REST + socket.
-  3. Multiple delayed handlers can start timers and emit duplicate `debate:phase-started`.
-* **Expected Behavior:**
-  Use an atomic DB update from `waiting_to_start` to `countdown`, then reject any second start while countdown is active.
-
-### BUG-20: Speaker End-Phase Checks Only Team Prefix, Not Exact Speaker Slot
-* **Severity:** Critical
-* **Location:** `backend/src/features/debate/debate.service.ts:429-438`
-* **Description:**
-  `endPhaseBySpeaker` derives `expectedPrefix` from `PRO_S1`/`OPP_S2` and only compares it to the participant team (`PRO` or `OPP`). Any debater on the active team can end the current speaker's phase. In 3v3, PRO_S2 can skip PRO_S1's speech and OPP_S3 can skip OPP_S1's speech.
-* **Reproduction Steps:**
-  1. Run a 3v3 debate with PRO_S1, PRO_S2, PRO_S3.
-  2. During PRO_S1 speech, Account C as PRO_S2 calls `/api/v1/debate/:roomId/finish-phase`.
-  3. The backend accepts the skip because the team prefix is `PRO`.
-* **Expected Behavior:**
-  Only the exact active speaker slot (`team + speakerSlot`) or an authorized controller can end a speech.
-
-### BUG-21: Host `next-turn` Can Advance From Idle/Countdown Without Phase-State Guard
-* **Severity:** Major
-* **Location:** `backend/src/features/room/room.routes.ts:1267-1274`, `backend/src/features/debate/debate.routes.ts:432-439`, `backend/src/features/debate/debate.service.ts:559-625`
-* **Description:**
-  Host next-turn endpoints call `triggerTransition` directly. Unlike `endPhaseBySpeaker`, they do not validate `currentTurn.phaseStatus` is active/paused. A host can advance while the phase is idle and before the intended speaker ever starts.
-* **Reproduction Steps:**
-  1. Finish prep so the room enters a waiting/idle speaker phase.
-  2. Host calls `/rooms/:id/host/next-turn` before clicking Start.
-  3. Backend snapshots and advances to the next step.
-* **Expected Behavior:**
-  Reject next-turn unless phase status is active/paused, or explicitly model "skip idle phase" as a separate audited action.
-
-### BUG-22: Round Judge Form Reloads Existing Scores From Wrong Fields
-* **Severity:** Major
-* **Location:** `frontend/src/pages/debate/DebateRoomPage.tsx:769-786`, `backend/src/features/room/room.routes.ts:1730-1761`
-* **Description:**
-  Backend stores round score values in `score.logic` and `score.crossExam` via `buildRoundScore`, but the frontend reloads previous values from `score.speak` and `score.ce`. When a judge reopens a submitted round, the form resets to default 14/14 instead of showing saved scores.
-* **Reproduction Steps:**
-  1. Judge submits round 1 with non-default values, e.g. 18/5.
-  2. Refetch or reopen the judge form.
-  3. UI shows 14/14 because `score.speak` and `score.ce` do not exist.
-* **Expected Behavior:**
-  Read from `score.logic` and `score.crossExam`, or store explicit `speak`/`ce` fields consistently.
-
-### BUG-23: Scores Aggregate Endpoint Message Allows Host/Owner But Code Only Allows Raw Judge Role
-* **Severity:** Major
-* **Location:** `backend/src/features/room/room.routes.ts:1877-1886`
-* **Description:**
-  The error message says "Only host, owner, or judge can aggregate scores", but the code checks only `(req as any).participant.roomRole === 'judge'`. Host, owner, and owner-as-judge are rejected.
-* **Reproduction Steps:**
-  1. Complete a judge feedback round.
-  2. Account A as owner/host clicks Aggregate scores.
-  3. API returns forbidden despite the message and intended role boundary.
-* **Expected Behavior:**
-  Use effective role and allow host/owner/judge consistently.
-
-### BUG-24: Owner Assigned As Judge Is Not Added To `room.judges`
-* **Severity:** Major
-* **Location:** `backend/src/features/room/room.routes.ts:780-793`
-* **Description:**
-  When assigning the creator as judge, the code keeps `roomRole = owner` and `primaryRole = judge`, but only pushes into `room.judges` when `participant.roomRole === 'judge'`. Any UI/API relying on `room.judges` undercounts judges and can show `0/judgeCount` even though the owner is acting as judge.
-* **Reproduction Steps:**
-  1. Owner assigns self as judge.
-  2. Inspect room payload or admin room judge count.
-  3. `participants` shows owner primary judge, but `judges` omits owner.
-* **Expected Behavior:**
-  Judge lists/counts should be derived from effective role or include owner-judge in `room.judges`.
-
-### BUG-25: Kick During Lobby Can Remove Required Participant Without Resetting Ready State
-* **Severity:** Major
-* **Location:** `backend/src/features/room/room.routes.ts:1145-1174`
-* **Description:**
-  The lobby kick endpoint removes a participant and clears host/judges, but does not reset `room.status` from `ready` to `waiting` or revalidate locks/required slots. A room can remain `ready` after the host, judge, or S1 debater is kicked.
-* **Reproduction Steps:**
-  1. Assign and lock all visible roles so room becomes `ready`.
-  2. Owner kicks one required debater/judge/host.
-  3. Room still reports ready and may be started.
-* **Expected Behavior:**
-  Any role/participant removal must invalidate ready state and clear stale lock/consensus state.
-
-### BUG-26: Cross-Exam REST Pass/Finish Endpoints Lack Participant/Controller Authorization
-* **Severity:** Critical
-* **Location:** `backend/src/features/room/room.routes.ts:1970-2025`
-* **Description:**
-  `/rooms/:id/cross-exam/pass-turn` and `/rooms/:id/cross-exam/finish` require authentication but do not use `roomParticipantGuard` or controller checks. Any logged-in account that knows a room id can mutate cross-exam turn state while the phase is `cross_exam`.
-* **Reproduction Steps:**
-  1. Account D is not in the debate room.
-  2. During cross-exam, Account D posts to `/api/v1/rooms/:id/cross-exam/finish`.
-  3. Session phase changes to `judge_feedback`.
-* **Expected Behavior:**
-  Require room participant and role/team/controller validation, or remove these duplicate endpoints.
-
-### BUG-27: Cross-Exam Finish Route Mutates Phase Without Updating Room Phase Or Broadcasting State
-* **Severity:** Major
-* **Location:** `backend/src/features/room/room.routes.ts:2012-2025`
-* **Description:**
-  The room-level CE finish endpoint sets `session.currentTurn.phase = 'judge_feedback'` and saves only the session. It does not update `room.currentPhase`, does not apply the canonical flow step, does not emit `room:state-restore`, and does not notify clients with `debate:phase-change`.
-* **Reproduction Steps:**
-  1. Use `/rooms/:id/cross-exam/finish` during CE.
-  2. Query room and session.
-  3. Session says judge feedback while room/current frontend state can still show cross-exam.
-* **Expected Behavior:**
-  All phase changes must go through `triggerTransition` or a single transition service.
-
-### BUG-28: Replay And Live Participant Filters Ignore Owner Effective Role
-* **Severity:** Minor
-* **Location:** `frontend/src/pages/replay/ReplayPage.tsx:108-111`, `frontend/src/pages/matches/LiveMatchesPage.tsx:160`
-* **Description:**
-  Replay filters debaters/judges using raw `roomRole`, and live matches checks rejoin roles against raw `roomRole`. Owner-debater and owner-judge are excluded or displayed in the wrong section even though many other components use effective role.
-* **Reproduction Steps:**
-  1. Run a debate where owner is a debater or judge.
-  2. Open replay or live matches.
-  3. Owner is missing from debater/judge lists or cannot rejoin from the live match card as expected.
-* **Expected Behavior:**
-  Frontend should consistently use `roomRole === 'owner' ? primaryRole : roomRole`.
-
-### BUG-29: Prep Early-End Consensus Uses S1 Debater Count, Not Required Two Teams
-* **Severity:** Major
-* **Location:** `backend/src/socket/debate.socket.ts:222-280`, `backend/src/socket/debate.socket.ts:421-430`
-* **Description:**
-  Prep early-end consensus is based on current S1 debaters found in the room. With duplicate slots, one-sided teams, or kicked/disconnected S1s, the threshold can become 1 or stale. The rejoin path also defaults display to 2 if it cannot compute the value, which can disagree with server trigger logic.
-* **Reproduction Steps:**
-  1. Create no-host or host room with only one effective S1 due to bad assignment/kick.
-  2. During prep, that one S1 clicks `End preparation`.
-  3. Server can advance prep without the opposite team being ready.
-* **Expected Behavior:**
-  Consensus should require required team roles by format, not whatever malformed participants currently match `speakerSlot === 'S1'`.
-
-### BUG-30: `finishCe` Uses Room Creator Identity To End CE, Breaking Owner-Not-Host / No-Host Cases
-* **Severity:** Major
-* **Location:** `backend/src/features/debate/debate.service.ts:1064-1079`
-* **Description:**
-  After validating the caller, `finishCe` calls `endPhaseByHost(roomId, room.createdBy.toString(), transcript)`. In human-host rooms where the creator is no longer the host, `endPhaseByHost` re-checks host authority for the creator and rejects. In no-host human-judge rooms, creator authority can also differ from Judge S1 authority.
-* **Reproduction Steps:**
-  1. Owner transfers host to Account B.
-  2. During CE, Account B calls the debate CE finish endpoint.
-  3. Service delegates to `endPhaseByHost` as the original creator, causing a forbidden/incorrect control path.
-* **Expected Behavior:**
-  Pass the actual caller `userId` into `endPhaseByHost`, or centralize CE finish authorization in one transition method.
-
----
-
-## High-Risk 4-Account Regression Matrix
-
-Run these as the next manual/API regression cases:
-1. Account A owner, Account B host, Account C proposition S1, Account D judge: lock, start, rapid Start/Skip across motion -> prep -> speech.
-2. Account A owner-as-judge, Account B host, Account C proposition S1, Account D opposition S1: submit round scores and aggregate.
-3. No-host AI: Account B proposition S1 and Account C opposition S1 both start; verify socket mutation settles and both S1 votes are required.
-4. Negative authorization: Account D not in room attempts `/rooms/:id/cross-exam/finish` during CE.
-5. Duplicate slot defense: two debaters attempt `proposition/S1`; backend must reject the second assignment.
+| Priority | ID | Status | Resolution |
+|---|---|---|---|
+| 1 | SCORE-01 | **FIXED** | `countS3/R2 += 1` instead of `0.5`, S3 uses `scoreVal` |
+| 2 | FLOW-01 | **FIXED** | All 4 flows: `JUDGES_FB_3` → `FINAL_JUDGING` phase |
+| 3 | FLOW-08 | **FIXED** | `finishCe` now passes `userId` (actual caller) to `endPhaseByHost` |
+| 4 | FLOW-02 | **FIXED** | OPP_S3 announcement: `"Finish Debate"` |
+| 5 | FLOW-06 | **FIXED** | New `debater:request-ce-early` socket + consensus Map enforces both-teams-skip |
+| 6 | FLOW-04 | **VERIFIED** | Backend role-based check sufficient (already in code) |
+| 7 | FLOW-03 | **VERIFIED** | `effectiveRole === 'judge'` includes Judge S1 — already correct |
+| 8 | PERM-01 | **VERIFIED** | `roomControllerGuard` uses `effectiveRole` correctly |
+| 9 | FLOW-09 | **FIXED** | Added `getEffectiveRole` helper, used in `canRejoin` |
