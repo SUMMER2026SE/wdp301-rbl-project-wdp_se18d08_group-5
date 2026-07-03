@@ -548,6 +548,13 @@ export default function DebateRoomPage() {
   const { cameraActive, peers: videoPeers, startCamera, stopCamera, localStream } =
     useDebateVideo({ roomId, enabled: debateStartedEffective });
 
+  // Local speaker-turn mic state — the primary WebRTC mic is managed by the
+  // <MicToggle> component; these stubs drive the secondary "Speak / Mute mic"
+  // toggle button shown to the active speaker during their speech phase.
+  const [isListening, setIsListening] = useState(false);
+  const startMic = useCallback(() => setIsListening(true), []);
+  const stopMic = useCallback(() => setIsListening(false), []);
+
   // Auto redirect handled by ResultBanner (10s countdown with View Result button).
   // We only clear the debate-room storage here so the return-to-debate banner
   // doesn't appear on the replay page.
@@ -724,15 +731,7 @@ export default function DebateRoomPage() {
     effectiveRole === 'debater' &&
     currentParticipant?.team === currentSpeakerTeam &&
     currentPhase === 'speech';
-  const canUseMicrophone = Boolean(
-    currentParticipant &&
-      (
-        isController ||
-        isMyTurnToSpeak ||
-        currentParticipant.roomRole === 'debater' ||
-        (isViewer && (speakingAllowed || currentParticipant.speakingAllowed))
-      ),
-  );
+
 
   // Gemini's input transcript replaces the browser-only speech recognition
   // as the transcript that is persisted for the active speaker's turn.
