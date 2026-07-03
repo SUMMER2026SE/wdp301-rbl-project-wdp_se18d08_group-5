@@ -106,7 +106,12 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
 
 /**
  * No-Host 3v3 workflow — mirrors backend DEBATE_FLOW_NOHost_3V3.
+<<<<<<< HEAD
  * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
+=======
+ * R2: PRO→OPP (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * WAITING_S1_START at index 0 aligns with backend for correct step matching.
+>>>>>>> 7a3a83b (fix: resolve private room access and realtime synchronization)
  */
 const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -119,8 +124,13 @@ const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
+<<<<<<< HEAD
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
+=======
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
+>>>>>>> 7a3a83b (fix: resolve private room access and realtime synchronization)
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },

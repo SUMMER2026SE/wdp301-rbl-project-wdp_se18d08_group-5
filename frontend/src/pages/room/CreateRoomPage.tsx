@@ -216,6 +216,9 @@ export default function CreateRoomPage() {
                         <option value="ai">AI Evaluator</option>
                         <option value="human">Human Panel Judges</option>
                       </Form.Select>
+                      {form.judgeType === 'ai' && (
+                        <Form.Text className="text-muted">AI Judge always uses exactly 1 judge.</Form.Text>
+                      )}
                     </Form.Group>
                   </Col>
                 </Row>

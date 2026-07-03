@@ -1198,6 +1198,7 @@ at:
 #1      Future.any.onValue (dart:async/future.dart:637)
 <asynchronous suspension>
 
+<<<<<<< HEAD
 [custom_lint] 2026-07-08T10:53:23.650508 Error: Couldn't resolve the package 'custom_lint_builder' in 'package:custom_lint_builder/src/channel.dart'.
 [custom_lint] 2026-07-08T10:53:23.650508 lib/custom_lint_client.dart:3:8: Error: Not found: 'package:custom_lint_builder/src/channel.dart'
 [custom_lint] 2026-07-08T10:53:23.650508 import 'package:custom_lint_builder/src/channel.dart';
@@ -1357,6 +1358,47 @@ at:
 [custom_lint] 2026-07-04T22:03:51.250317   ^^^^^^^^^
 [custom_lint] 2026-07-04T22:03:51.250317
 [custom_lint] 2026-07-04T22:03:51.250317
+=======
+[custom_lint] 2026-07-03T18:18:52.373012 Error: Couldn't resolve the package 'custom_lint_builder' in 'package:custom_lint_builder/src/channel.dart'.
+[custom_lint] 2026-07-03T18:18:52.373012 lib/custom_lint_client.dart:3:8: Error: Not found: 'package:custom_lint_builder/src/channel.dart'
+[custom_lint] 2026-07-03T18:18:52.373012 import 'package:custom_lint_builder/src/channel.dart';
+[custom_lint] 2026-07-03T18:18:52.373012        ^
+[custom_lint] 2026-07-03T18:18:52.373012 lib/custom_lint_client.dart:4:8: Error: Error when reading '../../Pub/Cache/hosted/pub.dev/riverpod_lint-3.1.4/lib/riverpod_lint.dart': The system cannot find the file specified
+[custom_lint] 2026-07-03T18:18:52.373012 import 'package:riverpod_lint/riverpod_lint.dart' as riverpod_lint;
+[custom_lint] 2026-07-03T18:18:52.373012        ^
+[custom_lint] 2026-07-03T18:18:52.373012 lib/custom_lint_client.dart:16:37: Error: Undefined name 'createPlugin'.
+[custom_lint] 2026-07-03T18:18:52.373012     {'riverpod_lint': riverpod_lint.createPlugin,
+[custom_lint] 2026-07-03T18:18:52.373012                                     ^^^^^^^^^^^^
+[custom_lint] 2026-07-03T18:18:52.373012 lib/custom_lint_client.dart:11:3: Error: Method not found: 'runSocket'.
+[custom_lint] 2026-07-03T18:18:52.373012   runSocket(
+[custom_lint] 2026-07-03T18:18:52.373012   ^^^^^^^^^
+[custom_lint] 2026-07-03T18:18:52.373012
+[custom_lint] 2026-07-03T18:18:52.373012
+>>>>>>> 7a3a83b (fix: resolve private room access and realtime synchronization)
+Failed to start pluginsThe request analysis.setContextRoots failed with the following error:
+RequestErrorCode.PLUGIN_ERROR
+Bad state: Failed to start the plugins.
+at:
+#0      SocketCustomLintServerToClientChannel._checkInitializationFail.<anonymous closure> (package:custom_lint/src/v2/server_to_client_channel.dart:223)
+<asynchronous suspension>
+#1      Future.any.onValue (dart:async/future.dart:637)
+<asynchronous suspension>
+
+[custom_lint] 2026-07-13T13:37:25.082621 Error: Couldn't resolve the package 'custom_lint_builder' in 'package:custom_lint_builder/src/channel.dart'.
+[custom_lint] 2026-07-13T13:37:25.082621 lib/custom_lint_client.dart:3:8: Error: Not found: 'package:custom_lint_builder/src/channel.dart'
+[custom_lint] 2026-07-13T13:37:25.082621 import 'package:custom_lint_builder/src/channel.dart';
+[custom_lint] 2026-07-13T13:37:25.082621        ^
+[custom_lint] 2026-07-13T13:37:25.082621 lib/custom_lint_client.dart:4:8: Error: Error when reading '/Users/mac/.pub-cache/hosted/pub.dev/riverpod_lint-3.1.4/lib/riverpod_lint.dart': No such file or directory
+[custom_lint] 2026-07-13T13:37:25.082621 import 'package:riverpod_lint/riverpod_lint.dart' as riverpod_lint;
+[custom_lint] 2026-07-13T13:37:25.082621        ^
+[custom_lint] 2026-07-13T13:37:25.082621 lib/custom_lint_client.dart:16:37: Error: Undefined name 'createPlugin'.
+[custom_lint] 2026-07-13T13:37:25.082621     {'riverpod_lint': riverpod_lint.createPlugin,
+[custom_lint] 2026-07-13T13:37:25.082621                                     ^^^^^^^^^^^^
+[custom_lint] 2026-07-13T13:37:25.082621 lib/custom_lint_client.dart:11:3: Error: Method not found: 'runSocket'.
+[custom_lint] 2026-07-13T13:37:25.082621   runSocket(
+[custom_lint] 2026-07-13T13:37:25.082621   ^^^^^^^^^
+[custom_lint] 2026-07-13T13:37:25.082621
+[custom_lint] 2026-07-13T13:37:25.082621
 Failed to start pluginsThe request analysis.setContextRoots failed with the following error:
 RequestErrorCode.PLUGIN_ERROR
 Bad state: Failed to start the plugins.
