@@ -1,5 +1,5 @@
 // ============================================================
-// SHARED TYPES — Phù hợp với Database Schema trong 04_TRD
+// SHARED TYPES — Aligned with the Database Schema in 04_TRD
 // ============================================================
 
 // --- Enums ---
@@ -16,6 +16,7 @@ export type CardType = 'yellow' | 'red';
 export type MessageType = 'chat' | 'system' | 'announcement' | 'cross-exam';
 
 export type DebatePhase =
+  | 'waiting_s1'
   | 'motion'
   | 'prep_7'
   | 'speech'
@@ -134,12 +135,14 @@ export interface RoomParticipant {
   username: string;
   avatar: string;
   roomRole: RoomRole;
+  primaryRole?: RoomRole | null;
   team: Team | null;
   speakerSlot: SpeakerSlot | null;
   positionLocked: boolean;
   muted?: boolean;
   speakingAllowed?: boolean;
   chatMuted?: boolean;
+  cameraMuted?: boolean;
 }
 
 export interface DebateRoom {
@@ -195,6 +198,32 @@ export interface SubmitJudgeScoreRequest {
   communication: number;
   winner?: Team | 'draw';
   notes?: string;
+}
+
+// Round-based judge evaluation (new UX).
+// Each round = one Judge Feedback phase where the judge scores BOTH teams.
+export interface SubmitJudgeRoundScoresRequest {
+  round: 1 | 2 | 3;
+  proposition: {
+    speaker: SpeakerTurn; // PRO_S1 | PRO_S2 | PRO_S3
+    speak: number;        // 0-20
+    ce: number;           // 0-20 (ignored in round 3)
+    notes?: string;
+  };
+  opposition: {
+    speaker: SpeakerTurn; // OPP_S1 | OPP_S2 | OPP_S3
+    speak: number;        // 0-20
+    ce: number;           // 0-20 (ignored in round 3)
+    notes?: string;
+  };
+}
+
+export interface SubmitJudgeRoundScoresResponse {
+  round: number;
+  proposition: { speaker: SpeakerTurn; score: ScoreBreakdown; notes: string };
+  opposition: { speaker: SpeakerTurn; score: ScoreBreakdown; notes: string };
+  finalScores: FinalScores;
+  autoCompleted: boolean;
 }
 
 export interface SubmitJudgeScoreResponse {
@@ -325,6 +354,12 @@ export interface DebateSession {
   }[];
   finalScores: FinalScores | null;
   aiSummary: string | null;
+  pauseType?: 'host' | 'proposition' | 'opposition' | null;
+  pausedAt?: string | null;
+  pausesUsed?: {
+    proposition: number;
+    opposition: number;
+  };
 }
 
 // --- Chat ---

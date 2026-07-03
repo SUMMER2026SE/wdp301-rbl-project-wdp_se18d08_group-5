@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ENV } from '@/config/env';
 import { useAuthStore } from '@stores/authStore';
@@ -54,17 +54,15 @@ function ensureSocket(accessToken: string): Socket {
  */
 export function useSocket() {
   const { accessToken, isAuthenticated } = useAuthStore();
-  const socketRef = useRef<Socket | null>(null);
+  const [activeSocket, setActiveSocket] = useState<Socket | null>(socket);
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) {
-      socketRef.current = null;
+      setActiveSocket(null);
       return;
     }
-    socketRef.current = ensureSocket(accessToken);
-    return () => {
-      // Don't disconnect on unmount — keep connection alive
-    };
+    const s = ensureSocket(accessToken);
+    setActiveSocket(s);
   }, [isAuthenticated, accessToken]);
 
   const joinRoom = useCallback((roomId: string) => {
@@ -82,15 +80,16 @@ export function useSocket() {
   const disconnect = useCallback(() => {
     socket?.disconnect();
     socket = null;
+    setActiveSocket(null);
   }, []);
 
   return {
-    socket: socketRef.current,
+    socket: activeSocket,
     joinRoom,
     leaveRoom,
     sendMessage,
     disconnect,
-    isConnected: socket?.connected ?? false,
+    isConnected: activeSocket?.connected ?? false,
   };
 }
 

@@ -1,0 +1,354 @@
+{
+  "loading": "読み込み中...",
+  "retry": "再試行",
+  "backToMatches": "試合に戻る",
+  "back": "戻る",
+  "cancel": "キャンセル",
+  "close": "閉じる",
+  "save": "保存",
+  "submit": "提出",
+  "confirm": "確認",
+  "yes": "はい",
+  "no": "いいえ",
+
+  "debateRoom": {
+    "loading": "討論室を読み込み中...",
+    "sessionStarting": "討論セッションを開始しています...",
+    "hostClickedStart": "ホストがSTARTをクリックしました",
+    "syncBanner": "ライブ討論状態を同期中...",
+    "phaseTransition": "フェーズ移行",
+    "muteMicAndLockChat": "マイクをミュートしチャットをロック",
+    "startsIn": "{{label}}がまもなく開始",
+    "startingSoon": "まもなく開始",
+    "startNow": "開始!",
+
+    "privateRoom": "プライベート討論室",
+    "enterPassword": "この討論はプライベートです。パスワードを入力してオブザーバーとして参加してください。",
+    "passwordPlaceholder": "パスワードを入力...",
+    "enterRoom": "入室",
+    "backToMatch": "試合に戻る",
+
+    "roomNotFound": "部屋データを読み込めませんでした。討論室が存在しないか、セッションが期限切れになっている可能性があります。",
+    "roomNotFoundRetry": "再試行",
+    "roomNotFoundBack": "試合に戻る",
+
+    "privatePasswordWrong": "パスワードが正しくありません",
+    "joiningAsSpectator": "オブザーバーとして参加中...",
+    "joinedAsSpectator": "オブザーバーとして参加しました",
+    "failedToJoin": "討論室に参加できませんでした",
+
+    "proposition": "olvable",
+    "opposition": "否定側",
+
+    "camera": "カメラ",
+    "liveCamera": "ライブカメラ",
+    "viewerOnly": "觀覧者的モード",
+    "viewerCount": "觀覧者数",
+    "spectator": "觀覧者",
+    "empty": "空",
+
+    "workflow": "ワークフロー",
+    "current": "現在",
+    "next": "次",
+    "waiting": "待機",
+    "result": "結果",
+    "completed": "完了",
+
+    "notifications": "通知",
+    "noNotifications": "まだ通知はありません。",
+
+    "countdown": {
+      "matchStarting": "試合開始",
+      "startsIn": "{{label}}がまもなく開始"
+    },
+
+    "previousScores": {
+      "round": "ラウンド{{round}}"
+    },
+
+    "winner": {
+      "label": "勝者:",
+      "waiting": "待機中"
+    },
+
+    "debateEnded": "討論終了！勝者：{{winner}}",
+
+    "speakerStatus": {
+      "speaking": "発言中",
+      "waiting": "待機中",
+      "empty": "空"
+    },
+
+    "spectator": "觀覧者",
+
+    "scoreBreakdown": {
+      "speak": "スピーチ:",
+      "ce": "CE:"
+    },
+
+    "matchChat": "試合チャット",
+    "noMessages": "まだメッセージはありません。",
+    "joinAsParticipantToChat": "參加者として参加してチャット",
+
+    "crossExam": {
+      "sharedTimer": "共有CEタイマー",
+      "propQuestionsLeft": "olvableの残り質問",
+      "oppQuestionsLeft": "否定側の残り質問",
+      "askQuestion": "質問する",
+      "cannotFinish": "このビューからCEを終了できません",
+      "finishCE": "CE終了",
+      "ask": "質問",
+      "pass": "パス"
+    },
+
+    "judge": {
+      "assigned": "割り当てられた審判",
+      "noJudges": "まだ審判がいません",
+      "quickReaction": "クイックリアクション",
+      "agree": "同意",
+      "disagree": "不同意",
+      "submitEvaluation": "評価を送信",
+      "currentStandings": "現在の順位",
+      "roundScores": "ラウンドスコア",
+      "aggregateScores": "合計スコア",
+      "determineWinner": "勝者を決定",
+      "notYetSubmitted": "この라운드はまだスコアが提交されていません。",
+      "noSubmitted": "未提交。",
+      "speech": "スピーチ",
+      "ce": "CE",
+      "notes": "メモ",
+      "score": "スコア",
+      "outOf": "{{value}}/20",
+      "judgeNotePlaceholder": "{{team}}のメモ...",
+      "scoreSubmitted": "라운드スコアが提交されました",
+      "failedToSubmit": "スコアの提交に失敗しました",
+      "canPreFill": "スコアとメモを事前に入力できます。スコアリングフェーズになったら提出をクリックしてください。",
+      "roundSubmitted": "라운드{{round}}が提交されました"
+    },
+
+    "actions": {
+      "start": "開始",
+      "skip": "スキップ",
+      "pause": "一時停止",
+      "resume": "再開",
+      "end": "終了",
+      "surrender": "降参",
+      "surrenderConfirm": "この試合を放棄しますか？",
+      "surrenderSent": "降参を送信しました",
+      "draw": "引き分け",
+      "acceptDraw": "引き分けを承諾",
+      "drawRequested": "引き分け要求を送信しました。相手チームの承諾を待っています。",
+      "drawRequestAlert": "{{name}}が引き分けを要求しました。承諾すると引き分けで試合が終了します。",
+      "drawSent": "引き分け要求を送信しました",
+      "actionFailed": "アクションに失敗しました",
+
+      "muteMic": "マイクをミュート",
+      "unmuteMic": "マイクをミュート解除",
+      "micMuted": "マイクがミュートされました",
+      "micUnmuted": "マイクのミュートが解除されました",
+      "micChangeFailed": "マイク状態の変更に失敗しました",
+
+      "turnCameraOff": "カメラをオフ",
+      "turnCameraOn": "カメラをオン",
+      "cameraDisabled": "カメラが無効になりました",
+      "cameraEnabled": "カメラが有効になりました",
+      "cameraChangeFailed": "カメラ状態の変更に失敗しました",
+
+      "muteChat": "チャットを無効",
+      "unmuteChat": "チャットを有効",
+      "chatDisabled": "チャットが無効になりました",
+      "chatEnabled": "チャットが有効になりました",
+      "chatChangeFailed": "チャット状態の変更に失敗しました",
+
+      "speak": "話す",
+      "lockedByHost": "ホストにロックされています"
+    },
+
+    "debateControls": "討論コントロール",
+    "participantControls": "参加者コントロール",
+    "user": "ユーザー",
+    "role": "役割",
+    "cam": "Cam",
+    "mic": "Mic",
+    "chat": "チャット",
+    "viewers": "觀覧者",
+    "viewersCount": "觀覧者{{count}}人",
+
+    "roles": {
+      "viewer": "觀覧者",
+      "debater": "辯論者",
+      "speaker": "スピーカー",
+      "judge": "審判",
+      "host": "ホスト",
+      "owner": "オーナー",
+      "prop": "PRO",
+      "opp": "OPP",
+      "propSlot": "PRO {{slot}}",
+      "oppSlot": "OPP {{slot}}"
+    },
+
+    "noHost": {
+      "waitingForS1": "S1の開始を待っています",
+      "s1MustStart": "両チームのS1がSTARTをクリックして試合を開始する必要があります。",
+      "judgeS1Responsible": "審判S1として、試合を開始する責任があります。",
+      "youHaveStarted": "あなたはSTARTをクリックしました",
+      "youHaveNotStarted": "まだSTARTをクリックしていません",
+      "started": "開始済み"
+    },
+
+    "preparation": {
+      "endPreparation": "準備を終了",
+      "ready": "準備完了",
+      "waitingForReady": "両チームの準備完了を待っています",
+      "countReady": "{{count}}/{{total}}"
+    },
+
+    "speakerStatus": {
+      "speaking": "発言中",
+      "asked": "質問中",
+      "idle": "空"
+    },
+
+    "privateRoom": {
+      "enter": "プライベートルームに入る",
+      "exit": "プライベートルームを出る",
+      "enterPrivateRoom": "プライベートルームに入る",
+      "exitPrivateRoom": "プライベートルームを出る",
+      "leftRoom": "プライベートルームを出ました",
+      "inThisRoom": "このルームには",
+      "noOneHere": "まだ誰もいません",
+      "you": "(あなた)"
+    },
+
+    "rules": {
+      "title": "討論室ルール",
+      "generalStructure": "一般的な構造",
+      "structureDesc": "この討論は、継続的な審判を伴う正式なターン制構造に従います：",
+      "motion": "モーション / 討論トピック",
+      "motionDesc": "ホストによって発表されるか、マッチング前に設定されます。",
+      "prep7": "準備（7分）",
+      "prep7Desc": "チームはプライベートルームで議論します。",
+      "speeches": "スピーチ（3分）",
+      "speechesDesc": "スピーカーは交代で論点を発表します。",
+      "crossExam": "交差質問（2分）",
+      "crossExamDesc": "チーム間の素早いQ&A。",
+      "judgeFeedback": "審判フィードバック",
+      "judgeFeedbackDesc": "審判がレビューして判定を提出します。",
+      "speakerPositions": "スピーカーポジション",
+      "s1": "S1（スピーカー1）",
+      "s1Desc": "議論のフレーミングと論点構造に焦点を当てます。",
+      "s2": "S2（スピーカー2）",
+      "s2Desc": "論点を拡張し、相手ケースを反駁します。",
+      "s3": "S3（スピーカー3 — クロージング）",
+      "s3Desc": "討論を要約します。S3後は交差質問はありません。",
+      "scoringCriteria": "スコアリング基準",
+      "scoringCriteriaDesc": "審判は{{max}}の基準でポイントを割り当てます：",
+      "logic": "論理学（{{max}}点）",
+      "logicDesc": "議論の一貫性と明瞭さ。",
+      "rebuttal": "反駁（{{max}}点）",
+      "rebuttalDesc": "相手の主張に反論する効果。",
+      "evidence": "証拠（{{max}}点）",
+      "evidenceDesc": "具体的なデータと論理的証明の使用。",
+      "crossExamCriteria": "交差質問（{{max}}点）",
+      "crossExamCriteriaDesc": "CE中の質問と防御スキル。",
+      "strategy": "戦略（{{max}}点）",
+      "strategyDesc": "論点の構造と優先順位。",
+      "communication": "コミュニケーション（{{max}}点）",
+      "communicationDesc": "発表、明瞭さ、声のコントロール。",
+      "closeRules": "ルールを閉じる"
+    },
+
+    "leave": {
+      "title": "討論室を出る",
+      "ownerWarning": "あなたはルームオーナーです。退出するには、まず所有権を转让する必要があります。",
+      "ownerWarning2": "後任を選択して所有権を转让するか、「今すぐ退出」をクリックして次の參加者に自動的に转让します。",
+      "onlyOneWarning": "ルームにあなたしかいないため、退出するとルームが閉じられます。",
+      "leaveNow": "今すぐ退出",
+      "leftRoom": "討論室を出ました",
+      "selectSuccessor": "後任を選択"
+    },
+
+    "admin": {
+      "title": "管理",
+      "controlPanel": "コントロールパネル",
+      "hostControlPanel": "ホストコントロールパネル",
+      "score": "スコア",
+      "privateRoom": "プライベートルーム",
+      "chat": "チャット",
+      "leaveRoom": "退出"
+    },
+
+    "errors": {
+      "cannotResolveSpeakers": "この라운드의スピーカーを解決できませんでした",
+      "scoresAggregated": "スコアが集計されました",
+      "failedToAggregate": "スコアの集計に失敗しました",
+      "winnerDetermined": "勝者が決定されました",
+      "failedToDetermine": "勝者の決定に失敗しました",
+      "phaseStarted": "フェーズが開始されました",
+      "failedToStartPhase": "フェーズの開始に失敗しました",
+      "waitingForOpposingS1": "相手のS1を待っています...",
+      "teamPauseStarted": "チーム一時停止が開始されました",
+      "failedToPause": "討論の一時停止に失敗しました",
+      "teamPauseResumed": "チームが再開しました",
+      "failedToResume": "討論再開に失敗しました",
+      "micMutedByHost": "ホストがあなたのマイクをミュートしました",
+      "micUnmutedByHost": "ホストがあなたのマイクのミュートを解除しました",
+      "chatRestrictedByHost": "ホストがあなたのチャットを制限しました",
+      "chatRestoredByHost": "ホストがあなたのチャットを復元しました",
+      "cameraRestrictedByHost": "ホストがあなたのカメラを制限しました",
+      "cameraRestoredByHost": "ホストがあなたのカメラを復元しました",
+      "browserNoSpeechRecognition": "このブラウザではマイク транскрипцияはサポートされていません",
+      "opponentRequestedDraw": "相手が引き分けを要求しました",
+      "debateUpdated": "討論が正常に更新されました",
+      "failedToUpdateDebate": "討論設定の更新に失敗しました",
+      "noOtherParticipants": "他の参加者はいません。"
+    },
+
+    "reconnect": {
+      "reconnecting": "再接続中...",
+      "restoring": "討論室のステータスを復元中"
+    },
+
+    "timer": {
+      "idle": "待機",
+      "paused": "一時停止",
+      "disconnected": "{{team}}が切断されました"
+    },
+
+    "roundLabels": {
+      "r1Opening": "ラウンド1 — 開会演説",
+      "r2Rebuttal": "ラウンド2 — 反駁と拡張",
+      "r3Closing": "ラウンド3 — 最終要約"
+    },
+
+    "match": "試合：",
+    "preparation": "準備",
+    "speech": "スピーチ",
+    "crossExam": "交差質問",
+    "judgeFeedback": "審判FB",
+    "finalJudging": "最終審判",
+    "judgesFb1": "審判FB 1",
+    "judgesFb2": "審判FB 2",
+    "judgesFb3": "審判FB 3",
+    "ce1": "CE 1",
+    "ce2": "CE 2",
+    "prop1": "olvable 1",
+    "opp1": "否定側 1",
+    "prop2": "olvable 2",
+    "opp2": "否定側 2",
+    "prop3": "olvable 3",
+    "opp3": "否定側 3",
+    "prep": "準備",
+    "motion": "モーション",
+    "waiting": "待機",
+    "oppositionTurn": "否定側のターン",
+    "propositionTurn": "olvableのターン",
+    "getReadyForCE": "交差質問の準備",
+    "endOfRound": "ラウンド{{round}}終了",
+    "nextRoundStarting": "次のラウンドが開始します",
+    "getReadyToSpeak": "発言の準備",
+    "preparationStarts": "準備開始",
+    "aiVerdict": "AI判定",
+    "finishDebate": "討論終了"
+  }
+}

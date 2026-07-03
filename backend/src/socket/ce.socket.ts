@@ -9,68 +9,71 @@ const CE_QUOTA_PER_TEAM = 2;
 
 type Team = 'proposition' | 'opposition';
 
-interface CEStatePayload {
-  askingTeam?: Team;
-  answeringTeam?: Team;
-  quotaPerTeam?: number;
-  questionsAsked?: number;
-  questionsAnswered?: number;
-  currentRole?: 'asker' | 'answerer';
-  transcript?: Array<Record<string, unknown>>;
-}
-
 interface CETimerState {
   roomId: string;
-  proRemaining: number;
-  oppRemaining: number;
-  activeTeam: Team | null;
-  interval: NodeJS.Timeout | null;
+  sharedRemaining: number;
+  totalSeconds: number;
   isPaused: boolean;
+  interval: NodeJS.Timeout | null;
+  questionsPro: number;
+  questionsOpp: number;
 }
 
+/** Tracks which teams have requested early CE finish for consensus-based ending. */
+const ceFinishConsensus: Map<string, Set<Team>> = new Map();
+
 /**
- * Server-authoritative Cross Examination timer.
- * - Each team has its own 3-minute quota.
- * - Timer only counts down for the active team (asking or answering).
- * - When the asking team passes turn, the timer is paused and the other team becomes active.
- *
- * NOTE: The authoritative phase/turn comes from the REST debate engine (Dev 2).
- * This service only tracks per-team CE seconds and broadcasts UI sync.
+ * Cross Examination Timer (Human Host Mode):
+ * - Both teams talk simultaneously during the 2-minute CE window
+ * - Each team has a quota of 2 questions
+ * - Timer is shared — when it hits 0, CE ends
+ * - Server-authoritative; broadcasts every second
  */
 class CETimerService {
   private states: Map<string, CETimerState> = new Map();
 
-  init(roomId: string, proRemaining = CE_SECONDS, oppRemaining = CE_SECONDS) {
-    const previous = this.states.get(roomId);
-    if (previous?.interval) {
-      clearInterval(previous.interval);
+  setIO(_io: Server) {
+    // io is accessed via getIO() in broadcastState
+  }
+
+  init(roomId: string) {
+    const existing = this.states.get(roomId);
+    if (existing?.interval) {
+      clearInterval(existing.interval);
     }
 
     this.states.set(roomId, {
       roomId,
-      proRemaining,
-      oppRemaining,
-      activeTeam: previous?.activeTeam || null,
-      interval: null,
+      sharedRemaining: CE_SECONDS,
+      totalSeconds: CE_SECONDS,
       isPaused: false,
+      interval: null,
+      questionsPro: 0,
+      questionsOpp: 0,
     });
 
     this.broadcastState(roomId);
   }
 
-  setActive(roomId: string, team: Team | null) {
+  start(roomId: string) {
     const state = this.states.get(roomId);
-    if (!state) {
-      this.init(roomId);
-    }
-    const next = this.states.get(roomId);
-    if (!next) return;
-    next.activeTeam = team;
-    if (team) {
-      this.startTicking(roomId);
-    } else {
-      this.stopTicking(roomId);
-    }
+    if (!state) return;
+    if (state.interval) return; // already ticking
+
+    state.interval = setInterval(() => {
+      if (state.isPaused) return;
+
+      state.sharedRemaining = Math.max(0, state.sharedRemaining - 1);
+      this.broadcastState(roomId);
+
+      if (state.sharedRemaining <= 0) {
+        this.stopTicking(roomId);
+        import('../features/debate/debate.service.js').then(({ triggerTransition }) => {
+          triggerTransition(roomId).catch(console.error);
+        });
+      }
+    }, 1000);
+
     this.broadcastState(roomId);
   }
 
@@ -96,34 +99,6 @@ class CETimerService {
     this.states.delete(roomId);
   }
 
-  getState(roomId: string): CETimerState | null {
-    return this.states.get(roomId) || null;
-  }
-
-  private startTicking(roomId: string) {
-    const state = this.states.get(roomId);
-    if (!state) return;
-    if (state.interval) {
-      clearInterval(state.interval);
-    }
-    state.interval = setInterval(() => {
-      if (state.isPaused || !state.activeTeam) return;
-      if (state.activeTeam === 'proposition') {
-        state.proRemaining = Math.max(0, state.proRemaining - 1);
-      } else {
-        state.oppRemaining = Math.max(0, state.oppRemaining - 1);
-      }
-      this.broadcastState(roomId);
-
-      if (state.proRemaining <= 0 || state.oppRemaining <= 0) {
-        this.stopTicking(roomId);
-        import('../features/debate/debate.service.js').then(({ triggerTransition }) => {
-          triggerTransition(roomId).catch(console.error);
-        });
-      }
-    }, 1000);
-  }
-
   private stopTicking(roomId: string) {
     const state = this.states.get(roomId);
     if (state?.interval) {
@@ -132,16 +107,56 @@ class CETimerService {
     }
   }
 
+  stopTickingOnly(roomId: string) {
+    this.stopTicking(roomId);
+  }
+
+  getState(roomId: string): CETimerState | null {
+    return this.states.get(roomId) || null;
+  }
+
+  /**
+   * Called when a team asks a question.
+   * Checks quota; if exceeded, returns false.
+   */
+  recordQuestion(roomId: string, team: Team): boolean {
+    const state = this.states.get(roomId);
+    if (!state) return false;
+
+    if (team === 'proposition') {
+      if (state.questionsPro >= CE_QUOTA_PER_TEAM) return false;
+      state.questionsPro++;
+    } else {
+      if (state.questionsOpp >= CE_QUOTA_PER_TEAM) return false;
+      state.questionsOpp++;
+    }
+
+    this.broadcastState(roomId);
+    return true;
+  }
+
+  /**
+   * Check if both teams have exhausted their quota.
+   */
+  isQuotaExhausted(roomId: string): boolean {
+    const state = this.states.get(roomId);
+    if (!state) return false;
+    return (
+      state.questionsPro >= CE_QUOTA_PER_TEAM &&
+      state.questionsOpp >= CE_QUOTA_PER_TEAM
+    );
+  }
+
   private broadcastState(roomId: string) {
     const state = this.states.get(roomId);
     if (!state) return;
     const io = getIO();
     io?.to(roomId).emit('cross-exam:update', {
-      activeTeam: state.activeTeam,
-      questionsPro: 0,
-      questionsOpp: 0,
-      timeRemainingPro: state.proRemaining,
-      timeRemainingOpp: state.oppRemaining,
+      sharedRemaining: state.sharedRemaining,
+      totalSeconds: state.totalSeconds,
+      questionsPro: state.questionsPro,
+      questionsOpp: state.questionsOpp,
+      quotaPerTeam: CE_QUOTA_PER_TEAM,
       isPaused: state.isPaused,
     });
   }
@@ -150,31 +165,23 @@ class CETimerService {
 export const ceTimerService = new CETimerService();
 
 /**
- * Initialize CE timer for a room using the current session ceState.
- * Called when phase becomes cross_exam (from debate.socket.ts).
+ * Initialize CE for a room. Called when host starts the cross_exam phase.
  */
-export function initCEForRoom(roomId: string, askingTeam: Team) {
-  ceTimerService.init(roomId, CE_SECONDS, CE_SECONDS);
-  ceTimerService.setActive(roomId, askingTeam);
+export function initCEForRoom(roomId: string) {
+  ceTimerService.init(roomId);
 }
 
 /**
- * Compute penalty score adjustments for incomplete CE quota.
- * §10.3: missing questions → that team loses the points for that section;
- * opponent receives max for the corresponding section.
+ * Start the CE shared timer. Called after host Start in CE phase.
  */
+export function startCEForRoom(roomId: string) {
+  ceTimerService.start(roomId);
+}
+
 function computePenalty(roomId: string, questionsPro: number, questionsOpp: number) {
   return {
-    pro: {
-      quota: CE_QUOTA_PER_TEAM,
-      asked: questionsPro,
-      missing: Math.max(0, CE_QUOTA_PER_TEAM - questionsPro),
-    },
-    opp: {
-      quota: CE_QUOTA_PER_TEAM,
-      asked: questionsOpp,
-      missing: Math.max(0, CE_QUOTA_PER_TEAM - questionsOpp),
-    },
+    pro: { quota: CE_QUOTA_PER_TEAM, asked: questionsPro, missing: Math.max(0, CE_QUOTA_PER_TEAM - questionsPro) },
+    opp: { quota: CE_QUOTA_PER_TEAM, asked: questionsOpp, missing: Math.max(0, CE_QUOTA_PER_TEAM - questionsOpp) },
     roomId,
   };
 }
@@ -207,27 +214,17 @@ async function broadcastSystemMessage(roomId: string, content: string) {
   }
 }
 
-async function getCurrentCeState(roomId: string) {
-  const session = await DebateSession.findOne({ roomId });
-  const currentTurn = session?.currentTurn as unknown as { ceState?: CEStatePayload; phase?: string } | undefined;
-  return {
-    session,
-    ceState: (currentTurn?.ceState as CEStatePayload | undefined) || null,
-    phase: currentTurn?.phase,
-  };
-}
-
 export function registerCEHandlers(_io: Server, socket: Socket) {
   const userId = (socket as unknown as { userId: string }).userId;
 
   /**
-   * Pass turn in CE — switch activeTeam.
-   * Note: Authoritative flow goes through Dev 2 REST (passCeTurn).
-   * This socket handler is a fast-path to update the CE timer UI only.
+   * Pass turn — use up one quota for the team.
+   * Both teams can pass independently; CE ends when time runs out
+   * or both teams exhausted their 2-question quota.
    */
   socket.on('cross-exam:pass-turn', async ({ roomId }: { roomId: string }) => {
     try {
-      const room = await DebateRoom.findById(roomId).select('participants');
+      const room = await DebateRoom.findById(roomId);
       if (!room) {
         socket.emit('cross-exam:error', { message: 'Room not found' });
         return;
@@ -240,22 +237,36 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
         return;
       }
 
-      const { phase } = await getCurrentCeState(roomId);
-      if (phase !== 'cross_exam') {
+      const session = await DebateSession.findOne({ roomId: room._id });
+      if (!session) return;
+      const turn = session.currentTurn as any;
+      if (turn.phase !== 'cross_exam') {
         socket.emit('cross-exam:error', { message: 'Current phase is not cross-exam' });
         return;
       }
 
-      const state = ceTimerService.getState(roomId);
-      if (!state) {
-        socket.emit('cross-exam:error', { message: 'CE timer not initialized' });
+      const team = participant.team as Team;
+      const recorded = ceTimerService.recordQuestion(roomId, team);
+
+      if (!recorded) {
+        socket.emit('cross-exam:error', { message: 'Question quota exhausted for your team' });
         return;
       }
 
-      // Switch active team
-      const nextActive: Team = state.activeTeam === 'proposition' ? 'opposition' : 'proposition';
-      ceTimerService.setActive(roomId, nextActive);
-      await broadcastSystemMessage(roomId, `${participant.team} passed CE turn`);
+      // Persist to session
+      const ceState = (turn.ceState as any) || {};
+      const teamQuestionsKey = team === 'proposition' ? 'questionsPro' : 'questionsOpp';
+      turn.ceState = { ...ceState, [teamQuestionsKey]: (ceState[teamQuestionsKey] || 0) + 1 };
+      await session.save();
+
+      await broadcastSystemMessage(roomId, `${participant.username} (${team}) passed CE turn (${ceState[teamQuestionsKey] || 1}/${CE_QUOTA_PER_TEAM})`);
+
+      // If both teams exhausted quota, trigger transition
+      if (ceTimerService.isQuotaExhausted(roomId)) {
+        ceTimerService.stopTickingOnly(roomId);
+        const { triggerTransition } = await import('../features/debate/debate.service.js');
+        triggerTransition(roomId).catch(console.error);
+      }
     } catch (error) {
       console.error('CE pass-turn error:', error);
       socket.emit('cross-exam:error', { message: 'Failed to pass CE turn' });
@@ -263,29 +274,118 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
   });
 
   /**
-   * Finish CE early — stops timer and notifies clients.
-   * The authoritative transition to judge_feedback goes through REST
-   * (debateService.finishPhase). Clients will then refresh via room:state-restore.
+   * Debater requests early CE end — tracks which teams have consented.
+   * When both teams have requested, auto-triggers transition.
+   * Rule: "cả 2 đội cùng skip" ends CE early.
    */
-  socket.on('cross-exam:finish', async ({ roomId, team }: { roomId: string; team: Team }) => {
+  socket.on('debater:request-ce-early', async ({ roomId }: { roomId: string }) => {
     try {
-      const { session, ceState } = await getCurrentCeState(roomId);
-      if (!session) {
-        socket.emit('cross-exam:error', { message: 'Session not found' });
+      const room = await DebateRoom.findById(roomId);
+      if (!room) return;
+      const participant = room.participants.find(
+        (entry) => entry.userId.toString() === userId,
+      );
+      if (!participant || !participant.team) {
+        socket.emit('ce-early:error', { message: 'Only debaters can request early CE end' });
         return;
       }
 
-      const questionsPro = ceState?.askingTeam === 'proposition' ? ceState?.questionsAsked || 0 : 0;
-      const questionsOpp = ceState?.askingTeam === 'opposition' ? ceState?.questionsAsked || 0 : 0;
+      const session = await DebateSession.findOne({ roomId: room._id });
+      if (!session) return;
+      const turn = session.currentTurn as any;
+      if (turn?.phase !== 'cross_exam') {
+        socket.emit('ce-early:error', { message: 'Current phase is not cross-exam' });
+        return;
+      }
+
+      const team = participant.team as Team;
+      if (!ceFinishConsensus.has(roomId)) {
+        ceFinishConsensus.set(roomId, new Set());
+      }
+      const consensus = ceFinishConsensus.get(roomId)!;
+
+      if (consensus.has(team)) {
+        // Already requested — no-op
+        return;
+      }
+
+      consensus.add(team);
+      const io = getIO();
+      io?.to(roomId).emit('ce-early:update', {
+        roomId,
+        requestingTeams: Array.from(consensus),
+        requiredTeams: ['proposition', 'opposition'],
+        allAgreed: consensus.size >= 2,
+      });
+
+      // When both teams agree, end CE
+      if (consensus.size >= 2) {
+        ceFinishConsensus.delete(roomId);
+        ceTimerService.stopTickingOnly(roomId);
+        await broadcastSystemMessage(roomId, 'Both teams agreed to end Cross-Examination');
+        const { triggerTransition } = await import('../features/debate/debate.service.js');
+        triggerTransition(roomId).catch(console.error);
+      }
+    } catch (error) {
+      console.error('CE early request error:', error);
+    }
+  });
+
+  /**
+   * Finish CE early — host or Judge S1 forces end; also called after both teams agree.
+   */
+  socket.on('cross-exam:finish', async ({ roomId }: { roomId: string }) => {
+    try {
+      const room = await DebateRoom.findById(roomId);
+      if (!room) return;
+      const participant = room.participants.find(
+        (entry) => entry.userId.toString() === userId,
+      );
+
+      const session = await DebateSession.findOne({ roomId: room._id });
+      if (!session) return;
+      const turn = session.currentTurn as any;
+
+      if (turn?.phase !== 'cross_exam') {
+        socket.emit('cross-exam:error', { message: 'Current phase is not cross-exam' });
+        return;
+      }
+
+      // Gate: only host, Judge S1 (no-host modes), or both teams agreed
+      const effectiveRole = participant
+        ? participant.roomRole === 'owner' ? (participant as any).primaryRole : participant.roomRole
+        : null;
+      const isController =
+        participant?.roomRole === 'owner' ||
+        effectiveRole === 'host' ||
+        (room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1');
+      const bothTeamsAgreed = (ceFinishConsensus.get(roomId)?.size ?? 0) >= 2;
+
+      if (!isController && !bothTeamsAgreed) {
+        socket.emit('cross-exam:error', {
+          message: 'Only host/Judge S1 can force-end CE, or both teams must agree via the "End CE" button',
+        });
+        return;
+      }
+
+      // Clear consensus state
+      ceFinishConsensus.delete(roomId);
+
+      const ceState = turn.ceState as any;
+      const questionsPro = ceState?.questionsPro || 0;
+      const questionsOpp = ceState?.questionsOpp || 0;
       const penalty = computePenalty(roomId, questionsPro, questionsOpp);
 
-      ceTimerService.stop(roomId);
+      ceTimerService.stopTickingOnly(roomId);
 
       const io = getIO();
       io?.to(roomId).emit('cross-exam:ended', {
         scoresAdjustment: penalty,
-        finishedBy: team,
+        finishedBy: isController ? 'controller' : 'both_teams_agreed',
       });
+
+      const { triggerTransition } = await import('../features/debate/debate.service.js');
+      triggerTransition(roomId).catch(console.error);
     } catch (error) {
       console.error('CE finish error:', error);
       socket.emit('cross-exam:error', { message: 'Failed to finish CE' });
@@ -293,8 +393,7 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
   });
 
   /**
-   * Question — increments the quota tracker on the active asking team.
-   * Persists to Message collection so the transcript is preserved.
+   * Ask a question — records quota, persists transcript.
    */
   socket.on(
     'cross-exam:question',
@@ -304,8 +403,9 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
           socket.emit('cross-exam:error', { message: 'Question is required' });
           return;
         }
-        const room = await DebateRoom.findById(roomId).select('participants');
-        const participant = room?.participants.find(
+        const room = await DebateRoom.findById(roomId);
+        if (!room) return;
+        const participant = room.participants.find(
           (entry) => entry.userId.toString() === userId,
         );
         if (!participant || participant.team !== team) {
@@ -313,26 +413,27 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
           return;
         }
 
-        const { ceState, session } = await getCurrentCeState(roomId);
-        if (ceState?.askingTeam !== team) {
-          socket.emit('cross-exam:error', { message: 'It is not your turn to ask' });
-          return;
-        }
-        const questionsAsked = ceState?.questionsAsked || 0;
-        if (questionsAsked >= (ceState?.quotaPerTeam || CE_QUOTA_PER_TEAM)) {
-          socket.emit('cross-exam:error', { message: 'Question quota exhausted' });
+        const session = await DebateSession.findOne({ roomId: room._id });
+        const turn = session?.currentTurn as any;
+        if (!session || turn?.phase !== 'cross_exam') {
+          socket.emit('cross-exam:error', { message: 'Current phase is not cross-exam' });
           return;
         }
 
-        if (session) {
-          const transcript = (Array.isArray(ceState?.transcript) ? (ceState.transcript as Array<Record<string, unknown>>) : []);
-          transcript.push({ team, type: 'question', content: question.trim(), timestamp: new Date() });
-          (session.currentTurn as unknown as { ceState: Record<string, unknown> }).ceState = {
-            ...(ceState || {}),
-            transcript,
-          };
-          await session.save();
+        const recorded = ceTimerService.recordQuestion(roomId, team);
+        if (!recorded) {
+          socket.emit('cross-exam:error', { message: 'Question quota exhausted for your team' });
+          return;
         }
+
+        // Persist
+        const ceState = (turn.ceState as any) || {};
+        const teamQuestionsKey = team === 'proposition' ? 'questionsPro' : 'questionsOpp';
+        turn.ceState = {
+          ...ceState,
+          [teamQuestionsKey]: (ceState[teamQuestionsKey] || 0) + 1,
+        };
+        await session.save();
 
         const io = getIO();
         io?.to(roomId).emit('chat:message', {
@@ -346,6 +447,13 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
           isToxic: false,
           timestamp: new Date(),
         });
+
+        // Check if both exhausted
+        if (ceTimerService.isQuotaExhausted(roomId)) {
+          ceTimerService.stopTickingOnly(roomId);
+          const { triggerTransition } = await import('../features/debate/debate.service.js');
+          triggerTransition(roomId).catch(console.error);
+        }
       } catch (error) {
         console.error('CE question error:', error);
         socket.emit('cross-exam:error', { message: 'Failed to send question' });
@@ -354,7 +462,7 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
   );
 
   /**
-   * Answer — append to transcript only (no quota impact).
+   * Answer — just append to transcript (no quota impact).
    */
   socket.on(
     'cross-exam:answer',
@@ -364,8 +472,9 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
           socket.emit('cross-exam:error', { message: 'Answer is required' });
           return;
         }
-        const room = await DebateRoom.findById(roomId).select('participants');
-        const participant = room?.participants.find(
+        const room = await DebateRoom.findById(roomId);
+        if (!room) return;
+        const participant = room.participants.find(
           (entry) => entry.userId.toString() === userId,
         );
         if (!participant) {
@@ -373,22 +482,24 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
           return;
         }
 
-        const { ceState, session } = await getCurrentCeState(roomId);
-        if (ceState?.answeringTeam !== team) {
-          socket.emit('cross-exam:error', { message: 'It is not your turn to answer' });
+        const session = await DebateSession.findOne({ roomId: room._id });
+        const turn = session?.currentTurn as any;
+        if (!session || turn?.phase !== 'cross_exam') {
+          socket.emit('cross-exam:error', { message: 'Current phase is not cross-exam' });
           return;
         }
 
-        if (session) {
-          const transcript = (Array.isArray(ceState?.transcript) ? (ceState.transcript as Array<Record<string, unknown>>) : []);
-          transcript.push({ team, type: 'answer', content: answer.trim(), timestamp: new Date() });
-          (session.currentTurn as unknown as { ceState: Record<string, unknown> }).ceState = {
-            ...(ceState || {}),
-            transcript,
-            questionsAnswered: (ceState?.questionsAnswered || 0) + 1,
-          };
-          await session.save();
-        }
+        const ceState = (turn.ceState as any) || {};
+        turn.ceState = {
+          ...ceState,
+          transcript: [...(ceState.transcript || []), {
+            team,
+            type: 'answer',
+            content: answer.trim(),
+            timestamp: new Date(),
+          }],
+        };
+        await session.save();
 
         const io = getIO();
         io?.to(roomId).emit('chat:message', {

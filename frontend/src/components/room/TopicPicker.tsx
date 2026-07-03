@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, ButtonGroup, Dropdown, Form } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 import { DEBATE_TOPICS } from '@utils/debateTopics';
 
 const MAX_VISIBLE_TOPICS = 30;
@@ -30,6 +31,7 @@ export function TopicPicker({
   disabled = false,
 }: TopicPickerProps) {
   const [search, setSearch] = useState('');
+  const { t } = useTranslation('lobby');
 
   const filteredTopics = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -47,7 +49,7 @@ export function TopicPicker({
           onClick={() => onModeChange('preset')}
           disabled={disabled}
         >
-          Seed Topics
+          {t('topicPicker.seedTopics')}
         </Button>
         <Button
           type="button"
@@ -55,7 +57,7 @@ export function TopicPicker({
           onClick={() => onModeChange('custom')}
           disabled={disabled}
         >
-          Custom Topic
+          {t('topicPicker.customTopic')}
         </Button>
       </ButtonGroup>
 
@@ -66,13 +68,13 @@ export function TopicPicker({
             className="w-100 d-flex align-items-center justify-content-between text-start"
             disabled={disabled}
           >
-            <span className="text-truncate">{selectedTopic || 'Choose a seeded topic'}</span>
+            <span className="text-truncate">{selectedTopic || t('topicPicker.chooseSeeded')}</span>
           </Dropdown.Toggle>
           <Dropdown.Menu className="w-100 p-2">
             <Form.Control
               size="sm"
               className="mb-2"
-              placeholder="Search topics"
+              placeholder={t('topicPicker.searchTopics')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               autoFocus
@@ -94,7 +96,7 @@ export function TopicPicker({
                   </Dropdown.Item>
                 ))
               ) : (
-                <Dropdown.ItemText>No matching topics</Dropdown.ItemText>
+                <Dropdown.ItemText>{t('topicPicker.noMatching')}</Dropdown.ItemText>
               )}
             </div>
           </Dropdown.Menu>
@@ -104,7 +106,7 @@ export function TopicPicker({
           as="textarea"
           rows={3}
           maxLength={240}
-          placeholder="Type a custom debate topic"
+          placeholder={t('topicPicker.typeCustom')}
           value={customTopic}
           onChange={(event) => onCustomTopicChange(event.target.value)}
           disabled={disabled}

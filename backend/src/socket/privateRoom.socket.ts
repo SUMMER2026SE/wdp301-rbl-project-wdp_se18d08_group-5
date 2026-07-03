@@ -1,4 +1,5 @@
 import { Server, Socket } from 'socket.io';
+import mongoose from 'mongoose';
 import { DebateRoom, IDebateRoom } from '../models/DebateRoom.js';
 import { Message } from '../models/Message.js';
 import { getIO } from './index.js';
@@ -21,18 +22,29 @@ function canJoinPrivateRoom(
   participant: IDebateRoom['participants'][0] | undefined,
   _userId: string,
   requestedTeam: 'proposition' | 'opposition' | 'judge',
+  room: IDebateRoom,
 ): boolean {
   if (!participant) return false;
 
-  if (participant.roomRole === 'host' || participant.roomRole === 'owner') return true;
+  const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+
+  // Host can join any private room
+  if (effectiveRole === 'host') return true;
+
+  // Judge S1 in no-host mode can join any private room
+  const isJudgeS1 =
+    room.hostType !== 'human' &&
+    effectiveRole === 'judge' &&
+    (participant as any).speakerSlot === 'S1';
+  if (isJudgeS1) return true;
 
   if (requestedTeam === 'judge') {
-    return participant.roomRole === 'judge';
+    return effectiveRole === 'judge';
   }
 
   if (requestedTeam === 'proposition' || requestedTeam === 'opposition') {
     return (
-      participant.roomRole === 'debater' &&
+      effectiveRole === 'debater' &&
       participant.team === requestedTeam
     );
   }
@@ -51,12 +63,13 @@ async function broadcastPrivateSystemMessage(
 
   const message = await Message.create({
     roomId,
-    senderId: 'system',
+    senderId: new mongoose.Types.ObjectId('000000000000000000000000'),
     senderName: 'System',
     senderRole: 'host',
     content,
     type: 'system',
     isToxic: false,
+    team: team === 'host' ? undefined : (team as 'proposition' | 'opposition' | 'judge'),
   });
 
   const io = getIO();
@@ -104,7 +117,7 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
         }
 
         const joinTeam = team as 'proposition' | 'opposition' | 'judge';
-        if (!canJoinPrivateRoom(participant, userId, joinTeam)) {
+        if (!canJoinPrivateRoom(participant, userId, joinTeam, room)) {
           socket.emit('private-room:error', { message: 'You cannot join this private room' });
           ack?.({ success: false, message: 'You cannot join this private room' });
           return;
@@ -124,10 +137,35 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
 
         socket.join(key);
 
+        // Fetch message history for this private room
+        const messageHistoryDocs = await Message.find({
+          roomId,
+          team: joinTeam,
+        })
+          .sort({ timestamp: 1 })
+          .limit(50)
+          .lean();
+
+        // Transform to plain objects for socket emission
+        const messageHistory = messageHistoryDocs.map((msg) => ({
+          _id: msg._id.toString(),
+          roomId: msg.roomId.toString(),
+          senderId: msg.senderId.toString(),
+          senderName: msg.senderName,
+          senderRole: msg.senderRole,
+          content: msg.content,
+          type: msg.type,
+          isToxic: msg.isToxic,
+          timestamp: msg.timestamp,
+          team: msg.team,
+        }));
+
         socket.emit('private-room:joined', {
           roomId,
           team,
           participantCount: state.participants.size,
+          participants: Array.from(state.participants),
+          messageHistory,
         });
 
         await broadcastPrivateSystemMessage(
@@ -142,6 +180,7 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
           username: participant?.username || 'Unknown',
           team,
           participantCount: state.participants.size,
+          participants: Array.from(state.participants),
         });
 
         ack?.({ success: true });
@@ -163,6 +202,17 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
 
       const key = privateRoomKey(roomId, team);
       const state = privateRooms.get(key);
+
+      // Broadcast participant update BEFORE leaving the room
+      socket.to(key).emit('private-room:participant-update', {
+        type: 'left',
+        userId,
+        team,
+        participantCount: state?.participants.size ? state.participants.size - 1 : 0,
+        participants: state ? Array.from(state.participants).filter((id) => id !== userId) : [],
+      });
+
+      // Update state and clean up
       if (state) {
         state.participants.delete(userId);
         if (state.participants.size === 0) {
@@ -170,8 +220,10 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
         }
       }
 
+      // Leave the socket room
       socket.leave(key);
 
+      // Broadcast system message about user leaving
       const room = await DebateRoom.findById(roomId).select('participants');
       const participant = room?.participants.find(
         (p) => p.userId.toString() === userId,
@@ -182,11 +234,10 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
         `${participant?.username || userId} left the ${team} private room`,
       );
 
-      socket.to(key).emit('private-room:participant-update', {
-        type: 'left',
-        userId,
+      // Emit left event to the leaving user
+      socket.emit('private-room:left', {
+        roomId,
         team,
-        participantCount: state?.participants.size ?? 0,
       });
 
       ack?.({ success: true });
@@ -211,14 +262,16 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
           (p) => p.userId.toString() === userId,
         );
 
+        const effectiveRole = participant ? (participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole) : 'viewer';
         const message = await Message.create({
           roomId,
-          senderId: userId,
+          senderId: new mongoose.Types.ObjectId(userId),
           senderName: participant?.username || 'Unknown',
-          senderRole: participant?.roomRole || 'viewer',
+          senderRole: effectiveRole || 'viewer',
           content: content.trim(),
           type: 'chat',
           isToxic: false,
+          team: team === 'host' ? undefined : (team as 'proposition' | 'opposition' | 'judge'),
         });
 
         const io = getIO();
@@ -262,6 +315,7 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
           userId,
           team: state.team,
           participantCount: state.participants.size,
+          participants: Array.from(state.participants),
         });
         if (state.participants.size === 0) {
           privateRooms.delete(key);

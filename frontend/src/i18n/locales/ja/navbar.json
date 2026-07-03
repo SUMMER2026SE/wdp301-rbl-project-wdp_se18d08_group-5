@@ -1,19 +1,22 @@
-{
+﻿{
   "brand": "AI Debate",
   "links": {
-    "liveMatches": "ライブ対戦",
-    "leaderboard": "ランキング",
-    "rank": "ランク対戦",
-    "createRoom": "ルーム作成",
-    "profile": "プロフィール",
-    "logout": "ログアウト",
-    "login": "ログイン",
-    "register": "登録"
+    "liveMatches": "Live Matches",
+    "leaderboard": "Leaderboard",
+    "rank": "Rank",
+    "createRoom": "Create Room",
+    "profile": "Profile",
+    "admin": "Admin",
+    "changePassword": "Change password",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register"
   },
   "language": {
-    "label": "言語",
+    "label": "Language",
     "en": "EN",
     "vi": "VI",
-    "ja": "日本語"
+    "ja": "æ—¥æœ¬èªž"
   }
 }
+

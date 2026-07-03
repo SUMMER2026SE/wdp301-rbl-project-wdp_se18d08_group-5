@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { getSocket } from './useSocket';
+import { useSocket } from './useSocket';
 import type { Team } from '@/types';
 
 interface MatchFoundPayload {
@@ -16,9 +16,9 @@ interface MatchFoundPayload {
  */
 export function useMatchSocket() {
   const navigate = useNavigate();
+  const { socket } = useSocket();
 
   useEffect(() => {
-    const socket = getSocket();
     if (!socket) return;
 
     const handleMatchFound = (data: MatchFoundPayload) => {
@@ -31,5 +31,5 @@ export function useMatchSocket() {
     return () => {
       socket.off('match:found', handleMatchFound);
     };
-  }, [navigate]);
+  }, [navigate, socket]);
 }

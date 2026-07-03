@@ -1,21 +1,21 @@
-{
-  "brand": "AI Debate",
-  "links": {
-    "liveMatches": "Live Matches",
-    "leaderboard": "Leaderboard",
-    "rank": "Rank",
-    "createRoom": "Create Room",
-    "profile": "Profile",
-    "admin": "Admin",
-    "changePassword": "Change password",
-    "logout": "Logout",
-    "login": "Login",
-    "register": "Register"
-  },
-  "language": {
-    "label": "Language",
-    "en": "EN",
-    "vi": "VI",
-    "ja": "日本語"
-  }
+﻿{
+    "brand":  "AI Debate",
+    "links":  {
+                  "liveMatches":  "Live Matches",
+                  "leaderboard":  "Leaderboard",
+                  "rank":  "Rank",
+                  "createRoom":  "Create Room",
+                  "profile":  "Profile",
+                  "admin":  "Admin",
+                  "changePassword":  "Change password",
+                  "logout":  "Logout",
+                  "login":  "Login",
+                  "register":  "Register"
+              },
+    "language":  {
+                     "label":  "Language",
+                     "en":  "English",
+                     "vi":  "Vietnamese",
+                     "ja":  "Japanese"
+                 }
 }

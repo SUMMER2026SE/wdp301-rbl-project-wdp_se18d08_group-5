@@ -160,6 +160,39 @@ a:hover { color: var(--bs-secondary); text-shadow: 0 0 8px var(--bs-secondary); 
 
 .btn-warning { background: var(--bs-warning); border: none; color: #0a0a0f; font-weight: 700; }
 
+/* ── Lobby lock feedback ── */
+.lock-icon-flash-lock,
+.lock-icon-flash-unlock {
+  display: inline-block;
+  animation: lockPulse 320ms ease-out;
+  transform-origin: center;
+}
+
+.lock-icon-flash-lock {
+  color: var(--bs-success);
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.8);
+}
+
+.lock-icon-flash-unlock {
+  color: var(--bs-warning);
+  text-shadow: 0 0 10px rgba(255, 214, 10, 0.8);
+}
+
+@keyframes lockPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1.25);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* ── Forms ── */
 .form-control, .form-select {
   background: rgba(18, 18, 31, 0.8);

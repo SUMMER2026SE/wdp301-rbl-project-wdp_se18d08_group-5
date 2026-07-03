@@ -1,0 +1,360 @@
+{
+  "loading": "Loading...",
+  "retry": "Retry",
+  "backToMatches": "Back to matches",
+  "back": "Back",
+  "cancel": "Cancel",
+  "close": "Close",
+  "save": "Save",
+  "submit": "Submit",
+  "confirm": "Confirm",
+  "yes": "Yes",
+  "no": "No",
+
+  "debateRoom": {
+    "loading": "Loading debate room...",
+    "sessionStarting": "Debate session is starting...",
+    "hostClickedStart": "The host just clicked Start",
+    "syncBanner": "Syncing live debate state…",
+    "phaseTransition": "PHASE TRANSITION",
+    "muteMicAndLockChat": "Mute mic and lock chat",
+    "startsIn": "{{label}} starts in",
+    "startingSoon": "Starting soon",
+    "startNow": "Start now!",
+
+    "privateRoom": "Private debate room",
+    "enterPassword": "This debate is private. Enter the password to join as a spectator.",
+    "passwordPlaceholder": "Enter password...",
+    "enterRoom": "Enter room",
+    "backToMatch": "Back to match",
+
+    "roomNotFound": "We couldn't load the room data. This usually means the debate room no longer exists, or your session has expired.",
+    "roomNotFoundRetry": "Retry",
+    "roomNotFoundBack": "Back to matches",
+    "retryNow": "Retry now",
+    "connecting": "Connecting...",
+
+    "privatePasswordWrong": "Incorrect password",
+    "joiningAsSpectator": "Joining debate as spectator...",
+    "joinedAsSpectator": "Joined as spectator",
+    "failedToJoin": "Failed to join the debate room",
+
+    "proposition": "Proposition",
+    "opposition": "Opposition",
+
+    "camera": "Camera",
+    "liveCamera": "Live camera",
+    "viewerOnly": "Viewer-only mode",
+    "viewerCount": "Viewer count",
+    "spectator": "Spectator",
+    "empty": "Empty",
+
+    "workflow": "Workflow",
+    "current": "Current",
+    "next": "Next",
+    "waiting": "Waiting",
+    "result": "Result",
+    "completed": "Completed",
+
+    "notifications": "Notifications",
+    "noNotifications": "No notifications yet.",
+
+    "countdown": {
+      "matchStarting": "Match starting",
+      "startsIn": "{{label}} starts in"
+    },
+
+    "previousScores": {
+      "round": "Round {{round}}"
+    },
+
+    "winner": {
+      "label": "Winner:",
+      "waiting": "Waiting"
+    },
+
+    "debateEnded": "Debate has ended! Winner: {{winner}}",
+
+    "speakerStatus": {
+      "speaking": "Speaking",
+      "waiting": "Waiting",
+      "empty": "Empty"
+    },
+
+    "spectator": "Spectator",
+
+    "scoreBreakdown": {
+      "speak": "Speak:",
+      "ce": "CE:"
+    },
+
+    "matchChat": "Match chat",
+    "noMessages": "No messages yet.",
+    "joinAsParticipantToChat": "Join as a participant to chat",
+
+    "crossExam": {
+      "sharedTimer": "Shared CE Timer",
+      "propQuestionsLeft": "Prop Questions Left",
+      "oppQuestionsLeft": "Opp Questions Left",
+      "askQuestion": "Ask a question",
+      "cannotFinish": "Cannot finish CE from this view",
+      "finishCE": "End CE",
+      "ask": "Ask",
+      "pass": "Pass"
+    },
+
+    "judge": {
+      "assigned": "Assigned judges",
+      "noJudges": "No judges yet",
+      "quickReaction": "Quick reaction",
+      "agree": "Agree",
+      "disagree": "Disagree",
+      "submitEvaluation": "Submit evaluation",
+      "currentStandings": "Current standings",
+      "roundScores": "Round Scores",
+      "aggregateScores": "Aggregate scores",
+      "determineWinner": "Determine winner",
+      "notYetSubmitted": "No scores have been submitted for this round.",
+      "noSubmitted": "Not submitted.",
+      "speech": "Speech",
+      "ce": "CE",
+      "notes": "Notes",
+      "notesPlaceholder": "Notes for proposition team...",
+      "notesOppPlaceholder": "Notes for opposition team...",
+      "score": "Score",
+      "outOf": "{{value}}/20",
+      "judgeNotePlaceholder": "Notes for {{team}}...",
+      "scoreSubmitted": "Round scores submitted",
+      "failedToSubmit": "Failed to submit round scores",
+      "canPreFill": "You can pre-fill scores and notes. Only click Submit when the scoring phase starts.",
+      "roundSubmitted": "Round {{round}} submitted",
+      "submitting": "Submitting…",
+      "submit": "Submit"
+    },
+
+    "actions": {
+      "start": "Start",
+      "skip": "Skip",
+      "pause": "Pause",
+      "resume": "Resume",
+      "end": "End",
+      "surrender": "Surrender",
+      "surrenderConfirm": "Surrender this match?",
+      "surrenderSent": "Surrender sent",
+      "draw": "Draw",
+      "acceptDraw": "Accept draw",
+      "drawRequested": "Draw request sent. Waiting for the other team to accept.",
+      "drawRequestAlert": "{{name}} requested a draw. Accepting will end the match as a draw.",
+      "drawSent": "Draw request sent",
+      "actionFailed": "Action failed",
+
+      "muteMic": "Mute mic",
+      "unmuteMic": "Unmute mic",
+      "micMuted": "Microphone muted",
+      "micUnmuted": "Microphone unmuted",
+      "micChangeFailed": "Failed to change microphone state",
+
+      "turnCameraOff": "Turn camera off",
+      "turnCameraOn": "Turn camera on",
+      "cameraDisabled": "Camera disabled",
+      "cameraEnabled": "Camera enabled",
+      "cameraChangeFailed": "Failed to change camera state",
+
+      "muteChat": "Disable chat",
+      "unmuteChat": "Enable chat",
+      "chatDisabled": "Chat disabled",
+      "chatEnabled": "Chat enabled",
+      "chatChangeFailed": "Failed to change chat state",
+
+      "speak": "Speak",
+      "lockedByHost": "Locked by host"
+    },
+
+    "debateControls": "Debate controls",
+    "participantControls": "Participant controls",
+    "user": "User",
+    "role": "Role",
+    "cam": "Cam",
+    "mic": "Mic",
+    "chat": "Chat",
+    "viewers": "Viewers",
+    "viewersCount": "{{count}} viewers",
+
+    "roles": {
+      "viewer": "Viewer",
+      "debater": "Debater",
+      "speaker": "Speaker",
+      "judge": "Judge",
+      "host": "Host",
+      "owner": "Owner",
+      "prop": "PRO",
+      "opp": "OPP",
+      "propSlot": "PRO {{slot}}",
+      "oppSlot": "OPP {{slot}}"
+    },
+
+    "noHost": {
+      "waitingForS1": "Waiting for S1 to start",
+      "s1MustStart": "Both teams' S1 must press Start to begin the match.",
+      "judgeS1Responsible": "As Judge S1, you are responsible for starting the match.",
+      "youHaveStarted": "You have pressed Start",
+      "youHaveNotStarted": "You have not pressed Start",
+      "started": "Started"
+    },
+
+    "preparation": {
+      "endPreparation": "End preparation",
+      "ready": "Ready",
+      "waitingForReady": "Waiting for both teams to ready up",
+      "countReady": "{{count}}/{{total}}"
+    },
+
+    "speakerStatus": {
+      "speaking": "Speaking",
+      "asked": "Asked",
+      "idle": "Idle"
+    },
+
+    "privateRoom": {
+      "enter": "Enter private room",
+      "exit": "Exit private room",
+      "enterPrivateRoom": "Enter private room",
+      "exitPrivateRoom": "Exit private room",
+      "leftRoom": "Left the private room",
+      "inThisRoom": "In this room",
+      "noOneHere": "No one is here yet",
+      "you": "(you)"
+    },
+
+    "rules": {
+      "title": "Debate room rules",
+      "generalStructure": "General structure",
+      "structureDesc": "This debate follows a formal turn-based structure with continuous judging:",
+      "motion": "Motion / Debate topic",
+      "motionDesc": "Announced by the host or set before matchmaking.",
+      "prep7": "Preparation (7 minutes)",
+      "prep7Desc": "Teams discuss in their private rooms.",
+      "speeches": "Speeches (3 minutes)",
+      "speechesDesc": "Speakers take turns presenting arguments.",
+      "crossExam": "Cross-examination (2 minutes)",
+      "crossExamDesc": "Rapid Q&A between teams.",
+      "judgeFeedback": "Judge feedback",
+      "judgeFeedbackDesc": "Judges review and submit their verdicts.",
+      "speakerPositions": "Speaker positions",
+      "s1": "S1 (Speaker 1)",
+      "s1Desc": "Focuses on framing and the line of argument.",
+      "s2": "S2 (Speaker 2)",
+      "s2Desc": "Extends points and rebuts the opposing case.",
+      "s3": "S3 (Speaker 3 — Closing)",
+      "s3Desc": "Summarizes the debate. No cross-examination after S3.",
+      "scoringCriteria": "Scoring criteria",
+      "scoringCriteriaDesc": "Judges assign points across {{max}} criteria:",
+      "logic": "Logic ({{max}} pts)",
+      "logicDesc": "Coherence and clarity of the argument.",
+      "rebuttal": "Rebuttal ({{max}} pts)",
+      "rebuttalDesc": "Effectiveness at countering opposing claims.",
+      "evidence": "Evidence ({{max}} pts)",
+      "evidenceDesc": "Use of specific data and logical proof.",
+      "crossExamCriteria": "Cross-examination ({{max}} pts)",
+      "crossExamCriteriaDesc": "Questioning and defense skills during CE.",
+      "strategy": "Strategy ({{max}} pts)",
+      "strategyDesc": "Structure and prioritization of points.",
+      "communication": "Communication ({{max}} pts)",
+      "communicationDesc": "Delivery, clarity, and vocal control.",
+      "closeRules": "Close rules"
+    },
+
+    "leave": {
+      "title": "Leave debate room",
+      "ownerWarning": "You are the Room Owner. If you leave, you must transfer room ownership first.",
+      "ownerWarning2": "Select a successor to transfer ownership, or click \"Leave now\" to auto-transfer to the next participant.",
+      "onlyOneWarning": "Since you are the only one in the room, leaving will close the room.",
+      "leaveNow": "Leave now",
+      "leftRoom": "Left the debate room",
+      "selectSuccessor": "Select a successor"
+    },
+
+    "admin": {
+      "title": "Admin",
+      "controlPanel": "Control panel",
+      "hostControlPanel": "Host control panel",
+      "score": "Score",
+      "privateRoom": "Private room",
+      "chat": "Chat",
+      "leaveRoom": "Leave room"
+    },
+
+    "errors": {
+      "cannotResolveSpeakers": "Could not resolve speakers for this round",
+      "scoresAggregated": "Scores aggregated",
+      "failedToAggregate": "Failed to aggregate scores",
+      "winnerDetermined": "Winner determined",
+      "failedToDetermine": "Failed to determine the winner",
+      "phaseStarted": "Phase started",
+      "failedToStartPhase": "Failed to start the phase",
+      "waitingForOpposingS1": "Waiting for opposing S1...",
+      "teamPauseStarted": "Team pause started",
+      "failedToPause": "Failed to pause the debate",
+      "teamPauseResumed": "Team pause resumed",
+      "failedToResume": "Failed to resume the debate",
+      "micMutedByHost": "Host has muted your microphone",
+      "micUnmutedByHost": "Host has unmuted your microphone",
+      "chatRestrictedByHost": "Host has restricted your chat",
+      "chatRestoredByHost": "Host has restored your chat",
+      "cameraRestrictedByHost": "Host has restricted your camera",
+      "cameraRestoredByHost": "Host has restored your camera",
+      "browserNoSpeechRecognition": "Microphone transcription is not supported in this browser",
+      "opponentRequestedDraw": "Opponent requested a draw",
+      "debateUpdated": "Debate updated successfully",
+      "failedToUpdateDebate": "Failed to update debate settings",
+      "noOtherParticipants": "No other participants."
+    },
+
+    "reconnect": {
+      "reconnecting": "Reconnecting…",
+      "restoring": "Restoring your debate room state"
+    },
+
+    "timer": {
+      "idle": "Idle",
+      "paused": "Paused",
+      "disconnected": "{{team}} disconnected"
+    },
+
+    "roundLabels": {
+      "r1Opening": "Round 1 — Opening Speeches",
+      "r2Rebuttal": "Round 2 — Rebuttal & Extensions",
+      "r3Closing": "Round 3 — Final Summaries"
+    },
+
+    "match": "MATCH:",
+    "preparation": "Preparation",
+    "speech": "Speech",
+    "crossExam": "Cross Exam",
+    "judgeFeedback": "Judge FB",
+    "finalJudging": "Final Judging",
+    "judgesFb1": "Judge FB 1",
+    "judgesFb2": "Judge FB 2",
+    "judgesFb3": "Judge FB 3",
+    "ce1": "CE 1",
+    "ce2": "CE 2",
+    "prop1": "Prop 1",
+    "opp1": "Opp 1",
+    "prop2": "Prop 2",
+    "opp2": "Opp 2",
+    "prop3": "Prop 3",
+    "opp3": "Opp 3",
+    "prep": "Prep",
+    "motion": "Motion",
+    "waiting": "Waiting",
+    "oppositionTurn": "Opposition turn",
+    "propositionTurn": "Proposition turn",
+    "getReadyForCE": "Get ready for cross-examination",
+    "endOfRound": "End of Round {{round}}",
+    "nextRoundStarting": "Next round starting",
+    "getReadyToSpeak": "Get ready to speak",
+    "preparationStarts": "Preparation starts",
+    "aiVerdict": "AI Verdict",
+    "finishDebate": "Finish Debate"
+  }
+}

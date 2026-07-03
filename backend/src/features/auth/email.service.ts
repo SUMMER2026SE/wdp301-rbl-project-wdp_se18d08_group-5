@@ -24,8 +24,8 @@ class EmailService {
     await this.getTransporter().sendMail({
       from: ENV.MAIL_FROM || ENV.SMTP_USER,
       to: email,
-      subject: 'Xác thực tài khoản AI Debate Platform',
-      html: `<p>Nhấn vào liên kết sau để xác thực tài khoản:</p><p><a href="${verificationUrl}">${verificationUrl}</a></p>`,
+      subject: 'Verify your AI Debate Platform account',
+      html: `<p>Click the link below to verify your account:</p><p><a href="${verificationUrl}">${verificationUrl}</a></p>`,
     });
   }
 
@@ -34,8 +34,8 @@ class EmailService {
     await this.getTransporter().sendMail({
       from: ENV.MAIL_FROM || ENV.SMTP_USER,
       to: email,
-      subject: 'Đặt lại mật khẩu AI Debate Platform',
-      html: `<p>Nhấn vào liên kết sau để đặt lại mật khẩu:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+      subject: 'Reset your AI Debate Platform password',
+      html: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
     });
   }
 }

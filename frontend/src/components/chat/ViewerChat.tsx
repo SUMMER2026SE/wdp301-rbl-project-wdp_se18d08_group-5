@@ -27,16 +27,21 @@ function isSystemMessage(message: ChatMessage) {
 export function ViewerChat({ roomId }: ViewerChatProps) {
   const { user } = useAuthStore();
   const viewerChatMessages = useDebateStore((state) => state.viewerChatMessages);
-  const addViewerChatMessage = useDebateStore((state) => state.addViewerChatMessage);
+  const setViewerChatMessages = useDebateStore((state) => state.setViewerChatMessages);
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const currentParticipant = useDebateStore((s) =>
-    s.participants.find((p) => p.userId === user?._id),
+    s.participants.find((p) => {
+      const uId = p.userId as any;
+      const pId = typeof uId === 'object' && uId?._id ? uId._id : uId;
+      return String(pId) === String(user?._id);
+    }),
   );
   const isViewer = currentParticipant?.roomRole === 'viewer';
-  const isHost = currentParticipant?.roomRole === 'host';
+  const isHost = currentParticipant?.roomRole === 'host' || currentParticipant?.roomRole === 'owner';
+  const isChatMuted = Boolean(currentParticipant?.chatMuted);
 
   useEffect(() => {
     if (listRef.current) {
@@ -46,17 +51,14 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
 
   useEffect(() => {
     const socket = getSocket();
-    if (!socket) return;
+    if (!socket || !roomId) return;
 
-    const handleViewerMessage = (message: ChatMessage) => {
-      addViewerChatMessage(message);
-    };
-
-    socket.on('viewer-chat:message', handleViewerMessage);
-    return () => {
-      socket.off('viewer-chat:message', handleViewerMessage);
-    };
-  }, [addViewerChatMessage]);
+    socket.emit('viewer-chat:history', { roomId }, (response?: { messages: ChatMessage[] }) => {
+      if (response?.messages) {
+        setViewerChatMessages(response.messages);
+      }
+    });
+  }, [roomId, setViewerChatMessages]);
 
   const handleSend = () => {
     const trimmed = content.trim();
@@ -70,8 +72,8 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
   };
 
   return (
-    <div className="d-flex flex-column h-100" style={{ minHeight: 280 }}>
-      <div className="d-flex align-items-center justify-content-between mb-2">
+    <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
+      <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
         <h6 className="mb-0">
           <i className="bi bi-people me-2" />
           Viewer Chat
@@ -84,7 +86,7 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
       <div
         ref={listRef}
         className="flex-grow-1 overflow-auto px-2 py-2 rounded-3"
-        style={{ maxHeight: 280, background: '#ffffff', color: '#1c1c1c' }}
+        style={{ minHeight: 0, background: '#ffffff', color: '#1c1c1c' }}
       >
         {viewerChatMessages.length === 0 ? (
           <div className="small text-center py-3" style={{ color: '#888888' }}>
@@ -120,7 +122,7 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
         )}
       </div>
 
-      {isViewer ? (
+      {isViewer && !isChatMuted ? (
         <InputGroup className="mt-2">
           <Form.Control
             placeholder="Chat as a viewer..."
@@ -139,6 +141,10 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
             <i className="bi bi-send" />
           </Button>
         </InputGroup>
+      ) : isViewer && isChatMuted ? (
+        <div className="text-danger small text-center py-2 border border-danger bg-danger bg-opacity-10 rounded-3 mt-2">
+          You have been banned from sending messages in this chat
+        </div>
       ) : isHost ? (
         <div className="text-muted small text-center py-2 border rounded-3 mt-2">
           Host view only — viewers can chat here

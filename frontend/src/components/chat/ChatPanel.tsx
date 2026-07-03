@@ -77,7 +77,7 @@ export function ChatPanel({ roomId }: ChatPanelProps) {
         style={{ maxHeight: 360 }}
       >
         {messages.length === 0 ? (
-          <div className="text-muted small text-center py-3">No messages yet.</div>
+          <div className="text-muted small text-center py-3">{t('common:components.chatPanel.noMessages')}</div>
         ) : (
           messages.map((message) => {
             if (isSystemMessage(message)) {

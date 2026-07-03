@@ -1,92 +1,93 @@
-{
+﻿{
   "hero": {
-    "kicker": "Tranh biện học thuật, được hỗ trợ bởi AI",
-    "title": "Nền tảng tranh biện AI cho thi đấu học thuật",
-    "subtitle": "Tranh biện xếp hạng, tạo phòng riêng và nhận phản hồi AI rõ ràng sau mỗi trận."
+    "kicker": "Academic debate, powered by AI",
+    "title": "AI debate platform for academic competition",
+    "subtitle": "Play ranked debates, create private rooms, and receive clear AI feedback after every match."
   },
   "cta": {
-    "primaryAuth": "Vào xếp hạng",
-    "primaryGuest": "Bắt đầu ngay",
-    "secondaryAuth": "Tạo phòng",
-    "secondaryGuest": "Xem trận đấu"
+    "primaryAuth": "Enter ranked queue",
+    "primaryGuest": "Get started",
+    "secondaryAuth": "Create room",
+    "secondaryGuest": "Watch matches"
   },
   "showcase": {
-    "liveRoom": "Phòng tranh biện trực tiếp",
-    "liveTitle": "Cross Examination đang diễn ra",
-    "liveCopy": "Luồng tranh biện rõ ràng, tốc độ nhanh, tập trung vào quyết định và phản biện.",
-    "playerSnapshot": "Tóm tắt người chơi",
-    "format": "Thể thức",
-    "judge": "Giám khảo",
-    "queue": "Hàng chờ",
+    "liveRoom": "Live Debate Room",
+    "liveTitle": "Cross Examination in progress",
+    "liveCopy": "Structured rounds, fast pacing, and better focus on decision-making and rebuttal.",
+    "playerSnapshot": "Player Snapshot",
+    "format": "Format",
+    "judge": "Judge",
+    "queue": "Queue",
     "elo": "ELO",
-    "winRate": "Tỉ lệ thắng",
-    "feedback": "Phản hồi",
-    "strengths": "4 điểm mạnh"
+    "winRate": "Win rate",
+    "feedback": "Feedback",
+    "strengths": "4 strengths"
   },
   "sections": {
     "start": {
-      "title": "Vào trận theo cách bạn muốn",
-      "description": "Chọn xếp hạng để gặp đối thủ phù hợp hoặc mở phòng riêng cho bạn bè và câu lạc bộ.",
-      "bullets": ["Ghép trận xếp hạng", "Phòng riêng linh hoạt", "1v1 và 3v3"],
-      "eyebrow": "Bắt đầu nhanh",
-      "panelTitle": "Ranked hoặc custom room",
-      "panelDetail": "Ghép cặp nhanh hoặc chủ động tạo bàn tranh biện của riêng bạn.",
+      "title": "Join debates your way",
+      "description": "Queue into ranked matches or open private rooms for your friends and debate club.",
+      "bullets": ["Ranked matchmaking", "Flexible private rooms", "1v1 and 3v3"],
+      "eyebrow": "Fast start",
+      "panelTitle": "Ranked or custom room",
+      "panelDetail": "Jump into matchmaking or host your own debate table.",
       "stats": {
-        "modes": "Chế độ",
-        "access": "Truy cập",
+        "modes": "Modes",
+        "access": "Access",
         "modesValue": "1v1 / 3v3",
-        "accessValue": "Công khai / riêng tư"
+        "accessValue": "Public / private"
       },
-      "cta": "Khám phá chế độ đấu"
+      "cta": "Explore formats"
     },
     "ai": {
-      "title": "AI giúp bạn tranh biện tốt hơn",
-      "description": "Không chỉ chấm điểm, AI còn chỉ ra lập luận yếu, ngụy biện và điểm cần cải thiện sau mỗi trận.",
-      "bullets": ["Phân tích lập luận", "Phát hiện ngụy biện", "Phản hồi sau trận"],
-      "eyebrow": "Lợi thế khác biệt",
-      "panelTitle": "Feedback rõ ràng, công bằng",
-      "panelDetail": "Biến mỗi trận đấu thành một vòng học tập có thể đo được.",
+      "title": "AI helps you debate better",
+      "description": "AI does more than score. It highlights weak reasoning, fallacies, and what to improve after the match.",
+      "bullets": ["Argument analysis", "Fallacy detection", "Post-match feedback"],
+      "eyebrow": "Core advantage",
+      "panelTitle": "Clear, fair feedback",
+      "panelDetail": "Turn every debate into a measurable learning loop.",
       "stats": {
-        "analysis": "Phân tích",
-        "detection": "Nhận diện",
-        "analysisValue": "Lập luận",
-        "detectionValue": "Ngụy biện"
+        "analysis": "Analysis",
+        "detection": "Detection",
+        "analysisValue": "Arguments",
+        "detectionValue": "Fallacies"
       },
-      "cta": "Xem trải nghiệm AI"
+      "cta": "See AI experience"
     },
     "progress": {
-      "title": "Theo dõi tiến bộ thật qua từng trận",
-      "description": "Điểm ELO, lịch sử thắng thua và hồ sơ cá nhân giúp bạn biết mình đang tiến lên ở đâu.",
-      "bullets": ["Xếp hạng ELO", "Lịch sử trận đấu", "Hồ sơ tiến bộ"],
-      "eyebrow": "Tiến bộ đo được",
-      "panelTitle": "Stats không chỉ để trưng bày",
-      "panelDetail": "Biết bạn đang mạnh ở đâu và cần luyện thêm điều gì.",
+      "title": "Track real progress after every match",
+      "description": "ELO, win/loss history, and your profile show exactly where you are improving.",
+      "bullets": ["ELO ranking", "Match history", "Progress profile"],
+      "eyebrow": "Measured growth",
+      "panelTitle": "Stats with meaning",
+      "panelDetail": "See where you are strong and what you should train next.",
       "stats": {
-        "tracking": "Theo dõi",
-        "improvement": "Cải thiện",
+        "tracking": "Tracking",
+        "improvement": "Improvement",
         "trackingValue": "Win / Loss",
-        "improvementValue": "Theo thời gian"
+        "improvementValue": "Over time"
       },
-      "cta": "Xem bảng xếp hạng"
+      "cta": "View leaderboard"
     },
     "community": {
-      "title": "Xem cộng đồng tranh biện đang diễn ra",
-      "description": "Theo dõi trận đang live, bảng xếp hạng và hoạt động nổi bật để học nhanh hơn từ người khác.",
-      "bullets": ["Trận trực tiếp", "Bảng xếp hạng", "Quan sát chiến thuật"],
-      "eyebrow": "Khám phá cộng đồng",
-      "panelTitle": "Học qua quan sát",
-      "panelDetail": "Không cần vào trận ngay, bạn vẫn có thể xem, phân tích và học hỏi.",
+      "title": "See the debate community in motion",
+      "description": "Watch live debates, explore the leaderboard, and learn faster by observing other players.",
+      "bullets": ["Live matches", "Leaderboard", "Strategy observation"],
+      "eyebrow": "Explore community",
+      "panelTitle": "Learn by watching",
+      "panelDetail": "You can still observe, analyze, and learn even before joining a match.",
       "stats": {
-        "watch": "Theo dõi",
-        "explore": "Khám phá",
-        "watchValue": "Trận trực tiếp",
-        "exploreValue": "Top người chơi"
+        "watch": "Watch",
+        "explore": "Explore",
+        "watchValue": "Live matches",
+        "exploreValue": "Top players"
       },
-      "cta": "Xem trận đang diễn ra"
+      "cta": "Watch live now"
     }
   },
   "finalCta": {
-    "title": "Sẵn sàng cho trận tranh biện tiếp theo?",
-    "copy": "Bắt đầu với một trận xếp hạng, mở phòng riêng hoặc khám phá cộng đồng đang tranh biện ngay lúc này."
+    "title": "Ready for your next debate?",
+    "copy": "Start a ranked match, open a private room, or explore the community debating right now."
   }
 }
+

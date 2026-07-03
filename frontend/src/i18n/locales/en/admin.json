@@ -1,0 +1,145 @@
+{
+  "dashboardTitle": "Admin Dashboard",
+  "dashboardSubtitle": "Accounts, rooms, reports, and platform moderation.",
+
+  "overview": {
+    "title": "Overview"
+  },
+
+  "users": {
+    "title": "Users",
+    "adminAccess": "Admin access",
+    "restricted": "Restricted",
+    "active": "Active",
+    "pending": "Pending",
+    "verifiedAccount": "Verified account",
+    "emailNotVerified": "Email not verified",
+    "until": "Until",
+    "banActive": "Ban active",
+    "banned": "Banned",
+    "ban": "Ban",
+    "unban": "Unban",
+    "noBanned": "No banned users",
+    "allRoles": "All roles",
+    "allStatus": "All status",
+    "search": "Search",
+    "searchPlaceholder": "Search by name, email, username...",
+    "loadingError": "Unable to load users",
+    "noUsers": "No users found",
+    "role": {
+      "admin": "Admin",
+      "user": "User",
+      "banned": "Banned"
+    },
+    "columns": {
+      "user": "User",
+      "email": "Email",
+      "role": "Role",
+      "provider": "Provider",
+      "status": "Status",
+      "ranking": "Ranking",
+      "joined": "Joined",
+      "actions": "Actions"
+    }
+  },
+
+  "rooms": {
+    "title": "Rooms",
+    "untitledRoom": "Untitled room",
+    "noMotionSet": "No motion set",
+    "openRoom": "Open room",
+    "phase": "Phase",
+    "participants": "Participants",
+    "muted": "Muted",
+    "viewerChat": "Viewer chat",
+    "on": "On",
+    "off": "Off",
+    "allStatus": "All status",
+    "allTypes": "All types",
+    "allFormats": "All formats",
+    "search": "Search",
+    "searchPlaceholder": "Search by title, motion...",
+    "loadingError": "Unable to load rooms",
+    "noRooms": "No rooms found",
+    "private": "Private",
+    "columns": {
+      "room": "Room",
+      "status": "Status",
+      "type": "Type",
+      "people": "People",
+      "hostJudge": "Host / Judge",
+      "created": "Created",
+      "actions": "Actions"
+    }
+  },
+
+  "reports": {
+    "title": "Reports",
+    "openReports": "Open reports",
+    "toxicMessages": "Toxic messages",
+    "noDetails": "No details provided",
+    "review": "Review",
+    "noReports": "No reports found",
+    "search": "Search",
+    "searchPlaceholder": "Search by reason, target...",
+    "allStatus": "All status",
+    "allTargets": "All targets",
+    "loadingError": "Unable to load reports",
+    "reporter": "Reporter",
+    "target": "Target",
+    "columns": {
+      "report": "Report",
+      "target": "Target",
+      "status": "Status",
+      "reporter": "Reporter",
+      "created": "Created",
+      "actions": "Actions"
+    }
+  },
+
+  "ban": {
+    "title": "Ban User",
+    "account": "Account",
+    "duration": "Duration",
+    "durationHours": "{{count}} hours",
+    "durationDays": "{{count}} days",
+    "customDuration": "Custom",
+    "customPlaceholderMinutes": "Enter number of minutes (minimum 1).",
+    "customPlaceholderHours": "Enter number of hours (minimum 1).",
+    "customPlaceholderDays": "Enter number of days (minimum 1).",
+    "reason": "Reason",
+    "reasonPlaceholder": "Enter ban reason...",
+    "cancel": "Cancel",
+    "confirmBan": "Confirm ban",
+    "applying": "Applying...",
+    "roomModeration": "Room Moderation",
+    "participant": "Participant",
+    "role": "Role",
+    "team": "Team",
+    "slot": "Slot",
+    "state": "State",
+    "actions": "Actions",
+    "muted": "muted",
+    "clear": "clear",
+    "close": "Close"
+  },
+
+  "reviewReport": {
+    "title": "Review Report",
+    "status": "Status",
+    "resolution": "Resolution",
+    "adminNote": "Admin note",
+    "adminNotePlaceholder": "Add a note...",
+    "cancel": "Cancel",
+    "saveReview": "Save review",
+    "saving": "Saving...",
+    "pending": "Pending",
+    "resolved": "Resolved",
+    "dismissed": "Dismissed"
+  },
+
+  "errors": {
+    "feedback": "feedback",
+    "unableToLoadOverview": "Unable to load admin overview"
+  }
+}

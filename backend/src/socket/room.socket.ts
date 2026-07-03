@@ -4,6 +4,13 @@ import { DebateSession } from '../models/DebateSession.js';
 import { Message } from '../models/Message.js';
 import { timerService } from './timer.service.js';
 import { ceTimerService } from './ce.socket.js';
+import {
+  handleParticipantDisconnect,
+  handleParticipantReconnect,
+  cleanupRoomDisconnectState,
+} from './disconnect.service.js';
+
+const CE_QUOTA_PER_TEAM = 2;
 
 type RoomEventPayload = {
   roomId: string;
@@ -41,7 +48,11 @@ export async function buildRoomStatePayload(roomId: string, userId: string) {
 
   const [session, messages] = await Promise.all([
     DebateSession.findOne({ roomId: room._id }),
-    Message.find({ roomId: room._id }).sort({ timestamp: -1 }).limit(50),
+    Message.find({
+      roomId: room._id,
+      type: { $ne: 'viewer_chat' },
+      team: { $exists: false },
+    }).sort({ timestamp: -1 }).limit(50),
   ]);
 
   const orderedMessages = messages.reverse().map((message) => ({
@@ -58,6 +69,14 @@ export async function buildRoomStatePayload(roomId: string, userId: string) {
 
   const ceState = ceTimerService.getState(roomId);
 
+  const { prepConsensus } = await import('./debate.socket.js');
+  const consensusSet = prepConsensus.get(roomId);
+  const s1Debaters = room.participants.filter((p) => {
+    const r = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
+    return r === 'debater' && (p as any).speakerSlot === 'S1';
+  });
+  const totalS1 = s1Debaters.length || 2;
+
   return {
     room,
     session,
@@ -68,14 +87,20 @@ export async function buildRoomStatePayload(roomId: string, userId: string) {
     timeRemaining:
       timerService.getTimeRemaining(roomId) || session?.currentTurn?.timeRemaining || 0,
     isPaused: room.status === 'paused',
+    pauseType: session?.pauseType || null,
+    pausesUsed: session?.pausesUsed || { proposition: 0, opposition: 0 },
     messages: orderedMessages,
     finalScores: session?.finalScores || null,
     viewerChatEnabled: room.viewerChatEnabled !== false,
+    prepConsensusReadyUserIds: consensusSet ? Array.from(consensusSet) : [],
+    prepConsensusTotalDebaters: totalS1,
     ceState: ceState
       ? {
-          activeTeam: ceState.activeTeam,
-          timeRemainingPro: ceState.proRemaining,
-          timeRemainingOpp: ceState.oppRemaining,
+          sharedRemaining: ceState.sharedRemaining,
+          totalSeconds: ceState.totalSeconds,
+          questionsPro: ceState.questionsPro,
+          questionsOpp: ceState.questionsOpp,
+          quotaPerTeam: CE_QUOTA_PER_TEAM,
           isPaused: ceState.isPaused,
         }
       : null,
@@ -125,6 +150,14 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       // Also broadcast the full room state so any client that joined earlier
       // can re-sync phase / timer / session if they missed an event.
       socket.to(roomId).emit('room:state-restore', { ...state, found: true });
+
+      // Handle reconnection case - cancel disconnect timeout if user rejoins
+      const participant = state.participants.find(
+        (p: any) => p.userId?.toString() === userId || p.userId === userId,
+      );
+      if (participant) {
+        handleParticipantReconnect(roomId, userId).catch(console.error);
+      }
 
       ack?.({ success: true, data: state });
     } catch (error) {
@@ -206,12 +239,38 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       // Re-fetch authoritative participant list so remaining clients stay in sync.
       const room = await DebateRoom.findById(roomId).select('participants');
       const participants = room?.participants || [];
+
+      // Find the participant who disconnected
+      const disconnectedParticipant = participants.find(
+        (p: any) => p.userId?.toString() === userId || p.userId === userId,
+      );
+
+      // Emit disconnect event
       io.to(roomId).emit('room:participant-update', {
         type: 'left',
         userId,
         reason,
         participants,
       });
+
+      // Handle disconnect tracking and forfeit logic
+      if (disconnectedParticipant) {
+        const team = disconnectedParticipant.team as 'proposition' | 'opposition';
+        if (team === 'proposition' || team === 'opposition') {
+          await handleParticipantDisconnect(
+            roomId,
+            userId,
+            disconnectedParticipant.username || 'Unknown',
+            team,
+          );
+        }
+      }
+
+      // Cleanup disconnect state for this room if no more sockets
+      const socketsInRoom = io?.sockets.adapter.rooms.get(roomId);
+      if (!socketsInRoom || socketsInRoom.size === 0) {
+        cleanupRoomDisconnectState(roomId);
+      }
     }
     socketRooms.delete(socketId);
     console.log(`User ${userId} disconnected from rooms: ${rooms.join(', ') || 'none'} (${reason})`);

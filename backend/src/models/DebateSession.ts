@@ -2,6 +2,12 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IDebateSession extends Document {
   roomId: mongoose.Types.ObjectId;
+  pausesUsed: {
+    proposition: number;
+    opposition: number;
+  };
+  pauseType: 'host' | 'proposition' | 'opposition' | null;
+  pausedAt: Date | null;
   currentTurn: {
     speaker: string;
     phase: string;
@@ -9,6 +15,7 @@ export interface IDebateSession extends Document {
     timeLimit: number;
     timeRemaining: number;
     status: string;
+    phaseStatus?: string;
     ceState?: {
       askingTeam: string;
       answeringTeam: string;
@@ -76,6 +83,12 @@ export interface IDebateSession extends Document {
 const debateSessionSchema = new Schema<IDebateSession>(
   {
     roomId: { type: Schema.Types.ObjectId, ref: 'DebateRoom', required: true, index: true },
+    pausesUsed: {
+      proposition: { type: Number, default: 0 },
+      opposition: { type: Number, default: 0 },
+    },
+    pauseType: { type: String, enum: ['host', 'proposition', 'opposition', null], default: null },
+    pausedAt: { type: Date, default: null },
     currentTurn: {
       speaker: { type: String, default: 'PRO_S1' },
       phase: { type: String, default: 'motion' },
@@ -83,6 +96,7 @@ const debateSessionSchema = new Schema<IDebateSession>(
       timeLimit: { type: Number, default: 0 },
       timeRemaining: { type: Number, default: 0 },
       status: { type: String, enum: ['active', 'paused', 'completed', 'waiting_to_start'], default: 'waiting_to_start' },
+      phaseStatus: { type: String, default: 'idle' },
       ceState: {
         type: Schema.Types.Mixed,
         default: null,

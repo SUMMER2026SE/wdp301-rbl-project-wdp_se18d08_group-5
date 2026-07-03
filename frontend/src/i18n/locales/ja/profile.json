@@ -1,101 +1,102 @@
-{
-  "title": "プロフィール",
+﻿{
+  "title": "Profile",
   "hero": {
-    "ownerKicker": "マイプロフィール",
-    "publicKicker": "公開プロフィール",
+    "ownerKicker": "Personal profile",
+    "publicKicker": "Public profile",
     "title": "{{name}}",
-    "ownerSubtitle": "ディベートでの表示情報、成績、ランキングの歩みを更新できます。",
-    "publicSubtitle": "{{name}} のプロフィール概要、成績、コミュニティ情報です。"
+    "ownerSubtitle": "Keep your debate identity, stats, and ranking journey up to date.",
+    "publicSubtitle": "Profile overview, competitive record, and community details for {{name}}."
   },
   "fields": {
-    "displayName": "表示名",
-    "avatar": "アバター",
+    "displayName": "Display name",
+    "avatar": "Avatar",
     "bio": "Bio",
-    "school": "学校",
-    "club": "クラブ"
+    "school": "School",
+    "club": "Club"
   },
   "stats": {
     "elo": "ELO",
     "tier": "Tier",
-    "winLoss": "勝ち / 負け",
-    "totalDebates": "総ディベート数",
-    "wins": "勝ち",
-    "losses": "負け",
-    "winRate": "勝率",
-    "avgScore": "平均スコア",
-    "profileCompletion": "プロフィール完成度",
-    "memberSince": "参加日",
-    "role": "ロール",
-    "otherResults": "その他",
-    "seasonPointsValue": "シーズン {{points}} pts",
-    "winLossValue": "{{wins}} 勝 / {{losses}} 敗",
-    "totalScoreValue": "合計 {{score}} pts",
-    "decidedDebates": "結果確定 {{count}} 試合"
+    "winLoss": "Wins / Losses",
+    "totalDebates": "Total debates",
+    "wins": "Wins",
+    "losses": "Losses",
+    "winRate": "Win rate",
+    "avgScore": "Avg score",
+    "profileCompletion": "Profile completion",
+    "memberSince": "Member since",
+    "role": "Role",
+    "otherResults": "Other",
+    "seasonPointsValue": "{{points}} season pts",
+    "winLossValue": "{{wins}} wins / {{losses}} losses",
+    "totalScoreValue": "{{score}} total pts",
+    "decidedDebates": "{{count}} decided matches"
   },
   "status": {
-    "emailVerified": "メール認証済み",
-    "emailUnverified": "メール未認証"
+    "emailVerified": "Email verified",
+    "emailUnverified": "Email not verified"
   },
   "messages": {
-    "loadFailed": "プロフィールを読み込めませんでした",
-    "updateSuccess": "プロフィールを更新しました。",
-    "updateFailed": "プロフィールを更新できませんでした",
-    "avatarUploadSuccess": "アバターをアップロードしました。",
-    "avatarUploadFailed": "アバターをアップロードできませんでした。",
-    "avatarUploadNoUrl": "アップロード後のアバターURLを取得できませんでした",
-    "notFound": "プロフィールが見つかりません"
+    "loadFailed": "Unable to load profile",
+    "updateSuccess": "Profile updated successfully.",
+    "updateFailed": "Unable to update profile",
+    "avatarUploadSuccess": "Avatar uploaded successfully.",
+    "avatarUploadFailed": "Unable to upload avatar.",
+    "avatarUploadNoUrl": "Upload did not return an avatar URL",
+    "notFound": "Profile not found"
   },
   "actions": {
-    "viewHistory": "ディベート履歴を見る",
-    "avatarUpload": "端末からアップロード",
-    "avatarUploading": "アップロード中...",
-    "viewLeaderboard": "ランキング",
-    "startRankQueue": "ランク待機へ",
-    "changePassword": "パスワード変更",
-    "updateAvatar": "アバター更新"
+    "viewHistory": "View debate history",
+    "avatarUpload": "Upload from device",
+    "avatarUploading": "Uploading...",
+    "viewLeaderboard": "Leaderboard",
+    "startRankQueue": "Join ranked queue",
+    "changePassword": "Change password",
+    "updateAvatar": "Update avatar"
   },
   "sections": {
-    "editProfile": "編集",
-    "publicProfile": "概要",
-    "activity": "活動",
-    "account": "アカウント"
+    "editProfile": "Edit",
+    "publicProfile": "Overview",
+    "activity": "Activity",
+    "account": "Account"
   },
   "form": {
-    "title": "表示情報",
-    "bioPlaceholder": "あなたのディベートスタイルを短く書いてください...",
-    "schoolPlaceholder": "学校または所属組織",
-    "clubPlaceholder": "クラブまたはチーム"
+    "title": "Display information",
+    "bioPlaceholder": "Write a short note about your debating style...",
+    "schoolPlaceholder": "School or organization",
+    "clubPlaceholder": "Club or team"
   },
   "details": {
-    "title": "コミュニティ情報"
+    "title": "Community information"
   },
   "activity": {
-    "title": "ディベート成績",
-    "winRateHint": "勝敗が確定した試合から計算されます。"
+    "title": "Debate performance",
+    "winRateHint": "Calculated from decided wins and losses."
   },
   "account": {
-    "title": "プロフィール状態",
-    "emailStatus": "メール",
-    "provider": "ログイン"
+    "title": "Profile status",
+    "emailStatus": "Email",
+    "provider": "Login"
   },
   "avatarUpload": {
-    "hint": "JPG、PNG、GIF、WebPに対応。最大5MB。"
+    "hint": "JPG, PNG, GIF, or WebP. Max 5MB."
   },
   "validation": {
-    "displayNameRequired": "表示名を入力してください",
-    "displayNameMax": "50文字以内で入力してください",
-    "avatarInvalid": "画像URLが正しくありません",
-    "avatarFileInvalid": "画像ファイルが正しくありません。JPG、PNG、GIF、WebP、最大5MBに対応しています。",
-    "bioMax": "500文字以内で入力してください",
-    "schoolMax": "100文字以内で入力してください",
-    "clubMax": "100文字以内で入力してください"
+    "displayNameRequired": "Please enter a display name",
+    "displayNameMax": "Maximum 50 characters",
+    "avatarInvalid": "Invalid image URL",
+    "avatarFileInvalid": "Invalid image file. Use JPG, PNG, GIF, or WebP up to 5MB.",
+    "bioMax": "Maximum 500 characters",
+    "schoolMax": "Maximum 100 characters",
+    "clubMax": "Maximum 100 characters"
   },
   "tiers": {
-    "novice": "初心者",
+    "novice": "Novice",
     "debater": "Debater",
-    "advanced": "上級",
-    "expert": "エキスパート",
-    "master": "マスター",
-    "grandMaster": "グランドマスター"
+    "advanced": "Advanced",
+    "expert": "Expert",
+    "master": "Master",
+    "grandMaster": "Grand Master"
   }
 }
+

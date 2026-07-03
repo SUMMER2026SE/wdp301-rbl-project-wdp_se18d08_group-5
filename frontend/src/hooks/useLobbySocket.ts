@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSocket } from './useSocket';
+import { useSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
 
 /**
@@ -22,9 +22,10 @@ export function useLobbySocket(
   const navigate = useNavigate();
   const setRoom = useDebateStore((state) => state.setRoom);
   const setParticipants = useDebateStore((state) => state.setParticipants);
+  const { socket } = useSocket();
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !socket) return;
 
     const handleStateUpdated = (data: {
       roomId: string;
@@ -53,36 +54,44 @@ export function useLobbySocket(
       onRoomStateUpdated?.();
     };
 
-    const joinChannel = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      socket.emit('room:join', { roomId });
+    const joinChannel = () => {
+      if (socket.connected) {
+        socket.emit('room:join', { roomId });
+      }
     };
 
-    const attach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      joinChannel(socket);
+    const attach = () => {
+      // If the socket is already connected, join immediately. Otherwise wait
+      // for the 'connect' event before emitting — `socket.emit` while
+      // disconnected buffers the event, but if the buffer overflows or the
+      // socket is mid-reconnect, the server may never receive `room:join`
+      // and the participant will miss `debate:started` broadcasts.
+      joinChannel();
       socket.on('room:state-updated', handleStateUpdated);
       socket.on('debate:started', handleDebateStarted);
       socket.on('room:participant-update', handleParticipantUpdate);
     };
 
-    const detach = (socket: ReturnType<typeof getSocket>) => {
-      if (!socket) return;
-      socket.emit('room:leave', { roomId });
+    const detach = () => {
       socket.off('room:state-updated', handleStateUpdated);
       socket.off('debate:started', handleDebateStarted);
       socket.off('room:participant-update', handleParticipantUpdate);
+      // Leave the room channel so the next page (DebateRoomPage) can rejoin
+      // cleanly. Without this, the socket stays subscribed to the lobby
+      // channel and the next emit('join-room') may race against stale state.
+      if (socket.connected) {
+        socket.emit('leave-room', { roomId });
+      }
     };
 
-    const socket = getSocket();
-    attach(socket);
+    attach();
 
-    const handleConnect = () => joinChannel(socket);
-    socket?.on('connect', handleConnect);
+    const handleConnect = () => joinChannel();
+    socket.on('connect', handleConnect);
 
     return () => {
-      socket?.off('connect', handleConnect);
-      detach(socket);
+      socket.off('connect', handleConnect);
+      detach();
     };
-  }, [navigate, onRoomStateUpdated, roomId, setParticipants, setRoom]);
+  }, [navigate, onRoomStateUpdated, roomId, setParticipants, setRoom, socket]);
 }

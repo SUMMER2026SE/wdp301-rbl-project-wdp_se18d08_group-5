@@ -100,12 +100,14 @@ export async function applyDebateResult(roomId: string): Promise<RankingApplicat
     return { applied: false, reason: 'missing_winner' };
   }
 
-  const propositionParticipants = room.participants.filter(
-    (participant) => participant.roomRole === 'debater' && participant.team === 'proposition',
-  );
-  const oppositionParticipants = room.participants.filter(
-    (participant) => participant.roomRole === 'debater' && participant.team === 'opposition',
-  );
+  const propositionParticipants = room.participants.filter((participant) => {
+    const role = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+    return role === 'debater' && participant.team === 'proposition';
+  });
+  const oppositionParticipants = room.participants.filter((participant) => {
+    const role = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+    return role === 'debater' && participant.team === 'opposition';
+  });
 
   if (propositionParticipants.length === 0 || oppositionParticipants.length === 0) {
     return { applied: false, reason: 'missing_debaters' };

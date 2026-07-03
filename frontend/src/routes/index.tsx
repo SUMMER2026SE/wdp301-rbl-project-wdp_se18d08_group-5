@@ -21,6 +21,7 @@ const LiveMatchesPage = lazy(() => import('@pages/matches/LiveMatchesPage'));
 const CreateRoomPage = lazy(() => import('@pages/room/CreateRoomPage'));
 const LobbyPage = lazy(() => import('@pages/room/LobbyPage'));
 const DebateRoomPage = lazy(() => import('@pages/debate/DebateRoomPage'));
+const PrivateRoomPage = lazy(() => import('@pages/debate/PrivateRoomPage'));
 const RankQueuePage = lazy(() => import('@pages/matchmaking/RankQueuePage'));
 const ReplayPage = lazy(() => import('@pages/replay/ReplayPage'));
 const ForumPage = lazy(() => import('@pages/forum/ForumPage'));
@@ -97,7 +98,10 @@ export const routes: RouteObject[] = [
     children: [
       {
         element: <DebateLayout />,
-        children: [{ index: true, element: withSuspense(DebateRoomPage) }],
+        children: [
+          { index: true, element: withSuspense(DebateRoomPage) },
+          { path: 'private/:team', element: withSuspense(PrivateRoomPage) },
+        ],
       },
     ],
   },

@@ -1,7 +1,8 @@
-{
-  "generic": "Đã có lỗi xảy ra",
-  "noRefreshToken": "Không có refresh token",
-  "system": "Hệ thống",
-  "yellowCard": "Thẻ vàng",
-  "redCard": "Thẻ đỏ"
+﻿{
+  "generic": "Something went wrong",
+  "noRefreshToken": "No refresh token",
+  "system": "System",
+  "yellowCard": "Yellow card",
+  "redCard": "Red card"
 }
+

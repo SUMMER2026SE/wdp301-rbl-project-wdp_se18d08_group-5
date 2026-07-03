@@ -37,6 +37,14 @@ export const debateService = {
     return api.post(`/debate/${roomId}/host/resume`);
   },
 
+  debaterPause(roomId: string) {
+    return api.post(`/debate/${roomId}/debater/pause`);
+  },
+
+  debaterResume(roomId: string) {
+    return api.post(`/debate/${roomId}/debater/resume`);
+  },
+
   issueCard(roomId: string, userId: string, reason: string) {
     return api.post(`/debate/${roomId}/host/issue-card`, { userId, reason });
   },

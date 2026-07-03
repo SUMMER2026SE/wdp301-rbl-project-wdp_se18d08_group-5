@@ -19,6 +19,7 @@ import {
   Table,
   Tabs,
 } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
 import type {
   AdminReport,
   AdminRoom,
@@ -39,13 +40,6 @@ import { formatDate, formatRelativeTime } from '@utils/formatters';
 
 const PAGE_SIZE = 10;
 
-const durationOptions: Array<{ value: BanDurationPreset; label: string }> = [
-  { value: '1h', label: '1 hour' },
-  { value: '24h', label: '24 hours' },
-  { value: '7d', label: '7 days' },
-  { value: '30d', label: '30 days' },
-  { value: 'custom', label: 'Custom' },
-];
 const customDurationUnits: CustomBanDurationUnit[] = ['minutes', 'hours', 'days'];
 const roomStatuses: RoomStatus[] = ['waiting', 'ready', 'active', 'paused', 'completed', 'cancelled'];
 const roomTypes: RoomType[] = ['rank', 'custom'];
@@ -62,18 +56,18 @@ function providerBadgeVariant(provider: AdminUser['authProvider']) {
   return provider === 'google' ? 'info' : 'secondary';
 }
 
-function userStatus(entry: AdminUser) {
+function userStatus(entry: AdminUser, t: (key: string) => string) {
   if (entry.isBanned) {
     return {
-      label: 'Banned',
+      label: t('users.role.banned'),
       variant: 'danger' as const,
-      detail: entry.bannedUntil ? `Until ${formatDate(entry.bannedUntil)} (${formatRelativeTime(entry.bannedUntil)})` : 'Ban active',
+      detail: entry.bannedUntil ? `${t('users.until')} ${formatDate(entry.bannedUntil)} (${formatRelativeTime(entry.bannedUntil)})` : t('users.banActive'),
     };
   }
 
   return entry.isEmailVerified
-    ? { label: 'Active', variant: 'success' as const, detail: 'Verified account' }
-    : { label: 'Pending', variant: 'warning' as const, detail: 'Email not verified' };
+    ? { label: t('users.active'), variant: 'success' as const, detail: t('users.verifiedAccount') }
+    : { label: t('users.pending'), variant: 'warning' as const, detail: t('users.emailNotVerified') };
 }
 
 function roomStatusVariant(status: RoomStatus) {
@@ -160,7 +154,16 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
+  const { t } = useTranslation('admin');
   const [activeTab, setActiveTab] = useState('overview');
+
+  const durationOptions: Array<{ value: BanDurationPreset; label: string }> = [
+    { value: '1h', label: t('ban.durationHours', { count: 1 }) },
+    { value: '24h', label: t('ban.durationHours', { count: 24 }) },
+    { value: '7d', label: t('ban.durationDays', { count: 7 }) },
+    { value: '30d', label: t('ban.durationDays', { count: 30 }) },
+    { value: 'custom', label: t('ban.customDuration') },
+  ];
   const [feedback, setFeedback] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
 
   const [userPage, setUserPage] = useState(1);
@@ -470,12 +473,12 @@ export default function AdminDashboardPage() {
           <div>
             <h2 className="mb-1">
               <i className="bi bi-shield-lock me-2" />
-              Admin Dashboard
+              {t('dashboardTitle')}
             </h2>
-            <p className="text-muted mb-0">Accounts, rooms, reports, and platform moderation.</p>
+            <p className="text-muted mb-0">{t('dashboardSubtitle')}</p>
           </div>
           <Badge bg={currentUser?.role === 'admin' ? 'danger' : 'secondary'} className="align-self-start align-self-lg-center">
-            {currentUser?.role === 'admin' ? 'Admin access' : 'Restricted'}
+            {currentUser?.role === 'admin' ? t('users.adminAccess') : t('users.restricted')}
           </Badge>
         </div>
 
@@ -486,37 +489,37 @@ export default function AdminDashboardPage() {
         )}
 
         {overviewQuery.isError && (
-          <Alert variant="danger">{getErrorMessage(overviewQuery.error, 'Unable to load admin overview.')}</Alert>
+          <Alert variant="danger">{getErrorMessage(overviewQuery.error, t('errors.unableToLoadOverview'))}</Alert>
         )}
 
         <Tabs activeKey={activeTab} onSelect={(key) => setActiveTab(key || 'overview')} className="mb-4">
-          <Tab eventKey="overview" title={<span><i className="bi bi-grid-1x2 me-1" />Overview</span>}>
+          <Tab eventKey="overview" title={<span><i className="bi bi-grid-1x2 me-1" />{t('overview.title')}</span>}>
             {overview && (
               <div className="d-flex flex-column gap-4">
                 <Row className="g-3">
-                  <Col md={3}><MetricCard icon="bi-people" label="Users" value={overview.users.total} /></Col>
-                  <Col md={3}><MetricCard icon="bi-camera-video" label="Rooms" value={overview.rooms.total} tone="info" /></Col>
-                  <Col md={3}><MetricCard icon="bi-flag" label="Open reports" value={overview.reports.open + overview.reports.reviewing} tone="danger" /></Col>
-                  <Col md={3}><MetricCard icon="bi-chat-left-text" label="Toxic messages" value={overview.moderation.toxicMessages} tone="warning" /></Col>
+                  <Col md={3}><MetricCard icon="bi-people" label={t('users.title')} value={overview.users.total} /></Col>
+                  <Col md={3}><MetricCard icon="bi-camera-video" label={t('rooms.title')} value={overview.rooms.total} tone="info" /></Col>
+                  <Col md={3}><MetricCard icon="bi-flag" label={t('reports.openReports')} value={overview.reports.open + overview.reports.reviewing} tone="danger" /></Col>
+                  <Col md={3}><MetricCard icon="bi-chat-left-text" label={t('reports.toxicMessages')} value={overview.moderation.toxicMessages} tone="warning" /></Col>
                 </Row>
 
                 <Row className="g-4">
                   <Col lg={4}>
                     <Card className="shadow-sm h-100">
                       <Card.Body>
-                        <h4 className="mb-3">User Health</h4>
+                        <h4 className="mb-3">{t('users.active')}</h4>
                         <ListGroup variant="flush">
                           <ListGroup.Item className="d-flex justify-content-between bg-transparent text-light px-0">
-                            <span>Admins</span><Badge bg="danger">{overview.users.admins}</Badge>
+                            <span>{t('users.role.admin')}</span><Badge bg="danger">{overview.users.admins}</Badge>
                           </ListGroup.Item>
                           <ListGroup.Item className="d-flex justify-content-between bg-transparent text-light px-0">
-                            <span>Banned</span><Badge bg="warning">{overview.users.banned}</Badge>
+                            <span>{t('users.banned')}</span><Badge bg="warning">{overview.users.banned}</Badge>
                           </ListGroup.Item>
                           <ListGroup.Item className="d-flex justify-content-between bg-transparent text-light px-0">
-                            <span>Pending verification</span><Badge bg="secondary">{overview.users.pendingVerification}</Badge>
+                            <span>{t('users.pending')}</span><Badge bg="secondary">{overview.users.pendingVerification}</Badge>
                           </ListGroup.Item>
                           <ListGroup.Item className="d-flex justify-content-between bg-transparent text-light px-0">
-                            <span>New today</span><Badge bg="success">{overview.users.newToday}</Badge>
+                            <span>{t('users.verifiedAccount')}</span><Badge bg="success">{overview.users.newToday}</Badge>
                           </ListGroup.Item>
                         </ListGroup>
                       </Card.Body>
@@ -526,15 +529,15 @@ export default function AdminDashboardPage() {
                   <Col lg={4}>
                     <Card className="shadow-sm h-100">
                       <Card.Body>
-                        <h4 className="mb-3">Room Flow</h4>
+                        <h4 className="mb-3">{t('rooms.title')}</h4>
                         <div className="d-flex flex-wrap gap-2">
                           {roomStatuses.map((status) => (
                             <Badge key={status} bg={roomStatusVariant(status)} className="text-uppercase">
                               {status}: {overview.rooms[status]}
                             </Badge>
                           ))}
-                          <Badge bg="info">rank: {overview.rooms.rank}</Badge>
-                          <Badge bg="secondary">custom: {overview.rooms.custom}</Badge>
+                          <Badge bg="info">{t('rooms.allTypes')}: {overview.rooms.rank}</Badge>
+                          <Badge bg="secondary">{t('rooms.allFormats')}: {overview.rooms.custom}</Badge>
                         </div>
                       </Card.Body>
                     </Card>
@@ -543,14 +546,14 @@ export default function AdminDashboardPage() {
                   <Col lg={4}>
                     <Card className="shadow-sm h-100">
                       <Card.Body>
-                        <h4 className="mb-3">Report Queue</h4>
+                        <h4 className="mb-3">{t('reports.title')}</h4>
                         <div className="d-flex flex-wrap gap-2">
                           {reportStatuses.map((status) => (
                             <Badge key={status} bg={reportStatusVariant(status)} className="text-uppercase">
                               {status}: {overview.reports[status]}
                             </Badge>
                           ))}
-                          <Badge bg="warning">yellow cards: {overview.moderation.yellowCards}</Badge>
+                          <Badge bg="warning">{t('reports.toxicMessages')}: {overview.moderation.yellowCards}</Badge>
                         </div>
                       </Card.Body>
                     </Card>
@@ -561,14 +564,14 @@ export default function AdminDashboardPage() {
                   <Col lg={6}>
                     <Card className="shadow-sm h-100">
                       <Card.Body>
-                        <h4 className="mb-3">Recent Rooms</h4>
+                        <h4 className="mb-3">{t('rooms.title')}</h4>
                         <div className="table-responsive">
                           <Table hover>
                             <tbody>
                               {overview.recentRooms.map((room) => (
                                 <tr key={room._id}>
                                   <td>
-                                    <div className="fw-semibold">{room.title || room.motion || 'Untitled room'}</div>
+                                    <div className="fw-semibold">{room.title || room.motion || t('rooms.untitledRoom')}</div>
                                     <div className="text-muted small">{room.format} · {room.roomType}</div>
                                   </td>
                                   <td><Badge bg={roomStatusVariant(room.status)}>{room.status}</Badge></td>
@@ -589,7 +592,7 @@ export default function AdminDashboardPage() {
                   <Col lg={6}>
                     <Card className="shadow-sm h-100">
                       <Card.Body>
-                        <h4 className="mb-3">Recent Reports</h4>
+                        <h4 className="mb-3">{t('reports.title')}</h4>
                         <div className="table-responsive">
                           <Table hover>
                             <tbody>
@@ -623,7 +626,7 @@ export default function AdminDashboardPage() {
             )}
           </Tab>
 
-          <Tab eventKey="users" title={<span><i className="bi bi-people me-1" />Users</span>}>
+          <Tab eventKey="users" title={<span><i className="bi bi-people me-1" />{t('users.title')}</span>}>
             <Card className="shadow-sm">
               <Card.Body>
                 <Form onSubmit={handleUserSearchSubmit} className="mb-3">
@@ -631,7 +634,7 @@ export default function AdminDashboardPage() {
                     <Col lg={5}>
                       <Form.Control
                         type="search"
-                        placeholder="Search username, email, display name"
+                        placeholder={t('users.searchPlaceholder')}
                         value={userSearchInput}
                         onChange={(event) => setUserSearchInput(event.target.value)}
                       />
@@ -641,9 +644,9 @@ export default function AdminDashboardPage() {
                         setUserPage(1);
                         setUserRole(event.target.value as 'all' | AdminUser['role']);
                       }}>
-                        <option value="all">All roles</option>
-                        <option value="user">Users</option>
-                        <option value="admin">Admins</option>
+                        <option value="all">{t('users.allRoles')}</option>
+                        <option value="user">{t('users.role.user')}</option>
+                        <option value="admin">{t('users.role.admin')}</option>
                       </Form.Select>
                     </Col>
                     <Col sm={6} lg={2}>
@@ -651,15 +654,15 @@ export default function AdminDashboardPage() {
                         setUserPage(1);
                         setUserStatusFilter(event.target.value as 'all' | 'active' | 'banned' | 'pending');
                       }}>
-                        <option value="all">All status</option>
-                        <option value="active">Active</option>
-                        <option value="banned">Banned</option>
-                        <option value="pending">Pending</option>
+                        <option value="all">{t('users.allStatus')}</option>
+                        <option value="active">{t('users.active')}</option>
+                        <option value="banned">{t('users.banned')}</option>
+                        <option value="pending">{t('users.pending')}</option>
                       </Form.Select>
                     </Col>
                     <Col lg={3}>
                       <ButtonGroup className="w-100">
-                        <Button type="submit" variant="primary"><i className="bi bi-search me-1" />Search</Button>
+                        <Button type="submit" variant="primary"><i className="bi bi-search me-1" />{t('users.search')}</Button>
                         <Button variant="outline-light" onClick={() => {
                           setUserSearchInput('');
                           setUserSearch('');
@@ -677,23 +680,23 @@ export default function AdminDashboardPage() {
                 {usersQuery.isLoading ? (
                   <LoadingScreen />
                 ) : usersQuery.isError ? (
-                  <Alert variant="danger">{getErrorMessage(usersQuery.error, 'Unable to load users.')}</Alert>
+                  <Alert variant="danger">{getErrorMessage(usersQuery.error, t('users.loadingError'))}</Alert>
                 ) : users.length === 0 ? (
-                  <Alert variant="info" className="mb-0">No users found.</Alert>
+                  <Alert variant="info" className="mb-0">{t('users.noUsers')}</Alert>
                 ) : (
                   <>
                     <div className="table-responsive">
                       <Table hover bordered>
                         <thead>
                           <tr>
-                            <th>User</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Provider</th>
-                            <th>Status</th>
-                            <th>Ranking</th>
-                            <th>Joined</th>
-                            <th>Actions</th>
+                            <th>{t('users.columns.user')}</th>
+                            <th>{t('users.columns.email')}</th>
+                            <th>{t('users.columns.role')}</th>
+                            <th>{t('users.columns.provider')}</th>
+                            <th>{t('users.columns.status')}</th>
+                            <th>{t('users.columns.ranking')}</th>
+                            <th>{t('users.columns.joined')}</th>
+                            <th>{t('users.columns.actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -702,7 +705,7 @@ export default function AdminDashboardPage() {
                             const isUpdatingRole = updateRoleMutation.isPending && updateRoleMutation.variables?.userId === entry._id;
                             const isUpdatingBan = (banUserMutation.isPending && banUserMutation.variables?._id === entry._id)
                               || (unbanUserMutation.isPending && unbanUserMutation.variables?._id === entry._id);
-                            const status = userStatus(entry);
+                            const status = userStatus(entry, t);
 
                             return (
                               <tr key={entry._id}>
@@ -717,12 +720,12 @@ export default function AdminDashboardPage() {
                                   <div className="d-flex flex-column gap-1">
                                     <Badge bg={status.variant} text={status.variant === 'warning' ? 'dark' : undefined}>{status.label}</Badge>
                                     <div className="text-muted small">{status.detail}</div>
-                                    {entry.isBanned && entry.banReason && <div className="small">Reason: {entry.banReason}</div>}
+                                    {entry.isBanned && entry.banReason && <div className="small">{t('ban.reason')}: {entry.banReason}</div>}
                                   </div>
                                 </td>
                                 <td>
                                   <div>{entry.ranking?.elo ?? 1000} ELO</div>
-                                  <div className="text-muted small">{entry.ranking?.tier ?? 'Novice'}</div>
+                                  <div className="text-muted small">{entry.ranking?.tier ?? t('users.pending')}</div>
                                 </td>
                                 <td>{formatDate(entry.createdAt)}</td>
                                 <td>
@@ -738,8 +741,8 @@ export default function AdminDashboardPage() {
                                         updateRoleMutation.mutate({ userId: entry._id, role: nextRole });
                                       }}
                                     >
-                                      <option value="user">user</option>
-                                      <option value="admin">admin</option>
+                                      <option value="user">{t('users.role.user')}</option>
+                                      <option value="admin">{t('users.role.admin')}</option>
                                     </Form.Select>
 
                                     {entry.isBanned ? (
@@ -752,7 +755,7 @@ export default function AdminDashboardPage() {
                                           unbanUserMutation.mutate(entry);
                                         }}
                                       >
-                                        <i className="bi bi-unlock me-1" />Unban
+                                        <i className="bi bi-unlock me-1" />{t('users.unban')}
                                       </Button>
                                     ) : (
                                       <Button
@@ -764,7 +767,7 @@ export default function AdminDashboardPage() {
                                           setSelectedUser(entry);
                                         }}
                                       >
-                                        <i className="bi bi-slash-circle me-1" />Ban
+                                        <i className="bi bi-slash-circle me-1" />{t('users.ban')}
                                       </Button>
                                     )}
                                   </Stack>
@@ -782,7 +785,7 @@ export default function AdminDashboardPage() {
             </Card>
           </Tab>
 
-          <Tab eventKey="rooms" title={<span><i className="bi bi-camera-video me-1" />Rooms</span>}>
+          <Tab eventKey="rooms" title={<span><i className="bi bi-camera-video me-1" />{t('rooms.title')}</span>}>
             <Card className="shadow-sm">
               <Card.Body>
                 <Form onSubmit={handleRoomSearchSubmit} className="mb-3">
@@ -790,7 +793,7 @@ export default function AdminDashboardPage() {
                     <Col lg={4}>
                       <Form.Control
                         type="search"
-                        placeholder="Search title, motion, participant"
+                        placeholder={t('rooms.searchPlaceholder')}
                         value={roomSearchInput}
                         onChange={(event) => setRoomSearchInput(event.target.value)}
                       />
@@ -800,7 +803,7 @@ export default function AdminDashboardPage() {
                         setRoomPage(1);
                         setRoomStatus(event.target.value as 'all' | RoomStatus);
                       }}>
-                        <option value="all">All status</option>
+                        <option value="all">{t('rooms.allStatus')}</option>
                         {roomStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                       </Form.Select>
                     </Col>
@@ -809,7 +812,7 @@ export default function AdminDashboardPage() {
                         setRoomPage(1);
                         setRoomType(event.target.value as 'all' | RoomType);
                       }}>
-                        <option value="all">All types</option>
+                        <option value="all">{t('rooms.allTypes')}</option>
                         {roomTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                       </Form.Select>
                     </Col>
@@ -818,13 +821,13 @@ export default function AdminDashboardPage() {
                         setRoomPage(1);
                         setRoomFormat(event.target.value as 'all' | DebateFormat);
                       }}>
-                        <option value="all">All formats</option>
+                        <option value="all">{t('rooms.allFormats')}</option>
                         {debateFormats.map((format) => <option key={format} value={format}>{format}</option>)}
                       </Form.Select>
                     </Col>
                     <Col lg={2}>
                       <Button type="submit" variant="primary" className="w-100">
-                        <i className="bi bi-search me-1" />Search
+                        <i className="bi bi-search me-1" />{t('rooms.search')}
                       </Button>
                     </Col>
                   </Row>
@@ -833,22 +836,22 @@ export default function AdminDashboardPage() {
                 {roomsQuery.isLoading ? (
                   <LoadingScreen />
                 ) : roomsQuery.isError ? (
-                  <Alert variant="danger">{getErrorMessage(roomsQuery.error, 'Unable to load rooms.')}</Alert>
+                  <Alert variant="danger">{getErrorMessage(roomsQuery.error, t('rooms.loadingError'))}</Alert>
                 ) : rooms.length === 0 ? (
-                  <Alert variant="info" className="mb-0">No rooms found.</Alert>
+                  <Alert variant="info" className="mb-0">{t('rooms.noRooms')}</Alert>
                 ) : (
                   <>
                     <div className="table-responsive">
                       <Table hover bordered>
                         <thead>
                           <tr>
-                            <th>Room</th>
-                            <th>Status</th>
-                            <th>Type</th>
-                            <th>People</th>
-                            <th>Host / Judge</th>
-                            <th>Created</th>
-                            <th>Actions</th>
+                            <th>{t('rooms.columns.room')}</th>
+                            <th>{t('rooms.columns.status')}</th>
+                            <th>{t('rooms.columns.type')}</th>
+                            <th>{t('rooms.columns.people')}</th>
+                            <th>{t('rooms.columns.hostJudge')}</th>
+                            <th>{t('rooms.columns.created')}</th>
+                            <th>{t('rooms.columns.actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -859,8 +862,8 @@ export default function AdminDashboardPage() {
                             return (
                               <tr key={room._id}>
                                 <td>
-                                  <div className="fw-semibold">{room.title || room.motion || 'Untitled room'}</div>
-                                  <div className="text-muted small">{room.motion || 'No motion set'}</div>
+                                  <div className="fw-semibold">{room.title || room.motion || t('rooms.untitledRoom')}</div>
+                                  <div className="text-muted small">{room.motion || t('rooms.noMotionSet')}</div>
                                 </td>
                                 <td>
                                   <Form.Select
@@ -880,8 +883,8 @@ export default function AdminDashboardPage() {
                                   <div className="text-muted small mt-1">{room.roomType} · {room.format}</div>
                                 </td>
                                 <td>
-                                  <div>{room.participantCount} participants</div>
-                                  <div className="text-muted small">{room.debaterCount} debaters · {room.mutedCount} muted</div>
+                                  <div>{room.participantCount} {t('rooms.participants')}</div>
+                                  <div className="text-muted small">{room.debaterCount} debaters · {room.mutedCount} {t('rooms.muted')}</div>
                                 </td>
                                 <td>
                                   <div>{room.hostName || room.hostType}</div>
@@ -918,7 +921,7 @@ export default function AdminDashboardPage() {
             </Card>
           </Tab>
 
-          <Tab eventKey="reports" title={<span><i className="bi bi-flag me-1" />Reports</span>}>
+          <Tab eventKey="reports" title={<span><i className="bi bi-flag me-1" />{t('reports.title')}</span>}>
             <Card className="shadow-sm">
               <Card.Body>
                 <Form onSubmit={handleReportSearchSubmit} className="mb-3">
@@ -926,7 +929,7 @@ export default function AdminDashboardPage() {
                     <Col lg={5}>
                       <Form.Control
                         type="search"
-                        placeholder="Search reports"
+                        placeholder={t('reports.searchPlaceholder')}
                         value={reportSearchInput}
                         onChange={(event) => setReportSearchInput(event.target.value)}
                       />
@@ -936,7 +939,7 @@ export default function AdminDashboardPage() {
                         setReportPage(1);
                         setReportStatus(event.target.value as 'all' | ReportStatus);
                       }}>
-                        <option value="all">All status</option>
+                        <option value="all">{t('reports.allStatus')}</option>
                         {reportStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                       </Form.Select>
                     </Col>
@@ -945,13 +948,13 @@ export default function AdminDashboardPage() {
                         setReportPage(1);
                         setReportTargetType(event.target.value as 'all' | ReportTargetType);
                       }}>
-                        <option value="all">All targets</option>
+                        <option value="all">{t('reports.allTargets')}</option>
                         {reportTargetTypes.map((targetType) => <option key={targetType} value={targetType}>{targetType}</option>)}
                       </Form.Select>
                     </Col>
                     <Col lg={3}>
                       <Button type="submit" variant="primary" className="w-100">
-                        <i className="bi bi-search me-1" />Search
+                        <i className="bi bi-search me-1" />{t('reports.search')}
                       </Button>
                     </Col>
                   </Row>
@@ -960,21 +963,21 @@ export default function AdminDashboardPage() {
                 {reportsQuery.isLoading ? (
                   <LoadingScreen />
                 ) : reportsQuery.isError ? (
-                  <Alert variant="danger">{getErrorMessage(reportsQuery.error, 'Unable to load reports.')}</Alert>
+                  <Alert variant="danger">{getErrorMessage(reportsQuery.error, t('reports.loadingError'))}</Alert>
                 ) : reports.length === 0 ? (
-                  <Alert variant="info" className="mb-0">No reports found.</Alert>
+                  <Alert variant="info" className="mb-0">{t('reports.noReports')}</Alert>
                 ) : (
                   <>
                     <div className="table-responsive">
                       <Table hover bordered>
                         <thead>
                           <tr>
-                            <th>Report</th>
-                            <th>Target</th>
-                            <th>Status</th>
-                            <th>Reporter</th>
-                            <th>Created</th>
-                            <th>Actions</th>
+                            <th>{t('reports.columns.report')}</th>
+                            <th>{t('reports.columns.target')}</th>
+                            <th>{t('reports.columns.status')}</th>
+                            <th>{t('reports.columns.reporter')}</th>
+                            <th>{t('reports.columns.created')}</th>
+                            <th>{t('reports.columns.actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -982,11 +985,11 @@ export default function AdminDashboardPage() {
                             <tr key={report._id}>
                               <td>
                                 <div className="fw-semibold text-capitalize">{formatReportReason(report.reason)}</div>
-                                <div className="text-muted small">{report.details || report.messageSnippet || 'No details'}</div>
+                                <div className="text-muted small">{report.details || report.messageSnippet || t('reports.noDetails')}</div>
                               </td>
                               <td>
                                 <Badge bg="secondary">{report.targetType}</Badge>
-                                <div className="small mt-1">{report.reportedUserName || report.roomTitle || report.messageSnippet || 'Unlinked'}</div>
+                                <div className="small mt-1">{report.reportedUserName || report.roomTitle || report.messageSnippet || t('reports.target')}</div>
                               </td>
                               <td>
                                 <Badge bg={reportStatusVariant(report.status)}>{report.status}</Badge>
@@ -996,7 +999,7 @@ export default function AdminDashboardPage() {
                               <td>{formatDate(report.createdAt)}</td>
                               <td>
                                 <Button size="sm" variant="outline-primary" onClick={() => openReportModal(report)}>
-                                  <i className="bi bi-eye me-1" />Review
+                                  <i className="bi bi-eye me-1" />{t('reports.review')}
                                 </Button>
                               </td>
                             </tr>
@@ -1015,17 +1018,17 @@ export default function AdminDashboardPage() {
 
       <Modal show={selectedUser !== null} onHide={() => setSelectedUser(null)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Ban User</Modal.Title>
+          <Modal.Title>{t('ban.title')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedUser && (
             <div className="mb-3 text-muted small">
-              Account: <strong>{selectedUser.profile.displayName || selectedUser.username}</strong>
+              {t('ban.account')}: <strong>{selectedUser.profile.displayName || selectedUser.username}</strong>
             </div>
           )}
 
           <Form.Group className="mb-3">
-            <Form.Label>Duration</Form.Label>
+            <Form.Label>{t('ban.duration')}</Form.Label>
             <Form.Select value={durationPreset} onChange={(event) => setDurationPreset(event.target.value as BanDurationPreset)}>
               {durationOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -1041,7 +1044,7 @@ export default function AdminDashboardPage() {
                 max={365}
                 value={customDurationValue}
                 onChange={(event) => setCustomDurationValue(event.target.value)}
-                placeholder="Value"
+                placeholder={t(`ban.customPlaceholder${customDurationUnit.charAt(0).toUpperCase() + customDurationUnit.slice(1)}`)}
               />
               <Form.Select value={customDurationUnit} onChange={(event) => setCustomDurationUnit(event.target.value as CustomBanDurationUnit)}>
                 {customDurationUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
@@ -1050,18 +1053,18 @@ export default function AdminDashboardPage() {
           )}
 
           <Form.Group>
-            <Form.Label>Reason</Form.Label>
+            <Form.Label>{t('ban.reason')}</Form.Label>
             <Form.Control
               as="textarea"
               rows={3}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Moderation note"
+              placeholder={t('ban.reasonPlaceholder')}
             />
           </Form.Group>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setSelectedUser(null)}>Cancel</Button>
+          <Button variant="outline-secondary" onClick={() => setSelectedUser(null)}>{t('ban.cancel')}</Button>
           <Button
             variant="danger"
             disabled={banUserMutation.isPending || !selectedUser || (durationPreset === 'custom' && !customDurationValue.trim())}
@@ -1070,14 +1073,14 @@ export default function AdminDashboardPage() {
               banUserMutation.mutate(selectedUser);
             }}
           >
-            {banUserMutation.isPending ? 'Applying...' : 'Confirm ban'}
+            {banUserMutation.isPending ? t('ban.applying') : t('ban.confirmBan')}
           </Button>
         </Modal.Footer>
       </Modal>
 
       <Modal size="lg" show={selectedRoom !== null} onHide={() => setSelectedRoom(null)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Room Moderation</Modal.Title>
+          <Modal.Title>{t('ban.roomModeration')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {!detailedRoom ? (
@@ -1085,21 +1088,21 @@ export default function AdminDashboardPage() {
           ) : (
             <div className="d-flex flex-column gap-3">
               <div>
-                <h4 className="mb-1">{detailedRoom.title || detailedRoom.motion || 'Untitled room'}</h4>
+                <h4 className="mb-1">{detailedRoom.title || detailedRoom.motion || t('rooms.untitledRoom')}</h4>
                 <div className="text-muted small">
-                  {detailedRoom.roomType} · {detailedRoom.format} · phase {detailedRoom.currentPhase}
+                  {detailedRoom.roomType} · {detailedRoom.format} · {t('rooms.phase')} {detailedRoom.currentPhase}
                 </div>
               </div>
 
               <Row className="g-2">
-                <Col sm={4}><MetricCard icon="bi-people" label="Participants" value={detailedRoom.participantCount} /></Col>
-                <Col sm={4}><MetricCard icon="bi-mic-mute" label="Muted" value={detailedRoom.mutedCount} tone="warning" /></Col>
-                <Col sm={4}><MetricCard icon="bi-chat-left" label="Viewer Chat" value={detailedRoom.viewerChatEnabled ? 'On' : 'Off'} tone={detailedRoom.viewerChatEnabled ? 'success' : 'secondary'} /></Col>
+                <Col sm={4}><MetricCard icon="bi-people" label={t('rooms.participants')} value={detailedRoom.participantCount} /></Col>
+                <Col sm={4}><MetricCard icon="bi-mic-mute" label={t('rooms.muted')} value={detailedRoom.mutedCount} tone="warning" /></Col>
+                <Col sm={4}><MetricCard icon="bi-chat-left" label={t('rooms.viewerChat')} value={detailedRoom.viewerChatEnabled ? t('rooms.on') : t('rooms.off')} tone={detailedRoom.viewerChatEnabled ? 'success' : 'secondary'} /></Col>
               </Row>
 
               {roomDetailQuery.data?.toxicMessages.length ? (
                 <Alert variant="warning" className="mb-0">
-                  <div className="fw-semibold mb-2">Toxic messages</div>
+                  <div className="fw-semibold mb-2">{t('reports.toxicMessages')}</div>
                   {roomDetailQuery.data.toxicMessages.map((message) => (
                     <div key={message._id} className="small">
                       <strong>{message.senderName}:</strong> {message.content}
@@ -1112,12 +1115,12 @@ export default function AdminDashboardPage() {
                 <Table hover bordered className="mb-0">
                   <thead>
                     <tr>
-                      <th>Participant</th>
-                      <th>Role</th>
-                      <th>Team</th>
-                      <th>Slot</th>
-                      <th>State</th>
-                      <th>Actions</th>
+                      <th>{t('ban.participant')}</th>
+                      <th>{t('ban.role')}</th>
+                      <th>{t('ban.team')}</th>
+                      <th>{t('ban.slot')}</th>
+                      <th>{t('ban.state')}</th>
+                      <th>{t('ban.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1134,7 +1137,7 @@ export default function AdminDashboardPage() {
                           <td><Badge bg={participant.roomRole === 'host' ? 'danger' : 'secondary'}>{participant.roomRole}</Badge></td>
                           <td>{participant.team || '-'}</td>
                           <td>{participant.speakerSlot || '-'}</td>
-                          <td>{participant.muted ? <Badge bg="warning">muted</Badge> : <Badge bg="success">clear</Badge>}</td>
+                          <td>{participant.muted ? <Badge bg="warning">{t('ban.muted')}</Badge> : <Badge bg="success">{t('ban.clear')}</Badge>}</td>
                           <td>
                             <ButtonGroup size="sm">
                               <Button
@@ -1169,37 +1172,37 @@ export default function AdminDashboardPage() {
         <Modal.Footer>
           {detailedRoom && (
             <Button variant="outline-primary" onClick={() => navigate(roomTargetPath(detailedRoom))}>
-              <i className="bi bi-box-arrow-up-right me-1" />Open room
+              <i className="bi bi-box-arrow-up-right me-1" />{t('rooms.openRoom')}
             </Button>
           )}
-          <Button variant="outline-secondary" onClick={() => setSelectedRoom(null)}>Close</Button>
+          <Button variant="outline-secondary" onClick={() => setSelectedRoom(null)}>{t('ban.close')}</Button>
         </Modal.Footer>
       </Modal>
 
       <Modal show={selectedReport !== null} onHide={() => setSelectedReport(null)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Review Report</Modal.Title>
+          <Modal.Title>{t('reviewReport.title')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedReport && (
             <div className="d-flex flex-column gap-3">
               <Alert variant="info" className="mb-0">
                 <div className="fw-semibold text-capitalize">{formatReportReason(selectedReport.reason)}</div>
-                <div className="small">{selectedReport.details || selectedReport.messageSnippet || 'No details'}</div>
+                <div className="small">{selectedReport.details || selectedReport.messageSnippet || t('reports.noDetails')}</div>
                 <div className="small mt-2">
-                  Reporter: {selectedReport.reporterName} · Target: {selectedReport.reportedUserName || selectedReport.roomTitle || selectedReport.targetType}
+                  {t('reports.reporter')}: {selectedReport.reporterName} · {t('reports.target')}: {selectedReport.reportedUserName || selectedReport.roomTitle || selectedReport.targetType}
                 </div>
               </Alert>
 
               <Form.Group>
-                <Form.Label>Status</Form.Label>
+                <Form.Label>{t('reviewReport.status')}</Form.Label>
                 <Form.Select value={reportEditStatus} onChange={(event) => setReportEditStatus(event.target.value as ReportStatus)}>
                   {reportStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                 </Form.Select>
               </Form.Group>
 
               <Form.Group>
-                <Form.Label>Resolution</Form.Label>
+                <Form.Label>{t('reviewReport.resolution')}</Form.Label>
                 <Form.Select value={reportResolution} onChange={(event) => setReportResolution(event.target.value as ReportResolution)}>
                   {reportResolutions.map((resolution) => <option key={resolution} value={resolution}>{resolution}</option>)}
                 </Form.Select>
@@ -1208,7 +1211,7 @@ export default function AdminDashboardPage() {
               {reportResolution === 'banned' && (
                 <>
                   <Form.Group>
-                    <Form.Label>Ban duration</Form.Label>
+                    <Form.Label>{t('ban.duration')}</Form.Label>
                     <Form.Select value={reportBanPreset} onChange={(event) => setReportBanPreset(event.target.value as BanDurationPreset)}>
                       {durationOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </Form.Select>
@@ -1221,7 +1224,7 @@ export default function AdminDashboardPage() {
                         max={365}
                         value={reportCustomDurationValue}
                         onChange={(event) => setReportCustomDurationValue(event.target.value)}
-                        placeholder="Value"
+                        placeholder={t(`ban.customPlaceholder${reportCustomDurationUnit.charAt(0).toUpperCase() + reportCustomDurationUnit.slice(1)}`)}
                       />
                       <Form.Select value={reportCustomDurationUnit} onChange={(event) => setReportCustomDurationUnit(event.target.value as CustomBanDurationUnit)}>
                         {customDurationUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
@@ -1232,20 +1235,20 @@ export default function AdminDashboardPage() {
               )}
 
               <Form.Group>
-                <Form.Label>Admin note</Form.Label>
+                <Form.Label>{t('reviewReport.adminNote')}</Form.Label>
                 <Form.Control
                   as="textarea"
                   rows={4}
                   value={reportAdminNote}
                   onChange={(event) => setReportAdminNote(event.target.value)}
-                  placeholder="Resolution note"
+                  placeholder={t('reviewReport.adminNotePlaceholder')}
                 />
               </Form.Group>
             </div>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setSelectedReport(null)}>Cancel</Button>
+          <Button variant="outline-secondary" onClick={() => setSelectedReport(null)}>{t('reviewReport.cancel')}</Button>
           <Button
             variant="primary"
             disabled={
@@ -1258,7 +1261,7 @@ export default function AdminDashboardPage() {
               updateReportMutation.mutate(selectedReport);
             }}
           >
-            {updateReportMutation.isPending ? 'Saving...' : 'Save review'}
+            {updateReportMutation.isPending ? t('reviewReport.saving') : t('reviewReport.saveReview')}
           </Button>
         </Modal.Footer>
       </Modal>
