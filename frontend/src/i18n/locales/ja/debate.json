@@ -110,8 +110,6 @@
       "submitEvaluation": "評価を送信",
       "currentStandings": "現在の順位",
       "roundScores": "ラウンドスコア",
-      "aggregateScores": "合計スコア",
-      "determineWinner": "勝者を決定",
       "notYetSubmitted": "この라운드はまだスコアが提交されていません。",
       "noSubmitted": "未提交。",
       "speech": "スピーチ",

@@ -18,8 +18,8 @@ import {
   requestDraw,
   surrenderDebate,
   triggerTransition,
-  aggregateScores,
 } from './debate.service.js';
+import { aggregateFinalScores } from '../../utils/scoring.js';
 import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
@@ -534,8 +534,10 @@ router.post(
 
     const hasHumanController = room.hostType === 'human' || room.judgeType === 'human';
     if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0 && !hasHumanController) {
-      const aggregate = aggregateScores(finalScores.judgeVerdicts);
-      
+      // Use the authoritative per-round aggregator with tie-breakers.
+      // (The legacy `aggregateScores` helper only worked for the old
+      // criteria-based submissions and is intentionally not used here.)
+      const aggregate = aggregateFinalScores(session, room) as any;
       finalScores.teamProposition = aggregate.teamProposition;
       finalScores.teamOpposition = aggregate.teamOpposition;
       finalScores.winner = aggregate.winner;

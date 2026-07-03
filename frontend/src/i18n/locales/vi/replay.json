@@ -7,13 +7,13 @@
   "debateArenaConcluded": "ARENA TRANH LUẬN KẾT THÚC",
   "motionSelection": "Lựa chọn chủ đề",
   "winner": "NGƯỜI THẮNG",
-  "propositionWins": "Bên Đi Thắng",
-  "oppositionWins": "Bên Vãng Thắng",
+  "propositionWins": "Proposition thắng",
+  "oppositionWins": "Opposition thắng",
   "drawMatch": "Hòa",
 
   "finalScoreboard": "Bảng điểm cuối cùng",
-  "proposition": "BÊN ĐI",
-  "opposition": "BÊN VÃNG",
+  "proposition": "Proposition",
+  "opposition": "Opposition",
   "points": "điểm",
 
   "aiSummaryVerdict": "Phán quyết tóm tắt AI",

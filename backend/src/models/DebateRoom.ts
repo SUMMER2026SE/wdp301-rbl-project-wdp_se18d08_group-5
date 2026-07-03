@@ -70,7 +70,18 @@ const debateRoomSchema = new Schema<IDebateRoom>(
       enum: ['human', 'ai'],
       default: 'ai',
     },
-    judgeCount: { type: Number, default: 1, min: 1, max: 3 },
+    judgeCount: {
+      type: Number,
+      default: 1,
+      validate: {
+        validator: function (v: number) {
+          // Per the rule docs: Human Judge = 1 or 3 only. AI Judge is always 1
+          // (controlled by the routes that force judgeCount=1 when judgeType='ai').
+          return v === 1 || v === 3;
+        },
+        message: 'judgeCount must be 1 or 3',
+      },
+    },
     judges: [
       {
         userId: { type: Schema.Types.ObjectId, ref: 'User' },

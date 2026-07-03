@@ -11,8 +11,6 @@ import type {
   SubmitJudgeScoreResponse,
   SubmitJudgeRoundScoresRequest,
   SubmitJudgeRoundScoresResponse,
-  FinalScores,
-  WinnerResult,
   RankingApplicationResult,
 } from '@/types';
 
@@ -75,6 +73,12 @@ export const roomService = {
     return api.post(`/rooms/${roomId}/start`);
   },
 
+  getStartReadiness(roomId: string) {
+    return api.get<ApiResponse<{ ready: boolean; reason?: string; counts?: any; status: string }>>(
+      `/rooms/${roomId}/start-readiness`,
+    );
+  },
+
   updateMotion(roomId: string, motion: string) {
     return api.post<ApiResponse<{ motion: string }>>(`/rooms/${roomId}/host/motion`, { motion });
   },
@@ -132,18 +136,6 @@ export const roomService = {
       `/rooms/${roomId}/judge/submit-round-scores`,
       data,
     );
-  },
-
-  aggregateScores(roomId: string) {
-    return api.post<ApiResponse<FinalScores>>(`/rooms/${roomId}/scores/aggregate`);
-  },
-
-  getWinner(roomId: string) {
-    return api.get<ApiResponse<WinnerResult>>(`/rooms/${roomId}/winner`);
-  },
-
-  determineWinner(roomId: string) {
-    return api.post<ApiResponse<WinnerResult>>(`/rooms/${roomId}/winner`);
   },
 
   applyRankResult(roomId: string) {

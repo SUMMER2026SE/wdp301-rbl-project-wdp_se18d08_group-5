@@ -76,7 +76,20 @@ export default function LobbyPage() {
     enabled: Boolean(roomId),
   });
 
+  const readinessQuery = useQuery({
+    // Polled so the Start button reacts to join/leave events without requiring
+    // a manual page reload. The socket already broadcasts `room:state-restore`
+    // on every change, so we also re-fetch on that event via the useLobbySocket
+    // hook below.
+    queryKey: ['room', roomId, 'start-readiness'],
+    queryFn: async () => (await roomService.getStartReadiness(roomId)).data.data,
+    enabled: Boolean(roomId) && roomQuery.data?.status !== 'active' && roomQuery.data?.status !== 'completed',
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+  });
+
   const room = roomQuery.data;
+  const startReadiness = readinessQuery.data;
 
   // Track room in storage for ReturnToDebateBanner while in the lobby
   useDebateRoomTracker(roomId, room?.title, true);
@@ -95,7 +108,10 @@ export default function LobbyPage() {
   });
 
   const invalidateRoom = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: ['room', roomId] }),
+    () => {
+      queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+      queryClient.invalidateQueries({ queryKey: ['room', roomId, 'start-readiness'] });
+    },
     [queryClient, roomId],
   );
 
@@ -556,10 +572,24 @@ export default function LobbyPage() {
                     </Button>
                   </div>
                   {canStartDebate && (
-                    <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
-                      <i className="bi bi-play-fill me-2" />
-                      {t('startDebate')}
-                    </Button>
+                    <div className="d-grid gap-2">
+                      <Button onClick={() => startMutation.mutate()} disabled={startMutation.isPending || startReadiness?.ready === false}>
+                        <i className="bi bi-play-fill me-2" />
+                        {t('startDebate')}
+                      </Button>
+                      {startReadiness?.ready === false && startReadiness?.reason && (
+                        <Alert variant="warning" className="small mb-0 py-2">
+                          <i className="bi bi-exclamation-triangle me-1" />
+                          {startReadiness.reason}
+                        </Alert>
+                      )}
+                      {startReadiness?.ready && (
+                        <div className="text-success small">
+                          <i className="bi bi-check-circle me-1" />
+                          All Main Participants are present.
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </Card.Body>
@@ -577,10 +607,20 @@ export default function LobbyPage() {
                     ? t('s1MustStart')
                     : t('judgeS1Responsible')}
                 </p>
-                <Button variant="success" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
+                <Button
+                  variant="success"
+                  onClick={() => startMutation.mutate()}
+                  disabled={startMutation.isPending || startReadiness?.ready === false}
+                >
                   <i className="bi bi-play-fill me-2" />
                   {t('startDebate')}
                 </Button>
+                {startReadiness?.ready === false && startReadiness?.reason && (
+                  <Alert variant="warning" className="small mb-0 py-2">
+                    <i className="bi bi-exclamation-triangle me-1" />
+                    {startReadiness.reason}
+                  </Alert>
+                )}
               </Card.Body>
             </Card>
           )}

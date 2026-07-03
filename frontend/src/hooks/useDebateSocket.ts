@@ -505,7 +505,6 @@ export function useDebateSocket(roomId: string | undefined) {
     const safetyTimer = window.setTimeout(() => {
       const storeRoomId = useDebateStore.getState().room?._id;
       if (storeRoomId === roomId) return; // already populated, nothing to do
-      // eslint-disable-next-line no-console
       console.warn('[useDebateSocket] room:joined not received in 3s — retrying join-room');
       emitJoin();
     }, 3000);

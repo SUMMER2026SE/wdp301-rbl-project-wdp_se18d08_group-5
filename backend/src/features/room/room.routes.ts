@@ -610,9 +610,10 @@ router.post(
       title,
       motion: normalizeMotion(motion),
       format,
-      hostType,
-      judgeType,
-      judgeCount: judgeCount || 1,
+      hostType: hostType || 'human',
+      judgeType: judgeType || 'ai',
+      // AI Judge: always exactly 1 judge (per rule)
+      judgeCount: (judgeType || 'ai') === 'ai' ? 1 : (judgeCount || 1),
       isPrivate: isPrivate || false,
       password: isPrivate ? password : null,
       createdBy: userId,
@@ -651,15 +652,10 @@ router.get(
     if (format) filter.format = format;
     if (roomType) filter.roomType = roomType;
 
-    // Default: show active/waiting rooms. Completed/ended matches should
-    // never show up on the live list — they belong in the replay/history page.
-    if (!status) {
-      filter.status = { $in: ['waiting', 'ready', 'active', 'paused'] };
-    } else if (status === 'completed') {
-      // Explicit completed filter is allowed (for history views), but we keep
-      // the broader inclusive list below just in case.
-      filter.status = 'completed';
-    }
+    // No status filter at all: return the full room list (caller controls the
+    // scope via the explicit ?status=... query param). Earlier we used the
+    // status filter to hide completed rooms, but the Live Matches page now
+    // expects "all rooms" when no filter is provided.
 
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
@@ -715,7 +711,12 @@ router.put(
     if (format !== undefined) room.format = format;
     if (hostType !== undefined) room.hostType = hostType;
     if (judgeType !== undefined) room.judgeType = judgeType;
-    if (judgeCount !== undefined) room.judgeCount = judgeCount;
+    // Enforce judgeCount rules: AI judge → always 1; human judge → 1 or 3
+    if (judgeType === 'ai') {
+      room.judgeCount = 1;
+    } else if (judgeCount !== undefined) {
+      room.judgeCount = judgeCount;
+    }
     if (motion !== undefined) room.motion = normalizeMotion(motion);
     if (isPrivate !== undefined) {
       room.isPrivate = isPrivate;
@@ -1071,6 +1072,9 @@ router.post(
   authenticate,
   roomParticipantGuard(),
   asyncHandler(async (req: AuthRequest, res: Response) => {
+    // The actual participant-count check lives inside startDebate so the rule
+    // is enforced server-side. The route also broadcasts the live state to
+    // every connected client so the lobby can react to join/leave realtime.
     const result = await startDebate(req.params.id, (req as any).participant.userId.toString());
 
     // Notify every client in the room so participants auto-navigate from
@@ -1088,6 +1092,21 @@ router.post(
     }
 
     sendSuccess(res, result, 'Debate started');
+  }),
+);
+
+// GET /api/v1/rooms/:id/start-readiness — Inspect whether the room is ready
+// to start (enough Main Participants). Frontend polls/binds this to show the
+// live "ready / not ready" status in the lobby without having to compute
+// the rule client-side.
+router.get(
+  '/:id/start-readiness',
+  asyncHandler(async (req: Request, res: Response) => {
+    const room = await DebateRoom.findById(req.params.id);
+    if (!room) throw new NotFoundError('Room not found');
+    const { checkStartMatchParticipants } = await import('../debate/debate.service.js');
+    const result = checkStartMatchParticipants(room);
+    sendSuccess(res, { ...result, status: room.status });
   }),
 );
 
@@ -1936,103 +1955,6 @@ router.get(
       turnHistory: session.turnHistory,
       participants: room.participants,
     });
-  }),
-);
-
-// POST /api/v1/rooms/:id/scores/aggregate — Aggregate human judges + AI scores (UC-62)
-router.post(
-  '/:id/scores/aggregate',
-  authenticate,
-  roomParticipantGuard(),
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const participant = (req as any).participant;
-    const effectiveRole = getEffectiveRoomRole(participant);
-    const isOwner = participant?.roomRole === 'owner';
-    const isHost = effectiveRole === 'host';
-    const isJudge = effectiveRole === 'judge';
-    if (!isOwner && !isHost && !isJudge) {
-      throw new ForbiddenError('Only host, owner, or judge can aggregate scores');
-    }
-
-    const session = await DebateSession.findOne({ roomId: req.params.id });
-    if (!session) throw new NotFoundError('Session not found');
-
-    const room = (req as any).room;
-    const aggregatedScores = aggregateFinalScores(session, room);
-    await session.save();
-
-    getIO().to(req.params.id).emit('score:aggregate-updated', {
-      roomId: req.params.id,
-      finalScores: aggregatedScores,
-    });
-
-    sendSuccess(res, aggregatedScores, 'Scores aggregated');
-  }),
-);
-
-// GET /api/v1/rooms/:id/winner — Determine winner by team totals (UC-63)
-router.get(
-  '/:id/winner',
-  asyncHandler(async (req: Request, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id).select('participants judgeType');
-    if (!room) throw new NotFoundError('Room not found');
-
-    const session = await DebateSession.findOne({ roomId: req.params.id });
-    if (!session) throw new NotFoundError('Session not found');
-
-    const finalScores = aggregateFinalScores(session, room);
-    await session.save();
-
-    sendSuccess(res, {
-      winnerTeam: finalScores.winnerTeam || finalScores.winner,
-      propositionTotal: finalScores.teamProposition.total,
-      oppositionTotal: finalScores.teamOpposition.total,
-      finalScores,
-      participants: room.participants,
-    });
-  }),
-);
-
-// POST /api/v1/rooms/:id/winner — Recompute and broadcast winner (UC-63)
-router.post(
-  '/:id/winner',
-  authenticate,
-  asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.id);
-    if (!room) throw new NotFoundError('Room not found');
-
-    const isHost = room.hostId?.toString() === req.user!.userId;
-    const isOwner = room.createdBy.toString() === req.user!.userId;
-    const isJudge = room.participants.some(
-      (participant) =>
-        participant.userId.toString() === req.user!.userId &&
-        participant.roomRole === 'judge',
-    );
-    if (!isHost && !isOwner && !isJudge) {
-      throw new ForbiddenError('Only host, owner, or judge can determine winner');
-    }
-
-    const session = await DebateSession.findOne({ roomId: req.params.id });
-    if (!session) throw new NotFoundError('Session not found');
-
-    const finalScores = aggregateFinalScores(session, room);
-    await session.save();
-
-    const payload = {
-      roomId: req.params.id,
-      winnerTeam: finalScores.winnerTeam || finalScores.winner,
-      propositionTotal: finalScores.teamProposition.total,
-      oppositionTotal: finalScores.teamOpposition.total,
-      finalScores,
-    };
-
-    getIO().to(req.params.id).emit('score:winner-determined', payload);
-    getIO().to(req.params.id).emit('score:aggregate-updated', {
-      roomId: req.params.id,
-      finalScores,
-    });
-
-    sendSuccess(res, payload, 'Winner determined');
   }),
 );
 

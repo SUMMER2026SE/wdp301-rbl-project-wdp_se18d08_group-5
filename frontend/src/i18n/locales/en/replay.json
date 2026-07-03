@@ -7,13 +7,13 @@
   "debateArenaConcluded": "DEBATE ARENA CONCLUDED",
   "motionSelection": "Motion Selection",
   "winner": "WINNER",
-  "propositionWins": "Proposition Wins",
-  "oppositionWins": "Opposition Wins",
+  "propositionWins": "Proposition Win",
+  "oppositionWins": "Opposition Win",
   "drawMatch": "Draw Match",
 
   "finalScoreboard": "Final Scoreboard",
-  "proposition": "PROPOSITION",
-  "opposition": "OPPOSITION",
+  "proposition": "Proposition",
+  "opposition": "Opposition",
   "points": "points",
 
   "aiSummaryVerdict": "AI Summary Verdict",

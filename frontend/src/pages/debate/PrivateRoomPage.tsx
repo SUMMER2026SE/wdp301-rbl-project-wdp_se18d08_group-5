@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Alert, Badge, Button, Form, ListGroup, Nav, Spinner } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@stores/authStore';
 import { useDebateStore } from '@stores/debateStore';
 import { usePrivateRoomSocket, type PrivateRoomTeam } from '@hooks/usePrivateRoomSocket';
@@ -8,6 +9,7 @@ import { usePrivateRoomVoice } from '@hooks/usePrivateRoomVoice';
 import { usePrivateRoomVideo } from '@hooks/usePrivateRoomVideo';
 import { debateWorkflow, isWorkflowStepActive } from '@utils/debateWorkflow';
 import { CameraGrid } from '@components/debate/CameraGrid';
+import { roomService } from '@services/roomService';
 import type { ChatMessage, RoomParticipant } from '@/types';
 
 const TEAM_LABELS: Record<PrivateRoomTeam, string> = {
@@ -33,12 +35,22 @@ export default function PrivateRoomPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  const room = useDebateStore((s) => s.room);
+  const storeRoom = useDebateStore((s) => s.room);
   const participants = useDebateStore((s) => s.participants);
   const currentPhase = useDebateStore((s) => s.currentPhase);
   const currentSpeaker = useDebateStore((s) => s.currentSpeaker);
   const timeRemaining = useDebateStore((s) => s.timeRemaining);
   const isPaused = useDebateStore((s) => s.isPaused);
+
+  // If the room is not yet in the store (e.g. user opened the private room
+  // URL directly without first visiting the debate room), fetch it.
+  const roomQuery = useQuery({
+    queryKey: ['room', roomId, 'private-room'],
+    queryFn: async () => (await roomService.getById(roomId)).data.data,
+    enabled: Boolean(roomId) && !storeRoom,
+    refetchOnMount: false,
+  });
+  const room = storeRoom ?? roomQuery.data;
 
   const team: PrivateRoomTeam | null = useMemo(() => {
     if (teamParam === 'proposition' || teamParam === 'opposition' || teamParam === 'judge') {
@@ -48,8 +60,8 @@ export default function PrivateRoomPage() {
   }, [teamParam]);
 
   const myParticipant = useMemo<RoomParticipant | undefined>(
-    () => participants.find((p) => p.userId === user?._id),
-    [participants, user?._id],
+    () => participants.find((p) => p.userId === user?._id) ?? (room as any)?.participants?.find((p: any) => p.userId === user?._id),
+    [participants, user?._id, room],
   );
 
   const effectiveRole = useMemo(() => {
@@ -66,7 +78,11 @@ export default function PrivateRoomPage() {
       (myParticipant as any)?.speakerSlot === 'S1';
   }, [room?.hostType, effectiveRole, myParticipant]);
 
-  const isHost = Boolean(effectiveRole === 'host' || isJudgeS1);
+  // The creator of the room holds Host privileges by default; if they have
+  // not formally chosen a team, treat them like a Host here so they can move
+  // between the private rooms of every team and the judging panel.
+  const isCreator = Boolean(user?._id && (room as any)?.createdBy && (room as any).createdBy === user._id);
+  const isHost = Boolean(effectiveRole === 'host' || isCreator || isJudgeS1);
 
   const allowedTeams = useMemo<PrivateRoomTeam[]>(() => {
     if (isHost) return ['proposition', 'opposition', 'judge'];
@@ -75,7 +91,7 @@ export default function PrivateRoomPage() {
       return [myParticipant.team as PrivateRoomTeam];
     }
     return [];
-  }, [isHost, effectiveRole, myParticipant]);
+  }, [isHost, effectiveRole, myParticipant?.team]);
 
   const hasAccess = team !== null && allowedTeams.includes(team);
 
@@ -125,6 +141,37 @@ export default function PrivateRoomPage() {
         <Button variant="primary" onClick={() => navigate(`/debate/${roomId}`)}>
           Back to debate
         </Button>
+      </div>
+    );
+  }
+
+  // Show a spinner while room data is loading. Without this, hasAccess would
+  // race against the freshly-fetched room and incorrectly render the "No
+  // access" screen, blocking the user from entering the private room.
+  if (roomQuery.isLoading || (!storeRoom && !room)) {
+    return (
+      <div className="container py-5 text-center text-light">
+        <Spinner animation="border" role="status" />
+        <div className="mt-3">Loading private room…</div>
+      </div>
+    );
+  }
+
+  if (roomQuery.isError) {
+    return (
+      <div className="container py-5">
+        <Alert variant="danger" className="text-center">
+          <Alert.Heading>
+            <i className="bi bi-exclamation-triangle me-2" />
+            Room not found
+          </Alert.Heading>
+          Unable to load the room. The debate may have ended.
+          <div className="mt-3">
+            <Button variant="primary" onClick={() => navigate('/lobby')}>
+              Back to lobby
+            </Button>
+          </div>
+        </Alert>
       </div>
     );
   }

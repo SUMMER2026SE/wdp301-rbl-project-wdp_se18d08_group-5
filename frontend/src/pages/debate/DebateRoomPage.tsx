@@ -61,93 +61,93 @@ type DebateWorkflowStep = {
 /**
  * Human Host 3v3 workflow — mirrors backend DEBATE_FLOW_HOST_3V3.
  * Rule order: R1(Prop→Opp→CE), R2(Prop→Opp→CE), R3(Opp→Prop,no CE)
- * R2: "(Luồng giống Round 1)" → PRO_S2 first, OPP_S2 second
+ * R2: "(Same flow as Round 1)" → PRO_S2 first, OPP_S2 second
  * R3: Opposition FIRST per rule (all 4 docs): Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Extension (3 min)' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Extension (3 min)' },
-  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing (3 min)' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing (3 min)' },
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Proposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * Human Host 1v1 workflow — mirrors backend DEBATE_FLOW_HOST_1V1.
- * R2: OPP→PRO (per "Luồng giống Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: OPP→PRO (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Closing speech (3 min)' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Closing speech (3 min)' },
-  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing speech (3 min)' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing speech (3 min)' },
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Proposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * No-Host 3v3 workflow — mirrors backend DEBATE_FLOW_NOHost_3V3.
- * R2: PRO→OPP (per "Luồng giống Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: PRO→OPP (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
  * WAITING_S1_START at index 0 aligns with backend for correct step matching.
  */
 const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'WAITING_S1_START', phase: 'waiting_s1', label: 'Waiting', detail: 'Both S1 start' },
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Extension (3 min)' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Extension (3 min)' },
-  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing (3 min)' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing (3 min)' },
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Proposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * No-Host 1v1 workflow — mirrors backend DEBATE_FLOW_NOHost_1V1.
- * R2: OPP→PRO (per "Luồng giống Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: OPP→PRO (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
  * WAITING_S1_START at index 0 aligns with backend for correct step matching.
  */
 const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
   { speaker: 'WAITING_S1_START', phase: 'waiting_s1', label: 'Waiting', detail: 'Both S1 start' },
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
-  { speaker: 'PRO_S1', phase: 'speech', label: 'Prop 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'OPP_S1', phase: 'speech', label: 'Opp 1', detail: 'Opening speech (3 min)' },
-  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'CE 1', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge FB 1', detail: 'Free discussion' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opp 2', detail: 'Closing speech (3 min)' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Closing speech (3 min)' },
-  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross examination (2 min)' },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Closing speech (3 min)' },
-  { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Closing speech (3 min)' },
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Free discussion' },
+  { speaker: 'PRO_S1', phase: 'speech', label: 'Proposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
+  { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
+  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
+  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
@@ -515,24 +515,6 @@ export default function DebateRoomPage() {
 
 
 
-  const aggregateMutation = useMutation({
-    mutationFn: () => roomService.aggregateScores(roomId),
-    onSuccess: () => {
-      toast.success('Scores aggregated');
-      invalidate();
-    },
-    onError: () => toast.error('Failed to aggregate scores'),
-  });
-
-  const winnerMutation = useMutation({
-    mutationFn: () => roomService.determineWinner(roomId),
-    onSuccess: () => {
-      toast.success('Winner determined');
-      invalidate();
-    },
-    onError: () => toast.error('Failed to determine the winner'),
-  });
-
   const room = roomQuery.data;
   const session = sessionQuery.data;
 
@@ -630,7 +612,6 @@ export default function DebateRoomPage() {
       ? currentParticipant.primaryRole
       : currentParticipant.roomRole
     : null;
-  const isController = Boolean(user && room?.hostId === user._id);
   const myRole = effectiveRole;
 
   const isHost = Boolean(effectiveRole === 'host');
@@ -704,7 +685,6 @@ export default function DebateRoomPage() {
     const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
     return role === 'judge';
   }) || [];
-  const canManageScores = Boolean(isController);
 
   const pendingDrawRequest = session?.finalScores?.drawRequests?.find((r) => r.status === 'pending');
   const ownTeamPendingDraw = Boolean(
@@ -978,7 +958,7 @@ export default function DebateRoomPage() {
         <Card style={{ width: '400px', background: 'rgba(15, 15, 25, 0.65)', border: '1px solid rgba(0, 245, 255, 0.25)', boxShadow: '0 0 40px rgba(0,245,255,0.1)', backdropFilter: 'blur(10px)' }} className="p-4 rounded-4 text-center">
           <h3 className="mb-3 text-neon-cyan" style={{ fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>
             <i className="bi bi-shield-lock me-2"></i>
-            PHÒNG TRANH LUẬN RIÊNG TƯ
+            {td('debateRoom.privateRoom', 'PRIVATE DEBATE ROOM')}
           </h3>
           <p className="text-muted small mb-4">{td('debateRoom.enterPassword')}</p>
           <Form onSubmit={handlePrivateJoin}>
@@ -1312,7 +1292,7 @@ export default function DebateRoomPage() {
                 {/* Left side: Proposition speakers list */}
                 <Col xl={3} md={4} className="d-flex flex-column">
                   <div className="text-neon-cyan mb-1" style={{ fontFamily: 'Orbitron', fontSize: '10px', letterSpacing: '0.05em' }}>
-                    <i className="bi bi-people-fill text-neon-cyan me-1"></i> BÊN ĐI
+                    <i className="bi bi-people-fill text-neon-cyan me-1"></i> PROPOSITION
                   </div>
                   <div className="d-flex flex-column gap-1 flex-grow-1 justify-content-around">
                     {slots.map((slot) => {
@@ -1469,7 +1449,7 @@ export default function DebateRoomPage() {
                 {/* Right side: Opposition speakers list */}
                 <Col xl={3} md={4} className="d-flex flex-column text-end">
                   <div className="text-neon-pink mb-1" style={{ fontFamily: 'Orbitron', fontSize: '10px', letterSpacing: '0.05em' }}>
-                    BÊN VÃNG <i className="bi bi-people-fill text-neon-pink ms-1"></i>
+                    OPPOSITION <i className="bi bi-people-fill text-neon-pink ms-1"></i>
                   </div>
                   <div className="d-flex flex-column gap-1 flex-grow-1 justify-content-around">
                     {slots.map((slot) => {
@@ -1884,16 +1864,6 @@ export default function DebateRoomPage() {
                       {td('debateRoom.judge.roundScores')}
                     </Button>
 
-                    {canManageScores && (
-                      <div className="d-grid gap-2 mt-3">
-                        <Button size="sm" variant="outline-primary" onClick={() => aggregateMutation.mutate()} disabled={aggregateMutation.isPending}>
-                          {td('debateRoom.judge.aggregateScores')}
-                        </Button>
-                        <Button size="sm" variant="outline-success" onClick={() => winnerMutation.mutate()} disabled={winnerMutation.isPending}>
-                          {td('debateRoom.judge.determineWinner')}
-                        </Button>
-                      </div>
-                    )}
                   </div>
 
                   {/* List of Judges */}

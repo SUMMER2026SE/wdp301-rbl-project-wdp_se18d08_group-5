@@ -276,7 +276,7 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
   /**
    * Debater requests early CE end — tracks which teams have consented.
    * When both teams have requested, auto-triggers transition.
-   * Rule: "cả 2 đội cùng skip" ends CE early.
+   * Rule: "both teams skip" ends CE early.
    */
   socket.on('debater:request-ce-early', async ({ roomId }: { roomId: string }) => {
     try {
