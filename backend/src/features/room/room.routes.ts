@@ -23,6 +23,7 @@ import { applyDebateResult } from '../ranking/ranking.service.js';
 import { startDebate, triggerTransition, endPhaseByHost, endPhaseBySpeaker } from '../debate/debate.service.js';
 import { timerService } from '../../socket/timer.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
+import { hasControlPanel } from '../../utils/roomPermissions.js';
 import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
@@ -766,6 +767,16 @@ router.post(
     const { userId, role, team, speakerSlot } = req.body;
     const room = (req as any).room;
 
+    // Enforce role/config consistency:
+    // - If the room is configured No-Host (hostType !== 'human'), no one can be assigned as Host.
+    // - If the room is configured AI Judge (judgeType === 'ai'), no player can be assigned as Judge.
+    if (role === 'host' && room.hostType !== 'human') {
+      throw new BadRequestError('This room is configured with No Host; Host role is not available');
+    }
+    if (role === 'judge' && room.judgeType === 'ai') {
+      throw new BadRequestError('This room is configured with AI Judge; human Judge role is not available');
+    }
+
     const participant = room.participants.find((p: any) => p.userId.toString() === userId);
     if (!participant) {
       throw new NotFoundError('Participant not found');
@@ -1089,6 +1100,14 @@ router.post(
     await broadcastRoomState(roomIdStr);
     if (io) {
       io.emit('room:update', { action: 'start', roomId: roomIdStr });
+    }
+
+    if (result.room.hostType !== 'human' && result.room.judgeType === 'ai') {
+      const { autoStartDebateCountdown } = await import('../debate/debate.service.js');
+      // Delay auto-countdown slightly to allow clients to redirect to the room
+      setTimeout(() => {
+        autoStartDebateCountdown(roomIdStr).catch(console.error);
+      }, 2000);
     }
 
     sendSuccess(res, result, 'Debate started');
@@ -2023,8 +2042,7 @@ router.post(
     }
 
     // Require team membership or controller (host/owner) to finish CE
-    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
-    const isController = participant.roomRole === 'owner' || effectiveRole === 'host';
+    const isController = participant.roomRole === 'owner' || hasControlPanel(room, req.user!.userId);
     const isAskingTeam = participant.team === session.currentTurn.ceState?.askingTeam;
     if (!isController && !isAskingTeam) {
       throw new ForbiddenError('Only the asking team or host can finish cross-examination');

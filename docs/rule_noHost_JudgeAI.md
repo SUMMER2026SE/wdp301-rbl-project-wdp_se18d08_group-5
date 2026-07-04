@@ -179,11 +179,6 @@ Sau khi match kết thúc:
 
 ## 13. Debate Lifecycle
 
-```
-Vào Room (timer không chạy)
-
-↓ Cả 2 đội cùng nhấn Start (S1 mỗi đội)
-
 Đếm ngược 3s
 
 ↓
@@ -191,7 +186,7 @@ Vào Room (timer không chạy)
 [PREPARATION PHASE — 7 phút]
 Kết thúc khi: hết 7p | cả 2 đội cùng skip
 
-↓ Mute + Lock Chat (3s) → Đếm ngược 10s
+↓ Mute + Lock Chat (3s) → Đếm ngược 3s
 
 ↓
 
@@ -202,18 +197,18 @@ ROUND 1 — Opening Arguments
 [S1 Proposition trình bày — 3 phút]
 Kết thúc khi: hết 3p | S1 Prop skip
 
-↓ Mute + Lock Chat (3s) — popup: "Tới lượt Opposition" → Đếm ngược 10s
+↓ Mute + Lock Chat (3s) — popup: "Tới lượt Opposition" → Đếm ngược 3s
 
 [S1 Opposition trình bày — 3 phút]
 Kết thúc khi: hết 3p | S1 Oppo skip
 
-↓ Mute + Lock Chat (3s) — popup: "Chuẩn bị CE" → Timer reset 00:00 → Đếm ngược 10s
+↓ Mute + Lock Chat (3s) — popup: "Chuẩn bị CE" → Timer reset 00:00 → Đếm ngược 3s
 
 [CROSS EXAMINATION — 2 phút]
 Cả 2 đội đều được mở mic
 Kết thúc khi: hết 2p | cả 2 đội cùng skip
 
-↓ Mute + Lock Chat (3s) — popup: "Hết Round 1" → Timer reset 00:00
+↓ Mute + Lock Chat (3s) — popup: "Hết Round 1" → Timer reset 00:00 → Đếm ngược 3s
 
 [FREE TIME — Hệ thống đợi AI sinh feedback Round 1]
 Tất cả participant tự do: mic, chat, camera
@@ -237,13 +232,13 @@ ROUND 2 — Deep Clash
 ROUND 3 — Final Summary (chỉ có trình bày, không có CE)
 ══════════════════════════
 
-[S3 Opposition trình bày — 3 phút]
-Kết thúc khi: hết 3p | S3 Oppo skip
-
-↓ Mute + Lock Chat (3s) — popup: "Tới lượt Proposition" → Đếm ngược 10s
-
 [S3 Proposition trình bày — 3 phút]
 Kết thúc khi: hết 3p | S3 Prop skip
+
+↓ Mute + Lock Chat (3s) — popup: "Tới lượt Opposition" → Đếm ngược 3s
+
+[S3 Opposition trình bày — 3 phút]
+Kết thúc khi: hết 3p | S3 Oppo skip
 
 ↓ Mute + Lock Chat (3s) — popup: "Finish Debate" → Đếm ngược 3s
 

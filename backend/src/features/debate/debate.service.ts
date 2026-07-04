@@ -8,7 +8,7 @@ const SPEECH_SECONDS = 3 * 60;
 const CE_SECONDS = 2 * 60;
 const PREP_SECONDS = 7 * 60;
 const TRANSITION_MUTE_SECONDS = 3;
-const AUTO_TRANSITION_COUNTDOWN = 10;
+const AUTO_TRANSITION_COUNTDOWN = 0;
 
 type DebateStep = {
   speaker: string;
@@ -120,8 +120,6 @@ const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
  * - Match ends automatically after Final Judging (no host End needed)
  */
 const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
-  // 0: Waiting for S1 consensus — no timer, waiting for S1 from both teams
-  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // 1: Motion announcement
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // 2: Prep — 7m auto, both teams can skip
@@ -159,7 +157,6 @@ const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
  * JUDGES_FB_3 added so human judges can submit R3 scores
  */
 const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
-  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: false },
   // Round 1: Prop → Opp → CE
@@ -386,14 +383,9 @@ export async function startDebate(roomId: string, userId: string) {
   const session = new DebateSession({ roomId: room._id });
   const flow = getFlow((room.format as '1v1' | '3v3') || '3v3', (room.hostType as 'human' | 'ai') || undefined);
 
-  // No-host + AI judge: start at WAITING_S1_START step (index 0)
-  // No-host + Human judge: Judge S1 already started, begin at motion step (index 1)
-  // Human host: start at motion step (index 0)
-  let startIdx = 0;
-  if (isNoHost && isAIJudge) startIdx = 0;
-  else if (isNoHost && !isAIJudge) startIdx = 1;
-  else startIdx = 0;
-
+  // All configurations now start directly at the motion step (index 0).
+  const startIdx = 0;
+  
   applyStep(session, flow[startIdx]);
   room.status = 'active';
   room.currentPhase = flow[startIdx].phase;
@@ -1398,3 +1390,77 @@ export async function requestDraw(roomId: string, userId: string): Promise<any> 
 }
 
 export { completeDebateWithWinner };
+
+export async function advanceFromMotionToPrep(roomId: string) {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) return;
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session || session.currentTurn.status !== 'active') return;
+
+  const phase = session.currentTurn.phase;
+  if (phase !== 'motion') return;
+
+  const { timerService } = await import('../../socket/timer.service.js');
+  const { getIO } = await import('../../socket/index.js');
+  const io = getIO();
+
+  const format = (room.format as '1v1' | '3v3') || '3v3';
+  const flow = getFlow(format, room.hostType as 'human' | 'ai');
+  const currentIndex = flow.findIndex(
+    (s) => s.speaker === session.currentTurn.speaker && s.phase === session.currentTurn.phase,
+  );
+  const prepStep = flow[Math.min(currentIndex + 1, flow.length - 1)];
+  
+  applyStep(session, prepStep);
+  session.currentTurn.timeRemaining = prepStep.timeLimit || 0;
+  session.currentTurn.startTime = new Date();
+  await session.save();
+  
+  room.currentPhase = prepStep.phase;
+  await room.save();
+
+  timerService.start(roomId, prepStep.timeLimit || 0, prepStep.phase, () => {
+    triggerTransition(roomId).catch(console.error);
+  });
+
+  if (io) {
+    io.to(roomId).emit('debate:phase-change', {
+      phase: prepStep.phase,
+      phaseStatus: 'active',
+      speaker: prepStep.speaker,
+    });
+    io.to(roomId).emit('debate:turn-status-change', {
+      turnStatus: 'active',
+      phaseStatus: 'active',
+    });
+
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(roomId, '');
+    if (state) io.to(roomId).emit('room:state-restore', state);
+  }
+}
+
+export async function autoStartDebateCountdown(roomId: string) {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) return;
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session) return;
+
+  session.currentTurn.status = 'active';
+  session.currentTurn.phaseStatus = 'active';
+  session.currentTurn.startTime = new Date();
+  await session.save();
+
+  const { getIO } = await import('../../socket/index.js');
+  const io = getIO();
+  if (io) {
+    io.to(roomId).emit('debate:countdown-start', { durationMs: 3000 });
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(roomId, '');
+    if (state) io.to(roomId).emit('room:state-restore', state);
+  }
+
+  setTimeout(() => {
+    advanceFromMotionToPrep(roomId).catch(console.error);
+  }, 3000);
+}

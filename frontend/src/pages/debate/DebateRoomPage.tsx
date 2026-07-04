@@ -60,9 +60,9 @@ type DebateWorkflowStep = {
 
 /**
  * Human Host 3v3 workflow — mirrors backend DEBATE_FLOW_HOST_3V3.
- * Rule order: R1(Prop→Opp→CE), R2(Prop→Opp→CE), R3(Opp→Prop,no CE)
+ * Rule order: R1(Prop→Opp→CE), R2(Prop→Opp→CE), R3(Prop→Opp, no CE)
  * R2: "(Same flow as Round 1)" → PRO_S2 first, OPP_S2 second
- * R3: Opposition FIRST per rule (all 4 docs): Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * R3: Proposition FIRST per requirement: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -75,8 +75,8 @@ const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
@@ -84,7 +84,7 @@ const debateWorkflow3v3: DebateWorkflowStep[] = [
 
 /**
  * Human Host 1v1 workflow — mirrors backend DEBATE_FLOW_HOST_1V1.
- * R2: OPP→PRO (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: OPP→PRO (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -97,8 +97,8 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
@@ -106,11 +106,9 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
 
 /**
  * No-Host 3v3 workflow — mirrors backend DEBATE_FLOW_NOHost_3V3.
- * R2: PRO→OPP (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
- * WAITING_S1_START at index 0 aligns with backend for correct step matching.
+ * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
-  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', label: 'Waiting', detail: 'Both S1 start' },
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
   { speaker: 'PRO_S1', phase: 'speech', label: 'Proposition S1', detail: 'Opening speech (3 min)' },
@@ -121,8 +119,8 @@ const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
@@ -130,11 +128,9 @@ const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
 
 /**
  * No-Host 1v1 workflow — mirrors backend DEBATE_FLOW_NOHost_1V1.
- * R2: OPP→PRO (per "Same flow as Round 1"), R3: Opp→Prop → JUDGES_FB_3 → FINAL_JUDGING
- * WAITING_S1_START at index 0 aligns with backend for correct step matching.
+ * R2: OPP→PRO (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
  */
 const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
-  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', label: 'Waiting', detail: 'Both S1 start' },
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', label: 'Prep', detail: '7 minute preparation' },
   { speaker: 'PRO_S1', phase: 'speech', label: 'Proposition S1', detail: 'Opening speech (3 min)' },
@@ -145,8 +141,8 @@ const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
   { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
-  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
+  { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
@@ -238,8 +234,8 @@ export default function DebateRoomPage() {
       const onResumed = () => {
         setPausedAtRemaining(undefined);
       };
-      const onCountdownStart = () => {
-        setCountdownSeconds(3);
+      const onCountdownStart = (data?: { durationMs?: number }) => {
+        setCountdownSeconds(data?.durationMs ? Math.round(data.durationMs / 1000) : 3);
       };
       socket.on('debate:paused', onPaused);
       socket.on('debate:resumed', onResumed);
@@ -254,7 +250,6 @@ export default function DebateRoomPage() {
     });
   }, [roomId]);
 
-  const [showRules, setShowRules] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
 
   // Track when socket has sent us authoritative room state.
@@ -334,12 +329,11 @@ export default function DebateRoomPage() {
   const isPaused = useDebateStore((s) => s.isPaused);
   const messages = useDebateStore((s) => s.messages);
   const isTransitioning = useDebateStore((s) => s.isTransitioning);
-  const transitionTime = useDebateStore((s) => s.transitionTime);
   const turnStatus = useDebateStore((s) => s.turnStatus);
   const speakingAllowed = useDebateStore((s) => s.speakingAllowed);
   const prepConsensusReadyUserIds = useDebateStore((s) => s.prepConsensusReadyUserIds);
   const prepConsensusTotalDebaters = useDebateStore((s) => s.prepConsensusTotalDebaters);
-  const noHostS1Ready = useDebateStore((s) => s.noHostS1Ready);
+
   const finalScores = useDebateStore((s) => s.finalScores);
 
   // Local loading state (not used — socketReady is derived from store above)
@@ -396,23 +390,6 @@ export default function DebateRoomPage() {
     onError: () => toast.error('Failed to start the phase'),
   });
 
-  // No-host S1 Start mutation (socket-based)
-  const noHostS1StartMutation = useMutation({
-    mutationFn: () => {
-      return new Promise<void>((resolve, reject) => {
-        const sock = getSocket();
-        if (!sock) return reject(new Error('Socket not connected'));
-        (sock as any).emit('debater:s1-start', { roomId }, (res: any) => {
-          if (res.error) reject(new Error(res.error.message));
-          else resolve();
-        });
-      });
-    },
-    onSuccess: () => {
-      toast.success('Waiting for opposing S1...');
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
 
   const debaterPauseMutation = useMutation({
     mutationFn: () => debateService.debaterPause(roomId),
@@ -619,9 +596,39 @@ export default function DebateRoomPage() {
   // Judge S1 has host-equivalent permissions in no-host + human-judge rooms
   const isNoHost = room?.hostType !== 'human';
   const isNoHostHumanJudge = isNoHost && room?.judgeType === 'human';
+  // Identify Judge S1: prefer explicit slot, fall back to first judge in the room.
+  // The backend assigns `speakerSlot = null` on judge role, so we must derive S1
+  // from the order of room.judges (or treat any single judge as S1 in 1v1).
+  // Owner-as-Judge is also recognized: when the room creator took judge role,
+  // they are not pushed into room.judges by the backend, so we still treat
+  // them as the S1 judge if they are the only judge in the room.
+  const mySpeakerSlot = (currentParticipant as any)?.speakerSlot as string | null | undefined;
+  const judgesList = (room?.judges as any[]) || [];
+  const myJudgeIndex = judgesList.findIndex(
+    (j) => j.userId?.toString() === user?._id?.toString(),
+  );
+  const isOnlyJudgeInList = judgesList.length === 1 && myJudgeIndex === 0;
+  const isFirstJudgeInList = myJudgeIndex === 0;
+  // Count owner-as-judge too — owner judges live in participants but not in room.judges.
+  const ownerAsJudgeCount =
+    effectiveRole === 'judge' &&
+    currentParticipant?.roomRole === 'owner' &&
+    !judgesList.some((j) => j.userId?.toString() === user?._id?.toString())
+      ? 1
+      : 0;
+  const totalJudges = judgesList.length + ownerAsJudgeCount;
+  const isSoleJudgeAnywhere =
+    effectiveRole === 'judge' &&
+    ((room?.format === '1v1' && totalJudges === 1 && (isOnlyJudgeInList || ownerAsJudgeCount === 1)) ||
+      (room?.format !== '1v1' && isFirstJudgeInList));
   const isJudgeS1 =
     effectiveRole === 'judge' &&
-    ((currentParticipant as any)?.speakerSlot === 'S1' || (currentParticipant as any)?.speakerSlot === undefined);
+    (mySpeakerSlot === 'S1' ||
+      mySpeakerSlot === undefined ||
+      // In 1v1, a single judge always acts as S1
+      (room?.format === '1v1' && isSoleJudgeAnywhere) ||
+      // In 3v3, the first judge in the judges list is Judge S1
+      isFirstJudgeInList);
   // In NH+HJ, Judge S1 inherits host controls (Start, Skip, End, etc.)
   const hasHostControl = isHost || (isNoHostHumanJudge && isJudgeS1);
 
@@ -677,6 +684,8 @@ export default function DebateRoomPage() {
     effectiveRole === 'debater' && ['active', 'paused'].includes(room?.status || '');
   const isJudge = effectiveRole === 'judge';
   const isViewer = effectiveRole === 'viewer' || !isParticipant;
+  // Viewer chat is read-only for Host/Owner/Judge; send-only for Viewer.
+  const canAccessViewerChat = isViewer || effectiveRole === 'host' || effectiveRole === 'owner' || isJudge;
   const debaters: RoomParticipant[] = room?.participants.filter((p) => {
     const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
     return role === 'debater';
@@ -705,12 +714,24 @@ export default function DebateRoomPage() {
   );
 
 
-  // Speech phase: mic enabled for current speaker
+  // Speech phase: mic enabled for current speaker.
+  // Speaker must match the team. Slot match is required only for 3v3 — in 1v1 a
+  // participant with slot S1 represents the same person for S1/S2/S3 (per the
+  // 1v1 rule: each team has 1 speaker who handles all 3 rounds).
   const currentSpeakerTeam = currentSpeaker?.startsWith('PRO_') ? 'proposition' : 'opposition';
+  const currentSpeakerSlot = currentSpeaker?.startsWith('PRO_S1')
+    || currentSpeaker?.startsWith('OPP_S1') ? 'S1'
+    : currentSpeaker?.startsWith('PRO_S2') || currentSpeaker?.startsWith('OPP_S2') ? 'S2'
+    : currentSpeaker?.startsWith('PRO_S3') || currentSpeaker?.startsWith('OPP_S3') ? 'S3'
+    : null;
+  const is1v1 = room?.format === '1v1';
   const isMyTurnToSpeak =
     effectiveRole === 'debater' &&
     currentParticipant?.team === currentSpeakerTeam &&
-    currentPhase === 'speech';
+    currentPhase === 'speech' &&
+    (is1v1
+      ? true
+      : currentSpeakerSlot === null || currentParticipant?.speakerSlot === currentSpeakerSlot);
 
 
   // Gemini's input transcript replaces the browser-only speech recognition
@@ -925,14 +946,12 @@ export default function DebateRoomPage() {
   // Surface clear diagnostics so a stuck page is easy to triage in the field.
   useEffect(() => {
     if (!roomQuery.isError) return;
-    // eslint-disable-next-line no-console
     console.warn('[DebateRoom] REST room fetch failed', roomQuery.error);
   }, [roomQuery.isError, roomQuery.error]);
 
   useEffect(() => {
     if (!socketPending) return;
     const timer = window.setTimeout(() => {
-      // eslint-disable-next-line no-console
       console.warn('[DebateRoom] Socket state still pending after 4s', {
         roomId,
         socketId: getSocket()?.id,
@@ -1074,7 +1093,11 @@ export default function DebateRoomPage() {
           <span>{td('debateRoom.syncBanner')}</span>
         </div>
       )}
-      <TransitionPopup />
+      <TransitionPopup 
+        countdownSeconds={countdownSeconds}
+        countdownLabel={currentWorkflowStep?.label ? td('debateRoom.countdown.startsIn', { label: currentWorkflowStep.label }) : td('debateRoom.countdown.matchStarting')}
+        countdownFooter={countdownSeconds === 'GO!' ? t('startNow') : t('startingSoon')}
+      />
       <ResultBanner
         roomId={roomId}
         finalScores={finalScores}
@@ -1097,24 +1120,6 @@ export default function DebateRoomPage() {
         }
       />
       <DisconnectTimer />
-
-      {isTransitioning && (
-        <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white animate-fade-in"
-          style={{
-            zIndex: 9999,
-            background: 'rgba(5, 5, 10, 0.95)',
-            fontFamily: 'Orbitron, sans-serif',
-            backdropFilter: 'blur(10px)',
-          }}
-        >
-          <div className="text-center p-5 rounded-4 border border-info border-opacity-25" style={{ background: 'rgba(15, 15, 25, 0.65)', boxShadow: '0 0 40px rgba(0,245,255,0.1)' }}>
-            <h2 className="text-neon-pink mb-3 speaking-pulse" style={{ letterSpacing: '0.1em' }}>{td('debateRoom.phaseTransition')}</h2>
-            <div className="fs-1 fw-bold text-neon-cyan mb-2" style={{ textShadow: '0 0 10px #00f5ff' }}>{transitionTime}s</div>
-            <div className="text-muted small text-uppercase" style={{ letterSpacing: '0.1em' }}>{td('debateRoom.muteMicAndLockChat')}</div>
-          </div>
-        </div>
-      )}
 
       {/* Floating Judge Reactions - positioned relative to viewport */}
       <div
@@ -1362,7 +1367,7 @@ export default function DebateRoomPage() {
                       <Button
                         size="sm"
                         variant="outline-info"
-                        onClick={() => setShowRules(true)}
+                        onClick={() => navigate(`/debate/${roomId}/rules`)}
                         style={{ fontSize: '9px', fontFamily: 'Orbitron', padding: '0.1rem 0.3rem' }}
                       >
                         Rules
@@ -1822,7 +1827,7 @@ export default function DebateRoomPage() {
                   {td('debateRoom.admin.privateRoom')}
                 </button>
               )}
-              {(isViewer || myRole === 'host' || myRole === 'owner') && (
+              {(canAccessViewerChat) && (
                 <button
                   className={`flex-1 py-2.5 text-center border-0 text-uppercase ${sidebarTab === 'viewer-chat' ? 'text-neon-cyan font-weight-bold' : 'text-muted'}`}
                   style={{
@@ -1840,7 +1845,7 @@ export default function DebateRoomPage() {
             </div>
 
             {/* Tab Contents */}
-            <div className="flex-grow-1 overflow-y-auto" style={{ minHeight: 0 }}>
+            <div className="flex-grow-1 overflow-y-auto d-flex flex-column" style={{ minHeight: 0 }}>
               
               {/* SCORING TAB PANEL */}
               {sidebarTab === 'scoring' && (
@@ -1969,51 +1974,6 @@ export default function DebateRoomPage() {
                     {td('debateRoom.admin.hostControlPanel')}
                   </h6>
 
-                  {/* No-Host: S1 Start Panel */}
-                  {room?.hostType === 'ai' && currentPhase === 'waiting_s1' && (
-                    <div className="p-3 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-3">
-                      <div className="text-success small mb-2 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>
-                        {td('debateRoom.noHost.waitingForS1')}
-                      </div>
-                      <div className="text-muted small mb-2">
-                        {td('debateRoom.noHost.s1MustStart')}
-                      </div>
-                      <div className="d-flex gap-2 align-items-center mb-2">
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: noHostS1Ready.includes(user?._id || '') ? '#00ff88' : 'rgba(255,255,255,0.2)',
-                            boxShadow: noHostS1Ready.includes(user?._id || '') ? '0 0 8px #00ff88' : 'none',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span className="small text-white">
-                          {noHostS1Ready.includes(user?._id || '')
-                            ? td('debateRoom.noHost.youHaveStarted')
-                            : td('debateRoom.noHost.youHaveNotStarted')}
-                        </span>
-                      </div>
-                      {isS1Debater && (
-                        <Button
-                          size="sm"
-                          className="w-100 fw-bold py-1.5"
-                          style={{
-                            background: noHostS1Ready.includes(user?._id || '') ? 'rgba(0,255,136,0.1)' : '#00ff66',
-                            color: noHostS1Ready.includes(user?._id || '') ? '#00ff88' : '#000',
-                            border: 'none',
-                            fontSize: '11px',
-                            boxShadow: noHostS1Ready.includes(user?._id || '') ? 'none' : '0 0 10px rgba(0,255,102,0.4)',
-                          }}
-                          onClick={() => noHostS1StartMutation.mutate()}
-                          disabled={noHostS1StartMutation.isPending || noHostS1Ready.includes(user?._id || '')}
-                        >
-                          {noHostS1Ready.includes(user?._id || '') ? td('debateRoom.noHost.started') : td('debateRoom.actions.start')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
 
                   {/* Host Phase & Timer Controls — only shown to authorized controllers */}
                   {hasHostControl && (
@@ -2248,8 +2208,8 @@ export default function DebateRoomPage() {
               )}
 
               {/* VIEWER CHAT TAB PANEL */}
-              {sidebarTab === 'viewer-chat' && (isViewer || myRole === 'host' || myRole === 'owner') && (
-                <div className="p-3">
+              {sidebarTab === 'viewer-chat' && canAccessViewerChat && (
+                <div className="p-3 h-100 d-flex flex-column">
                   <ViewerChat roomId={roomId} />
                 </div>
               )}
@@ -2296,7 +2256,7 @@ export default function DebateRoomPage() {
               {td('debateRoom.preparation')}
             </button>
           )}
-                {sidebarTab === 'viewer-chat' && (isViewer || myRole === 'host' || myRole === 'owner') && (
+                {sidebarTab === 'viewer-chat' && canAccessViewerChat && (
                   <button
                     className={`btn btn-sm ${sidebarTab === 'viewer-chat' ? 'btn-outline-info' : 'btn-outline-secondary'}`}
                     onClick={() => setSidebarTab('viewer-chat')}
@@ -2308,47 +2268,6 @@ export default function DebateRoomPage() {
                 )}
         </div>
       </div>
-
-      {/* === RULES OVERLAY MODAL === */}
-      <Modal show={showRules} onHide={() => setShowRules(false)} size="lg" centered className="dark-theme-modal">
-        <Modal.Header closeButton className="border-neon bg-dark text-white border-opacity-20">
-          <Modal.Title style={{ fontFamily: 'Orbitron', fontSize: '16px' }}>{td('debateRoom.rules.title')}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="bg-dark text-white p-4" style={{ fontFamily: 'Rajdhani', fontSize: '16px' }}>
-          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>{td('debateRoom.rules.generalStructure')}</h5>
-          <p className="text-muted mb-3">{td('debateRoom.rules.structureDesc')}</p>
-          <ul className="mb-4" style={{ paddingLeft: '20px' }}>
-            <li className="mb-2"><strong>{td('debateRoom.rules.motion')}</strong> {td('debateRoom.rules.motionDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.prep7')}</strong> {td('debateRoom.rules.prep7Desc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.speeches')}</strong> {td('debateRoom.rules.speechesDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.crossExam')}</strong> {td('debateRoom.rules.crossExamDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.judgeFeedback')}</strong> {td('debateRoom.rules.judgeFeedbackDesc')}</li>
-          </ul>
-
-          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>{td('debateRoom.rules.speakerPositions')}</h5>
-          <ul className="mb-4" style={{ paddingLeft: '20px' }}>
-            <li className="mb-2"><strong>{td('debateRoom.rules.s1')}</strong> {td('debateRoom.rules.s1Desc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.s2')}</strong> {td('debateRoom.rules.s2Desc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.s3')}</strong> {td('debateRoom.rules.s3Desc')}</li>
-          </ul>
-
-          <h5 className="text-neon-cyan font-weight-bold mb-2" style={{ fontFamily: 'Orbitron', fontSize: '14px' }}>{td('debateRoom.rules.scoringCriteria')}</h5>
-          <p className="text-muted mb-3">{td('debateRoom.rules.scoringCriteriaDesc')}</p>
-          <ul className="mb-0" style={{ paddingLeft: '20px' }}>
-            <li className="mb-2"><strong>{td('debateRoom.rules.logic', { max: 30 })}</strong> {td('debateRoom.rules.logicDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.rebuttal', { max: 20 })}</strong> {td('debateRoom.rules.rebuttalDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.evidence', { max: 15 })}</strong> {td('debateRoom.rules.evidenceDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.crossExamCriteria', { max: 15 })}</strong> {td('debateRoom.rules.crossExamCriteriaDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.strategy', { max: 10 })}</strong> {td('debateRoom.rules.strategyDesc')}</li>
-            <li className="mb-2"><strong>{td('debateRoom.rules.communication', { max: 10 })}</strong> {td('debateRoom.rules.communicationDesc')}</li>
-          </ul>
-        </Modal.Body>
-        <Modal.Footer className="border-neon bg-dark border-opacity-20">
-          <Button size="sm" variant="outline-primary" onClick={() => setShowRules(false)}>
-            {td('debateRoom.rules.closeRules')}
-          </Button>
-        </Modal.Footer>
-      </Modal>
 
       {/* === LEAVE CONFIRMATION MODAL === */}
       <Modal
@@ -2424,59 +2343,7 @@ export default function DebateRoomPage() {
         </Modal.Body>
       </Modal>
 
-      {/* === 3S COUNTDOWN OVERLAY (post-start countdown) === */}
-      {/* Visual style: semi-transparent so users see the underlying debate room
-          structure during the 3s countdown. The countdown number alone on a
-          fully opaque dark background reads as a "black screen" — show the
-          next phase label and the workflow stage alongside the digit. */}
-      {countdownSeconds !== null && (
-        <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white"
-          style={{
-            zIndex: 9999,
-            background: 'rgba(10, 10, 18, 0.55)',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          <style>{`
-            @keyframes zoomInScale {
-              0% { transform: scale(0.3); opacity: 0; }
-              50% { transform: scale(1.1); }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            .animate-zoom-scale {
-              animation: zoomInScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
-            }
-          `}</style>
-          <div className="animate-zoom-scale text-center" key={countdownSeconds}>
-            <p
-              className="mb-2 text-uppercase text-secondary"
-              style={{ fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: '4px' }}
-            >
-              {currentWorkflowStep?.label
-                ? td('debateRoom.countdown.startsIn', { label: currentWorkflowStep.label })
-                : td('debateRoom.countdown.matchStarting')}
-            </p>
-            <h1
-              className="m-0 text-neon-cyan"
-              style={{
-                fontFamily: 'Orbitron',
-                fontSize: countdownSeconds === 'GO!' ? '120px' : '150px',
-                fontWeight: 900,
-                textShadow: '0 0 20px rgba(0, 242, 254, 0.8), 0 0 40px rgba(0, 242, 254, 0.4)',
-              }}
-            >
-              {countdownSeconds}
-            </h1>
-            <p
-              className="mt-3 mb-0 text-uppercase text-secondary"
-              style={{ fontFamily: 'Orbitron', fontSize: '14px', letterSpacing: '3px' }}
-            >
-              {countdownSeconds === 'GO!' ? t('startNow') : t('startingSoon')}
-            </p>
-          </div>
-        </div>
-      )}
+
 
       {/* PREVIOUS SCORES MODAL */}
       <Modal
@@ -2620,11 +2487,11 @@ export function getRoundForStepIndex(index: number, format?: string, _hostType?:
     // 1v1: same structure but all steps are unique speakers per round
     if (index <= 5) return 1;   // HOST,PREP,PRO_S1,OPP_S1,CE1,JUDGES_FB_1
     if (index <= 9) return 2;   // OPP_S2,PRO_S2,CE2,JUDGES_FB_2
-    return 3;                   // OPP_S3,PRO_S3,JUDGES_FB_3
+    return 3;                   // PRO_S3,OPP_S3,JUDGES_FB_3 (Round 3: Proposition → Opposition)
   }
   // 3v3: same step count as 1v1
   if (index <= 5) return 1;   // HOST,PREP,PRO_S1,OPP_S1,CE1,JUDGES_FB_1
   if (index <= 9) return 2;   // PRO_S2,OPP_S2,CE2,JUDGES_FB_2
-  return 3;                   // OPP_S3,PRO_S3,JUDGES_FB_3
+  return 3;                   // PRO_S3,OPP_S3,JUDGES_FB_3 (Round 3: Proposition → Opposition)
 }
 

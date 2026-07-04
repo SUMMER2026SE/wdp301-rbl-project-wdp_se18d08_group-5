@@ -29,7 +29,7 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
       setCountdown((c) => {
         if (c <= 1) {
           clearInterval(timer);
-          navigate(`/replay/${roomId}`);
+          navigate(`/result/${roomId}`);
           return 0;
         }
         return c - 1;
@@ -288,7 +288,7 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
           }}
           onClick={() => {
             if (onViewResult) onViewResult();
-            else navigate(`/replay/${roomId}`);
+            else navigate(`/result/${roomId}`);
           }}
         >
           View details

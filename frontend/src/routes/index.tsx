@@ -21,9 +21,10 @@ const LiveMatchesPage = lazy(() => import('@pages/matches/LiveMatchesPage'));
 const CreateRoomPage = lazy(() => import('@pages/room/CreateRoomPage'));
 const LobbyPage = lazy(() => import('@pages/room/LobbyPage'));
 const DebateRoomPage = lazy(() => import('@pages/debate/DebateRoomPage'));
+const DebateRulesPage = lazy(() => import('@pages/debate/DebateRulesPage'));
 const PrivateRoomPage = lazy(() => import('@pages/debate/PrivateRoomPage'));
 const RankQueuePage = lazy(() => import('@pages/matchmaking/RankQueuePage'));
-const ReplayPage = lazy(() => import('@pages/replay/ReplayPage'));
+const ResultPage = lazy(() => import('@pages/result/ResultPage'));
 const ForumPage = lazy(() => import('@pages/forum/ForumPage'));
 const ForumTopicPage = lazy(() => import('@pages/forum/ForumTopicPage'));
 const NotFoundPage = lazy(() => import('@pages/NotFoundPage'));
@@ -87,8 +88,8 @@ export const routes: RouteObject[] = [
         ],
       },
       {
-        path: 'replay/:sessionId',
-        element: withSuspense(ReplayPage),
+        path: 'result/:sessionId',
+        element: withSuspense(ResultPage),
       },
     ],
   },
@@ -100,6 +101,7 @@ export const routes: RouteObject[] = [
         element: <DebateLayout />,
         children: [
           { index: true, element: withSuspense(DebateRoomPage) },
+          { path: 'rules', element: withSuspense(DebateRulesPage) },
           { path: 'private/:team', element: withSuspense(PrivateRoomPage) },
         ],
       },

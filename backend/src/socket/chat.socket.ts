@@ -186,7 +186,13 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      if (!['viewer', 'host', 'owner'].includes(participant.roomRole)) {
+      // Judges can READ viewer chat but not send. Owners/Hosts/Viewers can both.
+      const effectiveRole =
+        participant.roomRole === 'owner'
+          ? (participant.primaryRole ?? participant.roomRole)
+          : participant.roomRole;
+      const canRead = ['viewer', 'host', 'owner', 'judge'].includes(String(effectiveRole));
+      if (!canRead) {
         ack?.({ messages: [] });
         return;
       }

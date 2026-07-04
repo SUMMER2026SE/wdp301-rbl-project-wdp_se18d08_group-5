@@ -20,6 +20,7 @@ import {
   triggerTransition,
 } from './debate.service.js';
 import { aggregateFinalScores } from '../../utils/scoring.js';
+import { hasControlPanel } from '../../utils/roomPermissions.js';
 import type { AuthRequest } from '../../types/index.js';
 
 const router = Router();
@@ -359,9 +360,7 @@ router.post(
     const session = await DebateSession.findOne({ roomId: room._id });
     if (!session) throw new NotFoundError('Session not found');
 
-    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
-    const isJudgeS1 = room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1';
-    const isHost = effectiveRole === 'host' || isJudgeS1;
+    const isHost = hasControlPanel(room, req.user!.userId);
     const isPauserTeam = session.pauseType === participant.team;
 
     if (!isHost && !isPauserTeam) {

@@ -191,14 +191,7 @@
       "oppSlot": "OPP {{slot}}"
     },
 
-    "noHost": {
-      "waitingForS1": "Waiting for S1 to start",
-      "s1MustStart": "Both teams' S1 must press Start to begin the match.",
-      "judgeS1Responsible": "As Judge S1, you are responsible for starting the match.",
-      "youHaveStarted": "You have pressed Start",
-      "youHaveNotStarted": "You have not pressed Start",
-      "started": "Started"
-    },
+
 
     "preparation": {
       "endPreparation": "End preparation",
@@ -226,6 +219,19 @@
 
     "rules": {
       "title": "Debate room rules",
+      "configLabel": "Current configuration:",
+      "adaptiveHint": "Rules below adapt to this configuration.",
+      "backToRoom": "Back to debate room",
+      "format": {
+        "1v1": "1 vs 1",
+        "3v3": "3 vs 3"
+      },
+      "hostHuman": "Human Host",
+      "hostAi": "No Host (auto)",
+      "judgeHuman": "Human Judge",
+      "judgeAi": "AI Judge",
+      "matchControl": "Match & phase control",
+      "matchControlDesc": "The person whose control panel appears at the bottom of this page (Host or Judge S1 in no-host rooms) is responsible for starting the match, starting each phase, and skipping or ending it — including preparation, speeches, and cross-examination. Everyone else just follows along — your control panel is the source of truth for what you can press.",
       "generalStructure": "General structure",
       "structureDesc": "This debate follows a formal turn-based structure with continuous judging:",
       "motion": "Motion / Debate topic",
@@ -245,6 +251,17 @@
       "s2Desc": "Extends points and rebuts the opposing case.",
       "s3": "S3 (Speaker 3 — Closing)",
       "s3Desc": "Summarizes the debate. No cross-examination after S3.",
+      "s1v1Note": "In 1 vs 1, the same speaker takes all 3 rounds (S1, S2, S3).",
+      "judgingTitle": "Judging",
+      "humanJudgeScoringDesc": "Human judges score each round independently:",
+      "judgeScorePerRound": "Each judge submits a score per round (Logic, Rebuttal, Evidence, CE, Strategy, Communication).",
+      "judgeFeedbackNotes": "Judges may write short notes after each round.",
+      "judgeFinalSubmit": "The final verdict is determined after all rounds are scored.",
+      "aiJudgeDesc": "The AI Judge scores and provides feedback automatically:",
+      "aiJudgeCollect": "AI collects the transcript of every speech.",
+      "aiJudgeFeedback": "AI generates feedback after each round (shown in Free Time).",
+      "aiJudgeScore": "AI scores each round using the same criteria.",
+      "aiJudgeFinal": "AI submits the final verdict after Round 3.",
       "scoringCriteria": "Scoring criteria",
       "scoringCriteriaDesc": "Judges assign points across {{max}} criteria:",
       "logic": "Logic ({{max}} pts)",
@@ -259,6 +276,13 @@
       "strategyDesc": "Structure and prioritization of points.",
       "communication": "Communication ({{max}} pts)",
       "communicationDesc": "Delivery, clarity, and vocal control.",
+      "privateRoomsTitle": "Private rooms",
+      "propPrivateRoom": "Proposition private room — Proposition speaker(s) only.",
+      "oppPrivateRoom": "Opposition private room — Opposition speaker(s) only.",
+      "judgePrivateRoom": "Judge private room — All judges (and the host, if present) can enter.",
+      "surrenderDrawTitle": "Surrender & Draw",
+      "surrenderDesc": "Either team may Surrender at any time. The other team wins immediately.",
+      "drawDesc": "Either team may Request Draw. If accepted by the other team, the match ends in a draw.",
       "closeRules": "Close rules"
     },
 

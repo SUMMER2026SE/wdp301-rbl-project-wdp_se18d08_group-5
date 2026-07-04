@@ -10,7 +10,7 @@ import profileEn from './locales/en/profile.json';
 import errorsEn from './locales/en/errors.json';
 import debateEn from './locales/en/debate.json';
 import lobbyEn from './locales/en/lobby.json';
-import replayEn from './locales/en/replay.json';
+import resultEn from './locales/en/result.json';
 import adminEn from './locales/en/admin.json';
 
 import commonVi from './locales/vi/common.json';
@@ -21,7 +21,7 @@ import profileVi from './locales/vi/profile.json';
 import errorsVi from './locales/vi/errors.json';
 import debateVi from './locales/vi/debate.json';
 import lobbyVi from './locales/vi/lobby.json';
-import replayVi from './locales/vi/replay.json';
+import resultVi from './locales/vi/result.json';
 import adminVi from './locales/vi/admin.json';
 
 import commonJa from './locales/ja/common.json';
@@ -32,7 +32,7 @@ import profileJa from './locales/ja/profile.json';
 import errorsJa from './locales/ja/errors.json';
 import debateJa from './locales/ja/debate.json';
 import lobbyJa from './locales/ja/lobby.json';
-import replayJa from './locales/ja/replay.json';
+import resultJa from './locales/ja/result.json';
 import adminJa from './locales/ja/admin.json';
 
 const savedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -49,7 +49,7 @@ void i18n.use(initReactI18next).init({
       errors: errorsEn,
       debate: debateEn,
       lobby: lobbyEn,
-      replay: replayEn,
+      result: resultEn,
       admin: adminEn,
     },
     vi: {
@@ -61,7 +61,7 @@ void i18n.use(initReactI18next).init({
       errors: errorsVi,
       debate: debateVi,
       lobby: lobbyVi,
-      replay: replayVi,
+      result: resultVi,
       admin: adminVi,
     },
     ja: {
@@ -73,7 +73,7 @@ void i18n.use(initReactI18next).init({
       errors: errorsJa,
       debate: debateJa,
       lobby: lobbyJa,
-      replay: replayJa,
+      result: resultJa,
       admin: adminJa,
     },
   },

@@ -185,14 +185,7 @@
       "oppSlot": "OPP {{slot}}"
     },
 
-    "noHost": {
-      "waitingForS1": "S1の開始を待っています",
-      "s1MustStart": "両チームのS1がSTARTをクリックして試合を開始する必要があります。",
-      "judgeS1Responsible": "審判S1として、試合を開始する責任があります。",
-      "youHaveStarted": "あなたはSTARTをクリックしました",
-      "youHaveNotStarted": "まだSTARTをクリックしていません",
-      "started": "開始済み"
-    },
+
 
     "preparation": {
       "endPreparation": "準備を終了",
@@ -220,6 +213,19 @@
 
     "rules": {
       "title": "討論室ルール",
+      "configLabel": "現在の設定:",
+      "adaptiveHint": "以下のルールはこの設定に適応します。",
+      "backToRoom": "討論室に戻る",
+      "format": {
+        "1v1": "1 vs 1",
+        "3v3": "3 vs 3"
+      },
+      "hostHuman": "ヒューマンホスト",
+      "hostAi": "ホストなし (自動)",
+      "judgeHuman": "ヒューマンジェッジ",
+      "judgeAi": "AI ジェッジ",
+      "matchControl": "試合 & フェーズ制御",
+      "matchControlDesc": "このページ下部に表示される制御パネルを持つ人（ホスト、またはホストなしルームでは Judge S1）が試合の開始、各フェーズの開始、スキップ / 終了を担当します — 準備、スピーチ、交差質問もすべて含まれます。それ以外の人は流れに従ってください — あなたが押せる操作は制御パネルが正確な情報源です。",
       "generalStructure": "一般的な構造",
       "structureDesc": "この討論は、継続的な審判を伴う正式なターン制構造に従います：",
       "motion": "モーション / 討論トピック",
@@ -239,6 +245,17 @@
       "s2Desc": "論点を拡張し、相手ケースを反駁します。",
       "s3": "S3（スピーカー3 — クロージング）",
       "s3Desc": "討論を要約します。S3後は交差質問はありません。",
+      "s1v1Note": "1 vs 1 では、同じスピーカーが 3 ラウンドすべてを担当します（S1、S2、S3）。",
+      "judgingTitle": "審判",
+      "humanJudgeScoringDesc": "ヒューマンジェッジは各ラウンドを独立してスコアリングします:",
+      "judgeScorePerRound": "各ジェッジはラウンドごとにスコアを提出します（論理、反駁、証拠、CE、戦略、コミュニケーション）。",
+      "judgeFeedbackNotes": "ジェッジは各ラウンド後に短いノートを書くことができます。",
+      "judgeFinalSubmit": "最終判定はすべてのラウンドのスコアリング後に決定されます。",
+      "aiJudgeDesc": "AI ジェッジは自動的にスコアリングとフィードバックを提供します:",
+      "aiJudgeCollect": "AI は各スピーチのトランスクリプトを収集します。",
+      "aiJudgeFeedback": "AI は各ラウンド後にフィードバックを生成します（Free Time に表示）。",
+      "aiJudgeScore": "AI は同じ基準で各ラウンドをスコアリングします。",
+      "aiJudgeFinal": "AI は Round 3 後に最終判定を提出します。",
       "scoringCriteria": "スコアリング基準",
       "scoringCriteriaDesc": "審判は{{max}}の基準でポイントを割り当てます：",
       "logic": "論理学（{{max}}点）",
@@ -253,6 +270,13 @@
       "strategyDesc": "論点の構造と優先順位。",
       "communication": "コミュニケーション（{{max}}点）",
       "communicationDesc": "発表、明瞭さ、声のコントロール。",
+      "privateRoomsTitle": "プライベートルーム",
+      "propPrivateRoom": "Proposition プライベートルーム — Proposition スピーカーのみ。",
+      "oppPrivateRoom": "Opposition プライベートルーム — Opposition スピーカーのみ。",
+      "judgePrivateRoom": "ジェッジプライベートルーム — すべてのジェッジ（およびホストがいればホスト）が参加できます。",
+      "surrenderDrawTitle": "降参 & 引き分け",
+      "surrenderDesc": "どちらのチームもいつでも降参できます。相手チームが即座に勝利します。",
+      "drawDesc": "どちらのチームも引き分けをリクエストできます。相手チームが受け入れた場合、試合は引き分けで終了します。",
       "closeRules": "ルールを閉じる"
     },
 

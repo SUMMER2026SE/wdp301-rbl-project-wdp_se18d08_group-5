@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { DebateRoom } from '../models/DebateRoom.js';
 import { ForbiddenError, NotFoundError } from '../utils/AppError.js';
+import { hasControlPanel } from '../utils/roomPermissions.js';
 import type { AuthRequest, RoomRole } from '../types/index.js';
 
 type Guard = (req: AuthRequest, res: Response, next: NextFunction) => void;
@@ -132,28 +133,22 @@ export const roomControllerGuard = (paramName: string = 'id') => async (req: Aut
     if (!participant) throw new ForbiddenError('You are not a participant in this room');
 
     const isOwner = room.createdBy.toString() === userId;
-    const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
-
-    const isHost = effectiveRole === 'host';
-    const isJudgeS1 =
-      room.hostType !== 'human' &&
-      effectiveRole === 'judge' &&
-      (participant as any).speakerSlot === 'S1';
+    const hasControl = hasControlPanel(room, userId);
 
     // If debate is active or paused, only the actual debate controller (host or Judge S1) can control
     if (['active', 'paused'].includes(room.status)) {
-      if (!isHost && !isJudgeS1) {
+      if (!hasControl) {
         throw new ForbiddenError('Only host or Judge S1 can control the active debate');
       }
     } else {
       // Lobby/waiting/ready state: owner (creator) or host can control
-      if (!isOwner && !isHost) {
+      if (!isOwner && !hasControl) {
         throw new ForbiddenError('Only owner or host can control this room');
       }
     }
-
     (req as any).room = room;
     (req as any).participant = participant;
+    (req as any).isHost = hasControl;
     next();
   } catch (err) {
     next(err);

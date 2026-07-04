@@ -31,6 +31,12 @@
   "participantUpdated": "Participant updated",
   "couldNotUpdate": "Could not update participant",
 
+  "withHost": "With Host",
+  "noHost": "No Host",
+  "aiJudgeAuto": "AI Judge (auto)",
+  "humanJudges1": "1 Human Judge",
+  "humanJudges3": "3 Human Judges",
+
   "myDebaterPosition": "My Debater Position",
   "waitForOwnerAssign": "Wait for the owner to assign you as a debater.",
   "positionLocked": "Your position is locked.",

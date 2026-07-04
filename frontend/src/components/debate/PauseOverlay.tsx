@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@stores/authStore';
 import { useDebateStore } from '@stores/debateStore';
 
+import { hasHostControl } from '../../utils/roomPermissions';
+
 interface PauseOverlayProps {
   /**
    * Whether the debate is currently paused. The component renders nothing
@@ -47,12 +49,7 @@ export function PauseOverlay({
       : currentParticipant.roomRole
     : null;
 
-  const isJudgeS1 =
-    room?.hostType !== 'human' &&
-    effectiveRole === 'judge' &&
-    (currentParticipant as any)?.speakerSlot === 'S1';
-
-  const isHost = Boolean(effectiveRole === 'host' || isJudgeS1);
+  const isHost = hasHostControl(room, user?._id);
 
   const canResume = isHost || (
     effectiveRole === 'debater' &&

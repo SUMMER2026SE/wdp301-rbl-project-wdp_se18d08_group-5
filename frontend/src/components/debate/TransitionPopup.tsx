@@ -1,33 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useDebateStore } from '@stores/debateStore';
+import { useTranslation } from 'react-i18next';
 
 interface TransitionPopupProps {
   /** Override announcement text, e.g. for custom messages */
   overrideAnnouncement?: string;
+  countdownSeconds?: number | 'GO!' | null;
+  countdownLabel?: string;
+  countdownFooter?: string;
 }
 
 /**
  * Semi-transparent overlay shown during the 3s mute transition between debate
- * phases. Displays the announcement text (e.g. "Prop S1 gets ready to speak",
- * "End of Round 1") and counts down for `transitionTime` seconds.
+ * phases, and for the 3s GO! countdown before a phase starts.
  *
- * Also used for the 3s GO! countdown before a phase starts (when turnStatus
- * is idle).
- *
- * Visual style is intentionally aligned with the Start Phase countdown overlay
- * (`startPhaseMutation` block at the bottom of DebateRoomPage): same Orbitron
- * font, same neon-cyan digit, same semi-transparent dark backdrop. Users see
- * the underlying debate room structure during the 3s countdown so it doesn't
- * read as a "black screen".
+ * Uses a unified neon-cyan digit and dark blurred backdrop.
  */
-export function TransitionPopup({ overrideAnnouncement }: TransitionPopupProps) {
+export function TransitionPopup({ overrideAnnouncement, countdownSeconds, countdownLabel, countdownFooter }: TransitionPopupProps) {
+  const { t: td } = useTranslation('debate');
   const isTransitioning = useDebateStore((s) => s.isTransitioning);
   const transitionTime = useDebateStore((s) => s.transitionTime);
   const transitionAnnouncement = useDebateStore((s) => s.transitionAnnouncement);
 
   const [displayCount, setDisplayCount] = useState<number | 'GO!' | null>(null);
-
-  const announcement = overrideAnnouncement ?? transitionAnnouncement;
 
   // Countdown during transition (auto-mute between phases)
   useEffect(() => {
@@ -53,7 +48,22 @@ export function TransitionPopup({ overrideAnnouncement }: TransitionPopupProps) 
     return () => clearInterval(interval);
   }, [isTransitioning, transitionTime]);
 
-  if (!isTransitioning || displayCount === null) return null;
+  const isActiveTransition = isTransitioning && displayCount !== null;
+  const isActiveStart = !isTransitioning && countdownSeconds !== null && countdownSeconds !== undefined;
+
+  if (!isActiveTransition && !isActiveStart) return null;
+
+  const currentCount = isActiveTransition ? displayCount : countdownSeconds;
+  
+  const defaultTransitionLabel = td('debateRoom.phaseTransition', { defaultValue: 'PHASE TRANSITION' });
+  const currentLabel = isActiveTransition 
+    ? (overrideAnnouncement || transitionAnnouncement || defaultTransitionLabel) 
+    : countdownLabel;
+    
+  const defaultTransitionFooter = td('debateRoom.muteMicAndLockChat', { defaultValue: 'MUTE MIC AND LOCK CHAT' });
+  const currentFooter = isActiveTransition
+    ? (currentCount === 'GO!' ? 'GO!' : defaultTransitionFooter)
+    : (countdownFooter || (currentCount === 'GO!' ? 'GO!' : 'Starting Soon'));
 
   return (
     <div
@@ -61,8 +71,6 @@ export function TransitionPopup({ overrideAnnouncement }: TransitionPopupProps) 
       style={{
         zIndex: 9999,
         // Semi-transparent backdrop — let the debate room show through.
-        // Matches the Start Phase countdown overlay in DebateRoomPage so the
-        // two popups feel like the same UI element.
         background: 'rgba(10, 10, 18, 0.55)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
@@ -80,9 +88,8 @@ export function TransitionPopup({ overrideAnnouncement }: TransitionPopupProps) 
         }
       `}</style>
 
-      <div className="animate-zoom-scale text-center" key={`count-${displayCount}`}>
-        {/* Optional announcement above the digit (e.g. "End of Round 1") */}
-        {announcement && (
+      <div className="animate-zoom-scale text-center" key={`count-${currentCount}`}>
+        {currentLabel && (
           <p
             className="mb-2 text-uppercase text-secondary"
             style={{
@@ -91,36 +98,36 @@ export function TransitionPopup({ overrideAnnouncement }: TransitionPopupProps) 
               letterSpacing: '4px',
             }}
           >
-            {announcement}
+            {currentLabel}
           </p>
         )}
 
-        {/* Countdown digit or GO! */}
         <h1
           className="m-0 text-neon-cyan"
           style={{
             fontFamily: 'Orbitron, sans-serif',
-            fontSize: displayCount === 'GO!' ? '120px' : '150px',
+            fontSize: currentCount === 'GO!' ? '120px' : '150px',
             fontWeight: 900,
             textShadow:
               '0 0 20px rgba(0, 242, 254, 0.8), 0 0 40px rgba(0, 242, 254, 0.4)',
             lineHeight: 1,
           }}
         >
-          {displayCount}
+          {currentCount}
         </h1>
 
-        {/* Footer label — matches the Start Phase overlay exactly. */}
-        <p
-          className="mt-3 mb-0 text-uppercase text-secondary"
-          style={{
-            fontFamily: 'Orbitron, sans-serif',
-            fontSize: '14px',
-            letterSpacing: '3px',
-          }}
-        >
-          {displayCount === 'GO!' ? 'GO!' : 'Starting Soon'}
-        </p>
+        {currentFooter && (
+          <p
+            className="mt-3 mb-0 text-uppercase text-secondary"
+            style={{
+              fontFamily: 'Orbitron, sans-serif',
+              fontSize: '14px',
+              letterSpacing: '3px',
+            }}
+          >
+            {currentFooter}
+          </p>
+        )}
       </div>
     </div>
   );

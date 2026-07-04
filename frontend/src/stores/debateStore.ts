@@ -52,8 +52,8 @@ interface DebateState {
   judgeNextPhaseTotal: number;
 
   // No-host S1 start consensus
-  noHostS1Ready: string[]; // userIds of S1 debaters who have pressed Start
-  noHostS1Total: number; // total number of S1 debaters needed (2 for 3v3, 2 for 1v1)
+
+
 
   // AI feedback (for AI judge mode)
   aiFeedback: {
@@ -144,7 +144,6 @@ interface DebateState {
   removeDisconnectedMember: (userId: string) => void;
   setDisconnectTimerActive: (active: boolean, team?: 'proposition' | 'opposition' | null, startTime?: number | null) => void;
   setForfeitTeam: (team: 'proposition' | 'opposition' | null) => void;
-  setNoHostS1Ready: (ready: string[]) => void;
   setAIFeedback: (feedback: DebateState['aiFeedback']) => void;
   setAIFinalVerdict: (verdict: DebateState['aiFinalVerdict']) => void;
   reset: () => void;
@@ -181,8 +180,8 @@ export const useDebateStore = create<DebateState>((set) => ({
   prepConsensusOppositionTotal: 0,
   judgeNextPhaseVotes: [],
   judgeNextPhaseTotal: 0,
-  noHostS1Ready: [],
-  noHostS1Total: 2,
+
+
   aiFeedback: null,
   aiFinalVerdict: null,
   micActive: false,
@@ -312,7 +311,7 @@ export const useDebateStore = create<DebateState>((set) => ({
       disconnectTimerStartTime: startTime,
     }),
   setForfeitTeam: (team) => set({ forfeitTeam: team }),
-  setNoHostS1Ready: (noHostS1Ready) => set({ noHostS1Ready }),
+
   setAIFeedback: (aiFeedback) => set({ aiFeedback }),
   setAIFinalVerdict: (aiFinalVerdict) => set({ aiFinalVerdict }),
   reset: () =>
@@ -337,8 +336,8 @@ export const useDebateStore = create<DebateState>((set) => ({
       prepConsensusOppositionTotal: 0,
       judgeNextPhaseVotes: [],
       judgeNextPhaseTotal: 0,
-      noHostS1Ready: [],
-      noHostS1Total: 2,
+
+
       aiFeedback: null,
       aiFinalVerdict: null,
       micActive: false,

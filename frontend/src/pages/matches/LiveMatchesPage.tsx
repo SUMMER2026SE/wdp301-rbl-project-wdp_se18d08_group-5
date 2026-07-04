@@ -192,7 +192,7 @@ export default function LiveMatchesPage() {
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted small">{room.participants.length} participants</span>
                       {room.status === 'completed' ? (
-                        <Button size="sm" variant="info" onClick={() => navigate(`/replay/${room._id}`)}>
+                        <Button size="sm" variant="info" onClick={() => navigate(`/result/${room._id}`)}>
                           View result
                         </Button>
                       ) : isLive ? (

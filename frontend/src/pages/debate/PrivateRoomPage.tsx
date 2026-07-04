@@ -11,6 +11,7 @@ import { debateWorkflow, isWorkflowStepActive } from '@utils/debateWorkflow';
 import { CameraGrid } from '@components/debate/CameraGrid';
 import { roomService } from '@services/roomService';
 import type { ChatMessage, RoomParticipant } from '@/types';
+import { hasHostControl } from '../../utils/roomPermissions';
 
 const TEAM_LABELS: Record<PrivateRoomTeam, string> = {
   proposition: 'Proposition',
@@ -72,17 +73,10 @@ export default function PrivateRoomPage() {
       : null;
   }, [myParticipant]);
 
-  const isJudgeS1 = useMemo(() => {
-    return room?.hostType !== 'human' &&
-      effectiveRole === 'judge' &&
-      (myParticipant as any)?.speakerSlot === 'S1';
-  }, [room?.hostType, effectiveRole, myParticipant]);
-
-  // The creator of the room holds Host privileges by default; if they have
-  // not formally chosen a team, treat them like a Host here so they can move
-  // between the private rooms of every team and the judging panel.
-  const isCreator = Boolean(user?._id && (room as any)?.createdBy && (room as any).createdBy === user._id);
-  const isHost = Boolean(effectiveRole === 'host' || isCreator || isJudgeS1);
+  const isHost = useMemo(() => {
+    const isCreator = Boolean(user?._id && (room as any)?.createdBy && (room as any).createdBy === user._id);
+    return isCreator || hasHostControl(room, user?._id);
+  }, [user?._id, room]);
 
   const allowedTeams = useMemo<PrivateRoomTeam[]>(() => {
     if (isHost) return ['proposition', 'opposition', 'judge'];

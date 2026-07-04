@@ -4,6 +4,7 @@ import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
 import { getSocket } from '@hooks/useSocket';
 import type { ChatMessage } from '@/types';
+import { hasHostControl } from '../../utils/roomPermissions';
 
 interface ViewerChatProps {
   roomId: string;
@@ -40,7 +41,9 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
     }),
   );
   const isViewer = currentParticipant?.roomRole === 'viewer';
-  const isHost = currentParticipant?.roomRole === 'host' || currentParticipant?.roomRole === 'owner';
+  const room = useDebateStore((s) => s.room);
+  const isHost = hasHostControl(room, user?._id);
+  const isJudge = currentParticipant?.roomRole === 'judge';
   const isChatMuted = Boolean(currentParticipant?.chatMuted);
 
   useEffect(() => {
@@ -79,7 +82,7 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
           Viewer Chat
         </h6>
         <Badge bg="info">
-          {isViewer ? 'You are a viewer' : 'Host'}
+          {isViewer ? 'You are a viewer' : isHost ? 'Host' : isJudge ? 'Judge (read-only)' : 'Observer'}
         </Badge>
       </div>
 
@@ -148,6 +151,10 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
       ) : isHost ? (
         <div className="text-muted small text-center py-2 border rounded-3 mt-2">
           Host view only — viewers can chat here
+        </div>
+      ) : isJudge ? (
+        <div className="text-muted small text-center py-2 border rounded-3 mt-2">
+          Judge view only — you can read the viewer chat
         </div>
       ) : null}
     </div>

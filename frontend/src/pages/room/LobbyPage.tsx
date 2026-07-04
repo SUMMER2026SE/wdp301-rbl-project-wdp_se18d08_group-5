@@ -11,6 +11,7 @@ import { useLobbySocket } from '@hooks/useLobbySocket';
 import { useDebateRoomTracker, clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
 import { isSeededDebateTopic } from '@utils/debateTopics';
 import type { RoomParticipant, SpeakerSlot, Team } from '@/types';
+import { hasHostControl } from '../../utils/roomPermissions';
 
 type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
 
@@ -207,7 +208,7 @@ export default function LobbyPage() {
 
   const viewerChatEnabled = room?.viewerChatEnabled ?? true;
   const isOwner = Boolean(user && room?.createdBy === user._id);
-  const isHost = Boolean(user && room?.hostId === user._id);
+  const isHost = hasHostControl(room, user?._id);
   const canManageTopic = isOwner || isHost;
   const topicValue = getTopicValue(topicMode, selectedTopic, customTopic);
   const currentParticipant = room?.participants.find((item) => item.userId === user?._id);
@@ -217,29 +218,37 @@ export default function LobbyPage() {
       ? currentParticipant.primaryRole
       : currentParticipant.roomRole
     : null;
-  const mySlot = currentParticipant?.speakerSlot;
+  const mySlot = currentParticipant?.speakerSlot as string | null | undefined;
 
   const canStartDebate = useMemo(() => {
     if (!room || !user || !currentParticipant) return false;
 
-    if (room.hostType !== 'human') {
-      // No-Host mode: owner has NO special override — only S1 debaters or Judge S1 can start
-      if (room.judgeType === 'ai') {
-        // No-host + AI judge: S1 debaters start
-        return myEffectiveRole === 'debater' && mySlot === 'S1';
-      } else {
-        // No-host + Human judge: Judge S1 starts
-        return myEffectiveRole === 'judge' && mySlot === 'S1';
-      }
+    // Room Owner always sees the Start button (enabled/disabled by readiness check).
+    if (isOwner) return true;
+
+    if (room.hostType !== 'human' && room.judgeType === 'ai') {
+      // No-Host + AI: S1 debaters can start
+      return myEffectiveRole === 'debater' && mySlot === 'S1';
     } else {
-      // Host mode: owner or host can start
-      return isOwner || myEffectiveRole === 'host';
+      return isHost;
     }
-  }, [room, user, currentParticipant, myEffectiveRole, mySlot, isOwner]);
+  }, [room, user, currentParticipant, myEffectiveRole, mySlot, isOwner, isHost]);
   const isAssignedDebater =
     currentParticipant?.roomRole === 'debater' ||
     (currentParticipant?.roomRole === 'owner' && currentParticipant?.primaryRole === 'debater');
   const slots = useMemo(() => (room?.format === '1v1' ? ['S1'] : ['S1', 'S2', 'S3']) as SpeakerSlot[], [room?.format]);
+
+  // Reset `assignRole` to a valid option when the room config makes the current
+  // selection unavailable (e.g. switched to No Host while "Host" was selected).
+  useEffect(() => {
+    if (!room) return;
+    if (assignRole === 'host' && room.hostType !== 'human') {
+      setAssignRole('debater');
+    }
+    if (assignRole === 'judge' && room.judgeType !== 'human') {
+      setAssignRole('debater');
+    }
+  }, [room?.hostType, room?.judgeType, room?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!room) return;
@@ -431,6 +440,16 @@ export default function LobbyPage() {
             <Card className="mb-3">
               <Card.Body>
                 <Card.Title>{t('assignParticipant')}</Card.Title>
+                <div className="text-muted small mb-2">
+                  <i className="bi bi-info-circle me-1" />
+                  {(() => {
+                    const hostLabel = room.hostType === 'human' ? t('withHost') : t('noHost');
+                    const judgeLabel = room.judgeType === 'ai'
+                      ? t('aiJudgeAuto')
+                      : (room.judgeCount === 3 ? t('humanJudges3') : t('humanJudges1'));
+                    return `${hostLabel} • ${judgeLabel}`;
+                  })()}
+                </div>
                 <Form.Group className="mb-3">
                   <Form.Label>User</Form.Label>
                   <Form.Select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>
@@ -444,10 +463,22 @@ export default function LobbyPage() {
                 </Form.Group>
                 <Form.Group className="mb-3">
                   <Form.Label>{t('role')}</Form.Label>
-                  <Form.Select value={assignRole} onChange={(event) => setAssignRole(event.target.value as AssignableRole)}>
+                  <Form.Select
+                    value={assignRole}
+                    onChange={(event) => setAssignRole(event.target.value as AssignableRole)}
+                  >
                     <option value="debater">Debater</option>
-                    <option value="host">Host</option>
-                    <option value="judge">Judge</option>
+                    {/* Host is only available if room is configured with a Human Host. */}
+                    {room.hostType === 'human' && <option value="host">Host</option>}
+                    {/* Judge options are only available if room is configured with Human Judges.
+                        AI Judge is auto-generated by the system — players cannot be assigned as Judge. */}
+                    {room.judgeType === 'human' && (
+                      <>
+                        <option value="judge">Judge{room.judgeCount === 3 ? '' : ' 1'}</option>
+                        {room.judgeCount === 3 && <option value="judge">Judge 2</option>}
+                        {room.judgeCount === 3 && <option value="judge">Judge 3</option>}
+                      </>
+                    )}
                     <option value="viewer">Viewer</option>
                   </Form.Select>
                 </Form.Group>

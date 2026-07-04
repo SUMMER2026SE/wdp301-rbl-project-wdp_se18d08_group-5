@@ -82,7 +82,7 @@ export function useDebateSocket(roomId: string | undefined) {
     setPrepConsensus,
     setPrepConsensusByTeam,
     setJudgeNextPhaseVotes,
-    setNoHostS1Ready,
+
     setAIFeedback,
     setAIFinalVerdict,
     setCurrentPrivateRoom,
@@ -267,10 +267,6 @@ export function useDebateSocket(roomId: string | undefined) {
       }
     });
 
-    // No-host S1 consensus update
-    socket.on('debate:s1-start-update', (data: { readyUserIds: string[]; totalS1: number }) => {
-      setNoHostS1Ready(data.readyUserIds);
-    });
 
     // AI feedback received during judge feedback phase
     socket.on('debate:ai-feedback', (data: { speaker: string; feedback: AIAnalysis }) => {

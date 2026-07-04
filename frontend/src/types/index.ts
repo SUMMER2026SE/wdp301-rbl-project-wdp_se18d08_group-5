@@ -160,6 +160,7 @@ export interface DebateRoom {
   judgeType: JudgeType;
   judgeCount: number;
   participants: RoomParticipant[];
+  judges: { userId: string; username: string }[];
   currentPhase: DebatePhase;
   createdAt: string;
   startedAt: string | null;
