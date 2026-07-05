@@ -8,6 +8,7 @@ import 'package:flutter_riverpod_clean_architecture/core/providers/storage_provi
 import 'package:flutter_riverpod_clean_architecture/core/router/app_router.dart';
 import 'package:flutter_riverpod_clean_architecture/core/theme/app_theme.dart';
 import 'package:flutter_riverpod_clean_architecture/core/updates/update_providers.dart';
+import 'package:flutter_riverpod_clean_architecture/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flutter_riverpod_clean_architecture/l10n/app_localizations_delegate.dart';
 import 'package:flutter_riverpod_clean_architecture/l10n/l10n.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -80,16 +81,36 @@ class MyApp extends ConsumerWidget {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
-        
+
         // Add UpdateChecker as a builder to ensure it has MaterialLocalizations
         builder: (context, child) {
           return UpdateChecker(
             autoPrompt: true,
             enforceCriticalUpdates: true,
-            child: child ?? const SizedBox.shrink(),
+            child: _AuthInitializer(child: child ?? const SizedBox.shrink()),
           );
         },
       ),
     );
   }
+}
+
+class _AuthInitializer extends ConsumerStatefulWidget {
+  const _AuthInitializer({required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<_AuthInitializer> createState() => _AuthInitializerState();
+}
+
+class _AuthInitializerState extends ConsumerState<_AuthInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(authProvider.notifier).checkAuthStatus());
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

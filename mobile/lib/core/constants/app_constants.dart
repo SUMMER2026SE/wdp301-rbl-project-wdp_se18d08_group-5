@@ -1,6 +1,13 @@
 class AppConstants {
   // API constants
-  static const String apiBaseUrl = 'https://api.yourdomain.com';
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:4300/api/v1',
+  );
+  static const String socketBaseUrl = String.fromEnvironment(
+    'SOCKET_BASE_URL',
+    defaultValue: 'http://localhost:4300',
+  );
 
   // Storage constants
   static const String storagePrefix = 'app_';
@@ -9,7 +16,7 @@ class AppConstants {
   static const String refreshTokenKey = 'refreshToken';
 
   // App constants
-  static const String appName = 'Flutter Riverpod Clean Architecture';
+  static const String appName = 'DebateHub';
   static const String appVersion = '1.0.0';
   static const String packageName =
       'com.example.flutter_riverpod_clean_architecture';
@@ -23,16 +30,15 @@ class AppConstants {
   // Route constants
   static const String initialRoute = '/';
   static const String homeRoute = '/home';
-  static const String chatRoute = '/chat';
-  static const String surveyRoute = '/survey';
-  static const String counterRoute = '/counter';
   static const String loginRoute = '/login';
   static const String registerRoute = '/register';
+  static const String forgotPasswordRoute = '/forgot-password';
+  static const String changePasswordRoute = '/change-password';
+  static const String matchmakingRoute = '/matchmaking';
+  static const String leaderboardRoute = '/leaderboard';
+  static const String roomsRoute = '/rooms';
   static const String profileRoute = '/profile';
-  static const String settingsRoute = '/settings';
-  static const String languageSettingsRoute = '/settings/language';
-  static const String localizationDemoRoute = '/demo/localization';
-  static const String localizationAssetsDemoRoute = '/demo/localization/assets';
+  static const String resultRoute = '/results';
 
   // Hive box names
   static const String settingsBox = 'settings';

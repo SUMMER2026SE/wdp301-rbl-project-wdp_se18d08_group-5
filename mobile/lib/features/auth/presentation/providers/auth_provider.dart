@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod_clean_architecture/features/auth/domain/entities/user_entity.dart';
-import 'package:flutter_riverpod_clean_architecture/features/auth/providers/auth_providers.dart';
+import 'package:flutter_riverpod_clean_architecture/features/debate/data/repositories/debate_repository_impl.dart';
 
 // Auth state
 class AuthState {
@@ -41,33 +41,50 @@ class AuthNotifier extends Notifier<AuthState> {
 
   // Check auth status
   Future<void> checkAuthStatus() async {
-    // Here you would typically check if there's a valid token stored
-    // and validate it with your API if necessary
-
-    // For now, we'll just return false
-    state = state.copyWith(isAuthenticated: false, user: null);
+    final api = ref.read(debateRepositoryProvider);
+    final hasToken = await api.hasToken();
+    if (!hasToken) {
+      state = const AuthState(isAuthenticated: false, isLoading: false);
+      return;
+    }
+    try {
+      final profile = await api.me();
+      state = AuthState(
+        isAuthenticated: true,
+        isLoading: false,
+        user: profile.toUserEntity(),
+      );
+    } catch (error) {
+      await api.logout();
+      state = AuthState(
+        isAuthenticated: false,
+        isLoading: false,
+        errorMessage: error.toString(),
+      );
+    }
   }
 
   // Login
   Future<void> login({required String email, required String password}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    final loginUseCase = ref.read(loginUseCaseProvider);
-    final result = await loginUseCase.execute(email: email, password: password);
-
-    result.fold(
-      (failure) => state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: false,
-        errorMessage: failure.message,
-      ),
-      (user) => state = state.copyWith(
+    try {
+      final profile = await ref
+          .read(debateRepositoryProvider)
+          .login(email, password);
+      state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
-        user: user,
+        user: profile.toUserEntity(),
         errorMessage: null,
-      ),
-    );
+      );
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: false,
+        errorMessage: error.toString(),
+      );
+    }
   }
 
   // Register
@@ -78,47 +95,65 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    final registerUseCase = ref.read(registerUseCaseProvider);
-    final result = await registerUseCase.execute(
-      name: name,
-      email: email,
-      password: password,
-    );
-
-    result.fold(
-      (failure) => state = state.copyWith(
-        isLoading: false,
-        isAuthenticated: false,
-        errorMessage: failure.message,
-      ),
-      (user) => state = state.copyWith(
+    try {
+      final profile = await ref
+          .read(debateRepositoryProvider)
+          .register(name, email, password);
+      state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
-        user: user,
+        user: profile.toUserEntity(),
         errorMessage: null,
-      ),
-    );
+      );
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: false,
+        errorMessage: error.toString(),
+      );
+    }
   }
 
   // Logout
   Future<void> logout() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    final logoutUseCase = ref.read(logoutUseCaseProvider);
-    final result = await logoutUseCase.execute();
-
-    result.fold(
-      (failure) => state = state.copyWith(
-        isLoading: false,
-        errorMessage: failure.message,
-      ),
-      (_) => state = state.copyWith(
+    try {
+      await ref.read(debateRepositoryProvider).logout();
+      state = state.copyWith(
         isLoading: false,
         isAuthenticated: false,
         user: null,
         errorMessage: null,
-      ),
-    );
+      );
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+    }
+  }
+
+  Future<void> forgotPassword(String email) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await ref.read(debateRepositoryProvider).forgotPassword(email);
+      state = state.copyWith(isLoading: false, errorMessage: null);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await ref
+          .read(debateRepositoryProvider)
+          .changePassword(currentPassword, newPassword);
+      state = state.copyWith(isLoading: false, errorMessage: null);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+    }
   }
 }
 
