@@ -60,7 +60,13 @@ export default function LeaderboardPage() {
     queryKey: ['leaderboard', page],
     queryFn: async () => {
       const response = await rankingService.getLeaderboard({ page, limit: PAGE_SIZE });
-      return response.data.data;
+      const entries = response.data.data;
+
+      if (!Array.isArray(entries)) {
+        throw new Error('Invalid leaderboard response from server.');
+      }
+
+      return entries;
     },
   });
 
