@@ -20,29 +20,41 @@ function privateRoomKey(roomId: string, team: PrivateRoomTeam): string {
 
 function canJoinPrivateRoom(
   participant: IDebateRoom['participants'][0] | undefined,
-  _userId: string,
+  userId: string,
   requestedTeam: 'proposition' | 'opposition' | 'judge',
   room: IDebateRoom,
 ): boolean {
-  if (!participant) return false;
-
-  const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+  const effectiveRole = participant
+    ? participant.roomRole === 'owner'
+      ? participant.primaryRole
+      : participant.roomRole
+    : null;
 
   // Host can join any private room
   if (effectiveRole === 'host') return true;
 
-  // Judge S1 in no-host mode can join any private room
+  // Judge S1 in no-host mode can join any private room (acts as Control Panel holder)
   const isJudgeS1 =
     room.hostType !== 'human' &&
     effectiveRole === 'judge' &&
-    (participant as any).speakerSlot === 'S1';
+    (participant as any)?.speakerSlot === 'S1';
   if (isJudgeS1) return true;
 
+  // The room creator defaults to host privileges until they pick a different
+  // role (e.g. choose to be a debater). This avoids blocking the owner from
+  // jumping into any private room during setup.
+  const isCreator = room.createdBy?.toString() === userId;
+  if (isCreator) return true;
+
   if (requestedTeam === 'judge') {
+    // Judge private room ONLY exists when judgeType is 'human' (per rule docs)
+    if (room.judgeType !== 'human') return false;
+    if (!participant) return false;
     return effectiveRole === 'judge';
   }
 
   if (requestedTeam === 'proposition' || requestedTeam === 'opposition') {
+    if (!participant) return false;
     return (
       effectiveRole === 'debater' &&
       participant.team === requestedTeam
@@ -99,7 +111,7 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
       }
 
       try {
-        const room = await DebateRoom.findById(roomId).select('participants');
+        const room = await DebateRoom.findById(roomId).select('participants hostType judgeType createdBy');
         if (!room) {
           socket.emit('private-room:error', { message: 'Room not found' });
           ack?.({ success: false, message: 'Room not found' });
@@ -224,7 +236,7 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
       socket.leave(key);
 
       // Broadcast system message about user leaving
-      const room = await DebateRoom.findById(roomId).select('participants');
+      const room = await DebateRoom.findById(roomId).select('participants hostType judgeType createdBy');
       const participant = room?.participants.find(
         (p) => p.userId.toString() === userId,
       );
@@ -257,7 +269,7 @@ export function registerPrivateRoomHandlers(_io: Server, socket: Socket) {
       }
 
       try {
-        const room = await DebateRoom.findById(roomId).select('participants');
+        const room = await DebateRoom.findById(roomId).select('participants hostType judgeType createdBy');
         const participant = room?.participants.find(
           (p) => p.userId.toString() === userId,
         );

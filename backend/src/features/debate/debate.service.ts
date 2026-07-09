@@ -8,7 +8,7 @@ const SPEECH_SECONDS = 3 * 60;
 const CE_SECONDS = 2 * 60;
 const PREP_SECONDS = 7 * 60;
 const TRANSITION_MUTE_SECONDS = 3;
-const AUTO_TRANSITION_COUNTDOWN = 10;
+const AUTO_TRANSITION_COUNTDOWN = 0;
 
 type DebateStep = {
   speaker: string;
@@ -30,7 +30,7 @@ type DebateStep = {
  * Human Host 3v3 Debate Flow — aligned with rule_host_judgeHuman.md §14:
  *
  * Round order: R1 (Prop→Opp→CE), R2 (Opp→Prop→CE), R3 (Opp→Prop, no CE)
- * Round 2: "(Luồng giống Round 1)" → Pro→Opp, so S2 = Opp→Prop
+ * Round 2: "(Same flow as Round 1)" → Pro→Opp, so S2 = Opp→Prop
  * Round 3: Opposition speaks FIRST (Opp→Prop), then "Finish Debate"
  * JUDGES_FB_3 step added so human judges can submit R3 scores before FINAL_JUDGING
  */
@@ -50,7 +50,7 @@ const DEBATE_FLOW_HOST_3V3: DebateStep[] = [
   },
   // 5: Judge Feedback 1 — free, no timer, wait for scores
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 6: PROP2 speech (PRO_S2) — "(Luồng giống Round 1)"
+  // 6: PROP2 speech (PRO_S2) — "(Same flow as Round 1)"
   { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   // 7: OPP2 speech (OPP_S2)
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
@@ -88,7 +88,7 @@ const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
     ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // Round 2: Opp → Prop → CE (per "Luồng giống Round 1")
+  // Round 2: Opp → Prop → CE (per "Same flow as Round 1")
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   {
@@ -109,7 +109,7 @@ const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
  * rule_noHost_JudgeAI.md §13 and rule_noHost_JudgeHuman.md §15:
  *
  * R1: Prop→Opp→CE, R2: Prop→Opp→CE, R3: Opp→Prop (no CE)
- * R2: "(Luồng giống Round 1)" → PRO_S2 first, OPP_S2 second
+ * R2: "(Same flow as Round 1)" → PRO_S2 first, OPP_S2 second
  * R3: Opposition FIRST (Opp→Prop) per rule: "[S3 Opposition] → [S3 Proposition]"
  * JUDGES_FB_3 added so human judges can submit R3 scores before FINAL_JUDGING
  *
@@ -120,8 +120,6 @@ const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
  * - Match ends automatically after Final Judging (no host End needed)
  */
 const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
-  // 0: Waiting for S1 consensus — no timer, waiting for S1 from both teams
-  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // 1: Motion announcement
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // 2: Prep — 7m auto, both teams can skip
@@ -134,7 +132,7 @@ const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
     ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 2: "(Luồng giống Round 1)" → PRO first, OPP second
+  // Round 2: "(Same flow as Round 1)" → PRO first, OPP second
   { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   {
@@ -159,7 +157,6 @@ const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
  * JUDGES_FB_3 added so human judges can submit R3 scores
  */
 const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
-  { speaker: 'WAITING_S1_START', phase: 'waiting_s1', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: false },
   // Round 1: Prop → Opp → CE
@@ -170,7 +167,7 @@ const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
     ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 2: Prop → Opp → CE (per "Luồng giống Round 1")
+  // Round 2: Prop → Opp → CE (per "Same flow as Round 1")
   { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   {
@@ -198,6 +195,72 @@ export function getFlow(format?: '1v1' | '3v3', hostType?: 'human' | 'ai'): Deba
 
 export function getStepIndex(flow: DebateStep[], speaker: string, phase: string): number {
   return flow.findIndex((step) => step.speaker === speaker && step.phase === phase);
+}
+
+/**
+ * Per docs/rule_*  §Start Match — only allow Start when ALL Main Participants
+ * are present (debaters + host + human judges). AI judges don't add to the
+ * total. The expected total depends on format × hostType × judgeType.
+ */
+export function checkStartMatchParticipants(room: any): { ready: boolean; reason?: string; counts?: any } {
+  const getEffectiveRole = (p: any) =>
+    p?.roomRole === 'owner' ? p?.primaryRole : p?.roomRole;
+
+  const is1v1 = room.format === '1v1';
+  const debaterCount = is1v1 ? 2 : 6;
+  const hasHost = room.hostType === 'human';
+  const isAIJudge = room.judgeType === 'ai';
+  const requiredJudges = isAIJudge ? 0 : (room.judgeCount || 1);
+
+  const participants = (room.participants || []) as any[];
+  let currentDebaters = 0;
+  let currentHost = 0;
+  let currentJudges = 0;
+  const debatersWithoutPosition: string[] = [];
+
+  participants.forEach((p) => {
+    const role = getEffectiveRole(p);
+    if (role === 'debater') {
+      if (p.team && p.speakerSlot) {
+        currentDebaters += 1;
+      } else {
+        debatersWithoutPosition.push(p.username || p.userId?.toString() || 'unknown');
+      }
+    } else if (role === 'host') {
+      currentHost += 1;
+    } else if (role === 'judge') {
+      currentJudges += 1;
+    }
+  });
+
+  const missingDebaters = Math.max(0, debaterCount - currentDebaters);
+  const missingHost = hasHost ? Math.max(0, 1 - currentHost) : 0;
+  const missingJudges = Math.max(0, requiredJudges - currentJudges);
+
+  if (missingDebaters > 0 || missingHost > 0 || missingJudges > 0) {
+    const reasons: string[] = [];
+    if (missingDebaters > 0) reasons.push(`need ${missingDebaters} more debater(s) (${currentDebaters}/${debaterCount})`);
+    if (missingHost > 0) reasons.push(`need a Host (${currentHost}/1)`);
+    if (missingJudges > 0) reasons.push(`need ${missingJudges} more judge(s) (${currentJudges}/${requiredJudges})`);
+    return {
+      ready: false,
+      reason: `Cannot start: ${reasons.join(', ')}.`,
+      counts: { currentDebaters, currentHost, currentJudges, debaterCount, hasHost, requiredJudges },
+    };
+  }
+
+  if (debatersWithoutPosition.length > 0) {
+    return {
+      ready: false,
+      reason: `Debater(s) without team/slot: ${debatersWithoutPosition.join(', ')}`,
+      counts: { currentDebaters, currentHost, currentJudges, debaterCount, hasHost, requiredJudges },
+    };
+  }
+
+  return {
+    ready: true,
+    counts: { currentDebaters, currentHost, currentJudges, debaterCount, hasHost, requiredJudges },
+  };
 }
 
 function assertHost(room: any, userId: string) {
@@ -257,29 +320,23 @@ export function applyStep(session: any, step: DebateStep) {
   }
 }
 
-export function aggregateScores(verdicts: any[]) {
-  const totals: Record<string, { total: number; count: number }> = { proposition: { total: 0, count: 0 }, opposition: { total: 0, count: 0 } };
-  verdicts.forEach((verdict) => {
-    const speakerKey = verdict.speaker || '';
-    let target = 'opposition';
-    if (String(speakerKey).startsWith('PRO')) target = 'proposition';
-    if (target === 'proposition' || target === 'opposition') {
-      const values = Object.values(verdict.score || {}).filter((v) => typeof v === 'number') as number[];
-      totals[target].total += values.reduce((a, b) => a + b, 0);
-      totals[target].count += 1;
-    }
-  });
-  const proposition = totals.proposition.count ? totals.proposition.total / totals.proposition.count : 0;
-  const opposition = totals.opposition.count ? totals.opposition.total / totals.opposition.count : 0;
-  const winner = proposition === opposition ? 'draw' : proposition > opposition ? 'proposition' : 'opposition';
-  return { teamProposition: { total: proposition, breakdown: {} }, teamOpposition: { total: opposition, breakdown: {} }, winner };
-}
+// `aggregateFinalScores` from utils/scoring.ts remains the single source of
+// truth for scoring math. The earlier criteria-based helper at this location
+// has been retired — judge verdicts are now round-based (speak/ce) and any
+// aggregation must use the tie-breaker aware implementation.
 
 // ─── Public service functions ────────────────────────────────────────────────
 
 export async function startDebate(roomId: string, userId: string) {
   const room = await DebateRoom.findById(roomId);
   if (!room) throw new NotFoundError('Room not found');
+
+  // Enforce the rule: only allow Start when ALL Main Participants are present
+  // (debaters + host + human judges). AI judges don't count toward the total.
+  const participantsCheck = checkStartMatchParticipants(room);
+  if (!participantsCheck.ready) {
+    throw new BadRequestError(participantsCheck.reason || 'Not enough participants to start');
+  }
 
   // No-host: require S1 debaters consensus (AI judge) or Judge S1 (Human judge)
   // to start. The owner has no special override in No-Host modes.
@@ -326,14 +383,9 @@ export async function startDebate(roomId: string, userId: string) {
   const session = new DebateSession({ roomId: room._id });
   const flow = getFlow((room.format as '1v1' | '3v3') || '3v3', (room.hostType as 'human' | 'ai') || undefined);
 
-  // No-host + AI judge: start at WAITING_S1_START step (index 0)
-  // No-host + Human judge: Judge S1 already started, begin at motion step (index 1)
-  // Human host: start at motion step (index 0)
-  let startIdx = 0;
-  if (isNoHost && isAIJudge) startIdx = 0;
-  else if (isNoHost && !isAIJudge) startIdx = 1;
-  else startIdx = 0;
-
+  // All configurations now start directly at the motion step (index 0).
+  const startIdx = 0;
+  
   applyStep(session, flow[startIdx]);
   room.status = 'active';
   room.currentPhase = flow[startIdx].phase;
@@ -518,12 +570,12 @@ function computeTransitionAnnouncement(
   const { speaker: curr } = currentStep;
   const { speaker: next, phase: nextPhase } = nextStep;
 
-  // OPP_S3 -> JUDGES_FB_3: "Hết Round 3" per rule (all 4 docs)
+  // OPP_S3 -> JUDGES_FB_3: "End of Round 3" per rule (all 4 docs)
   if (curr === 'OPP_S3' && (nextPhase === 'judge_feedback' || nextPhase === 'final_judging')) {
     return 'End of Round 3';
   }
 
-  // PRO_S3 -> JUDGES_FB_3: "Tới lượt Proposition" (proposition's final summary starts)
+  // PRO_S3 -> JUDGES_FB_3: "Proposition turn" (proposition's final summary starts)
   if (curr === 'PRO_S3' && nextPhase === 'judge_feedback') {
     return 'Proposition turn';
   }
@@ -538,7 +590,7 @@ function computeTransitionAnnouncement(
     return 'Get ready for cross-examination';
   }
 
-  // After CE -> Free time / Judge feedback (rule: "Hết Round N")
+  // After CE -> Free time / Judge feedback (rule: "End of Round N")
   if (curr.startsWith('CE_') && (next.startsWith('JUDGES_FB') || nextPhase === 'judge_feedback')) {
     const roundNum = curr.split('_')[1]?.toLowerCase();
     return `End of Round ${roundNum?.replace('round', '')}`;
@@ -592,7 +644,7 @@ export async function triggerTransition(
   // BEFORE emitting transition-start. This guarantees every client receives
   // "00:00" simultaneously with the popup so the user never sees a delay
   // between the popup appearing and the timer stopping. Matches the rule:
-  //   "Timer reset về 00:00" happens at the START of the transition popup.
+  //   "Timer reset to 00:00" happens at the START of the transition popup.
   try {
     const preSession = await DebateSession.findOne({ roomId: room._id });
     if (preSession && preSession.currentTurn) {
@@ -788,6 +840,10 @@ export async function triggerTransition(
 
         // Snapshot current turn history with the old phase, then advance to
         // judge_feedback as 'active' (free time, no timer).
+        // The phase stays 'active' until the Control Panel holder (Host or
+        // Judge S1, depending on mode) explicitly ends the phase via Skip.
+        // Per the rule docs the judge may submit scores during this phase,
+        // but ending it is always gated on Skip, not on the Start button.
         snapshotCurrentTurn(session, '');
         applyStep(session, nextStep);
         session.currentTurn.phaseStatus = 'active';
@@ -802,12 +858,16 @@ export async function triggerTransition(
           speaker: nextStep.speaker,
           announcement,
           waitingForJudge: true,
+          waitingForControllerSkip: !isAIJudge,
         });
         io?.to(roomId).emit('debate:turn-status-change', { turnStatus: 'active', phaseStatus: 'active' });
 
         if (isAIJudge) {
-          // Check if any human judges are actually present in the room.
-          // If totalJudges === 0, auto-advance instead of waiting indefinitely.
+          // No-Host + AI Judge: this is the Mode 4 / Rank Queue path. The
+          // AI is the judge, so once it submits the per-round score the
+          // debate auto-transitions with no user action required.
+          // Per the rule: "AI Judge submits score → Judge Feedback ends
+          // immediately → Transition Phase starts immediately."
           const humanJudgeCount = updatedRoom.participants.filter((p: any) => {
             const r = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
             return r === 'judge';
@@ -815,19 +875,17 @@ export async function triggerTransition(
 
           if (humanJudgeCount === 0 || nextStep.speaker === 'JUDGES_FB_3') {
             // JUDGES_FB_3: AI already generated feedback for R3 speeches in the
-            // previous OPP_S3→PRO_S3 transition. No need to generate again.
-            // Auto-advance to FINAL_JUDGING after 5s.
+            // previous OPP_S3→PRO_S3 transition. Auto-advance to FINAL_JUDGING
+            // after a short delay (no UI interaction needed).
             console.log(`[triggerTransition] Auto-advancing from ${nextStep.speaker} (AI judge, no human judges or R3 FB)`);
             setTimeout(async () => {
               triggerTransition(roomId).catch(console.error);
-            }, 5000);
+            }, 3000);
             return;
           }
 
-          // AI judge: request AI feedback, then auto-advance 10s after
-          // feedback is shown (per the rule: "AI feedback hiển thị lên
-          // màn hình → Đếm ngược 10s"). We wait up to 30s for AI to respond,
-          // then start the 10s transition countdown.
+          // AI judge: generate feedback, auto-advance after a short delay so
+          // participants can read the feedback before transition.
           (async () => {
             const feedbackShown = await generateAIFeedback(roomId, nextStep.speaker);
             if (!feedbackShown) {
@@ -836,10 +894,12 @@ export async function triggerTransition(
             io?.to(roomId).emit('debate:ai-feedback-received', {});
             setTimeout(async () => {
               triggerTransition(roomId).catch(console.error);
-            }, 10000);
+            }, 5000);
           })();
         } else {
-          // Human judge: broadcast that we're waiting for judge scores + vote
+          // Human judge: wait for judge scores. The phase only ends when the
+          // Control Panel holder (Host or Judge S1 in no-host mode) clicks
+          // Skip. Submitting scores is not enough on its own.
           io?.to(roomId).emit('debate:waiting-judge-feedback', {
             phase: 'judge_feedback',
             waitingForVotes: true,
@@ -1330,3 +1390,77 @@ export async function requestDraw(roomId: string, userId: string): Promise<any> 
 }
 
 export { completeDebateWithWinner };
+
+export async function advanceFromMotionToPrep(roomId: string) {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) return;
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session || session.currentTurn.status !== 'active') return;
+
+  const phase = session.currentTurn.phase;
+  if (phase !== 'motion') return;
+
+  const { timerService } = await import('../../socket/timer.service.js');
+  const { getIO } = await import('../../socket/index.js');
+  const io = getIO();
+
+  const format = (room.format as '1v1' | '3v3') || '3v3';
+  const flow = getFlow(format, room.hostType as 'human' | 'ai');
+  const currentIndex = flow.findIndex(
+    (s) => s.speaker === session.currentTurn.speaker && s.phase === session.currentTurn.phase,
+  );
+  const prepStep = flow[Math.min(currentIndex + 1, flow.length - 1)];
+  
+  applyStep(session, prepStep);
+  session.currentTurn.timeRemaining = prepStep.timeLimit || 0;
+  session.currentTurn.startTime = new Date();
+  await session.save();
+  
+  room.currentPhase = prepStep.phase;
+  await room.save();
+
+  timerService.start(roomId, prepStep.timeLimit || 0, prepStep.phase, () => {
+    triggerTransition(roomId).catch(console.error);
+  });
+
+  if (io) {
+    io.to(roomId).emit('debate:phase-change', {
+      phase: prepStep.phase,
+      phaseStatus: 'active',
+      speaker: prepStep.speaker,
+    });
+    io.to(roomId).emit('debate:turn-status-change', {
+      turnStatus: 'active',
+      phaseStatus: 'active',
+    });
+
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(roomId, '');
+    if (state) io.to(roomId).emit('room:state-restore', state);
+  }
+}
+
+export async function autoStartDebateCountdown(roomId: string) {
+  const room = await DebateRoom.findById(roomId);
+  if (!room) return;
+  const session = await DebateSession.findOne({ roomId: room._id });
+  if (!session) return;
+
+  session.currentTurn.status = 'active';
+  session.currentTurn.phaseStatus = 'active';
+  session.currentTurn.startTime = new Date();
+  await session.save();
+
+  const { getIO } = await import('../../socket/index.js');
+  const io = getIO();
+  if (io) {
+    io.to(roomId).emit('debate:countdown-start', { durationMs: 3000 });
+    const { buildRoomStatePayload } = await import('../../socket/room.socket.js');
+    const state = await buildRoomStatePayload(roomId, '');
+    if (state) io.to(roomId).emit('room:state-restore', state);
+  }
+
+  setTimeout(() => {
+    advanceFromMotionToPrep(roomId).catch(console.error);
+  }, 3000);
+}

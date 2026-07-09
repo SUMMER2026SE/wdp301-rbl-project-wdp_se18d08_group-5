@@ -7,6 +7,7 @@ import { useAuthStore } from '@stores/authStore';
 import { getSocket } from '@hooks/useSocket';
 import { roomService } from '@services/roomService';
 import type { ChatMessage } from '@/types';
+import { hasHostControl } from '../../utils/roomPermissions';
 
 interface MainRoomChatProps {
   roomId: string;
@@ -63,12 +64,7 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
   const myRole = currentParticipant?.roomRole;
   const isChatMuted = Boolean(currentParticipant?.chatMuted);
 
-  const isHost =
-    myRole === 'host' ||
-    myRole === 'owner' ||
-    roomQuery.data?.hostId === user?._id ||
-    roomQuery.data?.createdBy === user?._id ||
-    debateRoom?.hostId === user?._id;
+  const isHost = hasHostControl(roomQuery.data || debateRoom, user?._id);
 
   const canSend =
     isPrivateRoom ||
@@ -139,9 +135,55 @@ export function MainRoomChat({ roomId, isPrivateRoom = false }: MainRoomChatProp
                   <strong className="small text-capitalize" style={{ color: isOwn ? '#0d6efd' : '#333333' }}>
                     {message.senderName}
                   </strong>
-                  <Badge bg="secondary" pill className="text-uppercase" style={{ fontSize: '0.6rem' }}>
-                    {message.senderRole}
-                  </Badge>
+                  {(() => {
+                    let badgeText = message.senderRole?.toUpperCase() || 'UNKNOWN';
+                    let customBg = '#6c757d';
+                    let customColor = '#ffffff';
+
+                    if (message.senderRole === 'debater') {
+                      const participant = participants.find((p: any) => {
+                        const uId = typeof p.userId === 'object' ? p.userId?._id : p.userId;
+                        return String(uId) === String(message.senderId);
+                      });
+                      
+                      if (participant?.team === 'proposition') {
+                        badgeText = 'PROP';
+                        customBg = '#007aff'; // vibrant blue
+                      } else if (participant?.team === 'opposition') {
+                        badgeText = 'OPP';
+                        customBg = '#ff3b30'; // vibrant red
+                      } else {
+                        badgeText = 'DEBATER';
+                      }
+                    } else if (message.senderRole === 'host' || message.senderRole === 'owner') {
+                      badgeText = 'HOST';
+                      customBg = '#af52de'; // vibrant purple
+                    } else if (message.senderRole === 'judge') {
+                      badgeText = 'JUDGE';
+                      customBg = '#ffcc00'; // vibrant amber
+                      customColor = '#212529'; // dark text for contrast
+                    } else if (message.senderRole === 'viewer') {
+                      badgeText = 'VIEWER';
+                      customBg = '#343a40';
+                    }
+
+                    const badgeStyle: React.CSSProperties = { 
+                      fontSize: '10px', 
+                      fontWeight: 700, 
+                      letterSpacing: '0.5px',
+                      backgroundColor: customBg,
+                      color: customColor,
+                      padding: '4px 8px',
+                      boxShadow: `0 2px 4px ${customBg}40`,
+                      transform: 'translateY(-1px)',
+                    };
+
+                    return (
+                      <span className="badge rounded-pill text-uppercase" style={badgeStyle}>
+                        {badgeText}
+                      </span>
+                    );
+                  })()}
                   <span className="text-muted" style={{ fontSize: '0.7rem' }}>
                     {formatTime(message.timestamp)}
                   </span>

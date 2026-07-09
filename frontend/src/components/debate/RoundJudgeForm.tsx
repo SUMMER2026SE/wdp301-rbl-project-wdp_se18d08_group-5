@@ -100,11 +100,11 @@ export function RoundJudgeForm({
           </Form.Group>
         )}
         <Form.Group className="mb-2">
-          <Form.Label className="small text-muted mb-0">{t('debate.judge.notes')}</Form.Label>
+          <Form.Label className="small text-muted mb-0">{t('notes')}</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
-            placeholder={t('debate.judge.notesPlaceholder', 'Notes for proposition team...')}
+            placeholder={t('notesPlaceholder', 'Notes for proposition team...')}
             className="small"
             value={propNotes}
             onChange={(e) => onPropNotesChange(e.target.value)}
@@ -140,11 +140,11 @@ export function RoundJudgeForm({
           </Form.Group>
         )}
         <Form.Group className="mb-2">
-          <Form.Label className="small text-muted mb-0">{t('debate.judge.notes')}</Form.Label>
+          <Form.Label className="small text-muted mb-0">{t('notes')}</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
-            placeholder={t('debate.judge.notesOppPlaceholder', 'Notes for opposition team...')}
+            placeholder={t('notesOppPlaceholder', 'Notes for opposition team...')}
             className="small"
             value={oppNotes}
             onChange={(e) => onOppNotesChange(e.target.value)}
@@ -155,7 +155,7 @@ export function RoundJudgeForm({
       {!isSubmitEnabled && (
         <div className="alert alert-info py-1.5 px-2.5 small mb-2 text-white bg-info bg-opacity-10 border border-info border-opacity-20" style={{ fontSize: '10px', lineHeight: 1.4 }}>
           <i className="bi bi-info-circle me-1" />
-          {t('debate.judge.canPreFill')}
+          {t('canPreFill')}
         </div>
       )}
 
@@ -165,7 +165,7 @@ export function RoundJudgeForm({
         onClick={onSubmit}
         disabled={isPending || !isSubmitEnabled}
       >
-        {isPending ? t('debate.judge.submitting') : t('debate.judge.submit')}
+        {isPending ? t('submitting') : t('submit')}
       </Button>
     </div>
   );

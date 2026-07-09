@@ -20,19 +20,24 @@ export default function LiveMatchesPage() {
   const currentUser = useAuthStore((state) => state.user);
   const [format, setFormat] = useState<DebateFormat | ''>('');
   const [roomType, setRoomType] = useState<RoomType | ''>('');
-  const [status, setStatus] = useState<RoomStatus | ''>('');
+  // Default filter is "all" — show every room regardless of status
+  const [status, setStatus] = useState<RoomStatus | 'all' | ''>('all');
   const [selectedRoom, setSelectedRoom] = useState<DebateRoom | null>(null);
   const [password, setPassword] = useState('');
   const { socket } = useSocket();
 
   const roomsQuery = useQuery({
     queryKey: ['rooms', { format, roomType, status }],
-    queryFn: async () => (await roomService.getAll({
-      format: format || undefined,
-      roomType: roomType || undefined,
-      status: status || undefined,
-      limit: 24,
-    })).data.data,
+    queryFn: async () => {
+      // 'all' = no status filter (show every room); other values are status keys
+      const statusFilter = !status || status === 'all' ? undefined : status;
+      return (await roomService.getAll({
+        format: format || undefined,
+        roomType: roomType || undefined,
+        status: statusFilter,
+        limit: 24,
+      })).data.data;
+    },
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
@@ -98,15 +103,13 @@ export default function LiveMatchesPage() {
     }
   }
 
-  const visibleRooms = useMemo(
+    const visibleRooms = useMemo(
     () => (roomsQuery.data || []).filter((room) => {
-      if (status) {
+      // 'all' (or empty) = no status filter; show every room from the API
+      if (status && status !== 'all') {
         return room.status === status;
       }
-      if (room.status === 'completed' || room.status === 'cancelled') {
-        return false;
-      }
-      return ['waiting', 'ready', 'active', 'paused'].includes(room.status);
+      return true;
     }),
     [roomsQuery.data, status],
   );
@@ -146,11 +149,16 @@ export default function LiveMatchesPage() {
           </div>
           <div>
             <Form.Label>Status</Form.Label>
-            <Form.Select value={status} onChange={(event) => setStatus(event.target.value as RoomStatus | '')}>
-              <option value="">Open and live</option>
+            <Form.Select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as RoomStatus | 'all' | '')}
+            >
+              <option value="all">All</option>
+              <option value="open-live">Open and live</option>
               <option value="waiting">Waiting</option>
               <option value="ready">Ready</option>
               <option value="active">Active</option>
+              <option value="paused">Paused</option>
               <option value="completed">Completed</option>
             </Form.Select>
           </div>
@@ -184,7 +192,7 @@ export default function LiveMatchesPage() {
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted small">{room.participants.length} participants</span>
                       {room.status === 'completed' ? (
-                        <Button size="sm" variant="info" onClick={() => navigate(`/replay/${room._id}`)}>
+                        <Button size="sm" variant="info" onClick={() => navigate(`/result/${room._id}`)}>
                           View result
                         </Button>
                       ) : isLive ? (

@@ -64,7 +64,7 @@ export function ReturnToDebateBanner() {
   const [storedRoom, setStoredRoom] = useState<StoredDebateRoom | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const isOnRoomPage = location.pathname.includes('/debate/') || location.pathname.includes('/lobby');
-  const isOnResultPage = location.pathname.includes('/replay/') || location.pathname.includes('/result');
+  const isOnResultPage = location.pathname.includes('/result/') || location.pathname.includes('/result');
   const { socket } = useSocket();
 
   useEffect(() => {

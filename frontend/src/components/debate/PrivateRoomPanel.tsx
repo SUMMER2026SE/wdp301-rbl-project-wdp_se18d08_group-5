@@ -6,6 +6,7 @@ import { useAuthStore } from '@stores/authStore';
 import { getSocket } from '@hooks/useSocket';
 import toast from 'react-hot-toast';
 import type { Team } from '@/types';
+import { hasHostControl } from '../../utils/roomPermissions';
 
 type PrivateRoomTeam = Team | 'judge';
 
@@ -37,8 +38,7 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
   const participant = room?.participants.find((p) => p.userId === user?._id);
   const myRole = participant?.roomRole;
   const myTeam = participant?.team;
-  const isController = Boolean(user && room?.hostId === user._id);
-  const isHost = Boolean(isController || myRole === 'host' || myRole === 'owner');
+  const isHost = hasHostControl(room, user?._id);
 
   const allowedTeams = (() => {
     if (isHost) return ['proposition', 'opposition', 'judge'] as PrivateRoomTeam[];

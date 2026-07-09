@@ -29,7 +29,7 @@ export const debateWorkflow: DebateWorkflowStep[] = [
   { speaker: 'PRO_S2', phase: 'speech', label: 'Prop 2', detail: 'Proposition second speech' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'CE 2', detail: 'Cross‑exam round 2' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge FB 2', detail: 'Judges review round 2' },
-  // Round 3 (Prop first, no CE)
+  // Round 3 (Proposition first, no CE) per requirement: Prop→Opp
   { speaker: 'PRO_S3', phase: 'speech', label: 'Prop 3', detail: 'Proposition final speech' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opp 3', detail: 'Opposition final speech' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge FB 3', detail: 'Judges review final round' },

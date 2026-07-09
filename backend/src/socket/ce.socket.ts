@@ -3,6 +3,7 @@ import { DebateRoom } from '../models/DebateRoom.js';
 import { DebateSession } from '../models/DebateSession.js';
 import { Message } from '../models/Message.js';
 import { getIO } from './index.js';
+import { hasControlPanel } from '../utils/roomPermissions.js';
 
 const CE_SECONDS = 2 * 60;
 const CE_QUOTA_PER_TEAM = 2;
@@ -276,7 +277,7 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
   /**
    * Debater requests early CE end — tracks which teams have consented.
    * When both teams have requested, auto-triggers transition.
-   * Rule: "cả 2 đội cùng skip" ends CE early.
+   * Rule: "both teams skip" ends CE early.
    */
   socket.on('debater:request-ce-early', async ({ roomId }: { roomId: string }) => {
     try {
@@ -351,14 +352,7 @@ export function registerCEHandlers(_io: Server, socket: Socket) {
         return;
       }
 
-      // Gate: only host, Judge S1 (no-host modes), or both teams agreed
-      const effectiveRole = participant
-        ? participant.roomRole === 'owner' ? (participant as any).primaryRole : participant.roomRole
-        : null;
-      const isController =
-        participant?.roomRole === 'owner' ||
-        effectiveRole === 'host' ||
-        (room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1');
+      const isController = participant?.roomRole === 'owner' || hasControlPanel(room, userId);
       const bothTeamsAgreed = (ceFinishConsensus.get(roomId)?.size ?? 0) >= 2;
 
       if (!isController && !bothTeamsAgreed) {

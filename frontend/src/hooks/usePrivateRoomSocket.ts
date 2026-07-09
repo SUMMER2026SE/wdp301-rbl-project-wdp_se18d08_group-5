@@ -43,21 +43,32 @@ export function usePrivateRoomSocket(
   const { socket } = useSocket();
 
   useEffect(() => {
-    if (!roomId || !team || !socket) return;
+    if (!roomId || !team || !socket || !socket.connected) return;
 
     setError(null);
     setMessages([]);
 
-    socket.emit(
-      'private-room:join',
-      { roomId, team },
-      (response: { success: boolean; message?: string }) => {
-        if (!response.success) {
-          setError(response.message || 'Failed to join private room');
-          setJoined(false);
-        }
-      },
-    );
+    let cancelled = false;
+    const safeEmitJoin = () => {
+      if (cancelled || !socket.connected) return;
+      socket.emit(
+        'private-room:join',
+        { roomId, team },
+        (response: { success: boolean; message?: string }) => {
+          if (cancelled) return;
+          if (!response.success) {
+            setError(response.message || 'Failed to join private room');
+            setJoined(false);
+          }
+        },
+      );
+    };
+
+    if (socket.connected) {
+      safeEmitJoin();
+    } else {
+      socket.once('connect', safeEmitJoin);
+    }
 
     const handleJoined = (data: PrivateRoomJoinPayload) => {
       if (data.roomId !== roomId || data.team !== team) return;
@@ -113,7 +124,11 @@ export function usePrivateRoomSocket(
     socket.on('private-room:left', handleLeft);
 
     return () => {
-      socket.emit('private-room:leave', { roomId, team });
+      cancelled = true;
+      socket.off('connect', safeEmitJoin);
+      if (socket.connected) {
+        socket.emit('private-room:leave', { roomId, team });
+      }
       socket.off('private-room:joined', handleJoined);
       socket.off('private-room:participant-update', handleParticipantUpdate);
       socket.off('private-chat:message', handleMessage);

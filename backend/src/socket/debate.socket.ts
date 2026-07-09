@@ -3,6 +3,7 @@ import { DebateRoom } from '../models/DebateRoom.js';
 import { DebateSession } from '../models/DebateSession.js';
 import { timerService } from './timer.service.js';
 import { triggerTransition } from '../features/debate/debate.service.js';
+import { hasControlPanel } from '../utils/roomPermissions.js';
 
 // Tracks user IDs of debaters who clicked "End Prep early" per roomId
 export const prepConsensus = new Map<string, Set<string>>();
@@ -11,8 +12,7 @@ export const prepConsensus = new Map<string, Set<string>>();
 // Tracks judges who have pressed "Next Phase" during Judge Feedback phase
 export const judgeNextPhaseVotes = new Map<string, Set<string>>();
 
-// Tracks S1 debaters who pressed Start in no-host mode
-export const s1StartConsensus = new Map<string, Set<string>>();
+// Tracks S1 debaters who pressed Start in no-host mode (removed)
 
 export function registerDebateHandlers(io: Server, socket: Socket) {
   const userId = (socket as unknown as { userId: string }).userId;
@@ -24,16 +24,8 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
       const room = await DebateRoom.findById(roomId);
       if (!room) return;
 
-      const participant = room.participants.find((p: any) => p.userId?.toString() === userId);
-      const effectiveRole = participant ? (participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole) : null;
-      const isHost = effectiveRole === 'host';
-      const isJudgeS1 =
-        room.hostType !== 'human' &&
-        effectiveRole === 'judge' &&
-        (participant as any).speakerSlot === 'S1';
-
-      if (!isHost && !isJudgeS1) {
-        socket.emit('debate:error', { message: 'Only the host or Judge S1 can start a phase' });
+      if (!hasControlPanel(room, userId)) {
+        socket.emit('debate:error', { message: 'Only the host or Judge S1 can perform this action' });
         return;
       }
 
@@ -70,38 +62,8 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
           //   "Host Start -> 3s countdown -> 7m preparation"
           // The motion step is just the "announcement window" before prep starts.
           if (phase === 'motion') {
-            const { applyStep } = await import('../features/debate/debate.service.js');
-            const { getFlow } = await import('../features/debate/debate.service.js');
-            const format = (room.format as '1v1' | '3v3') || '3v3';
-            const flow = getFlow(format, room.hostType as 'human' | 'ai');
-            const currentIndex = flow.findIndex(
-              (s) => s.speaker === freshSession.currentTurn.speaker && s.phase === freshSession.currentTurn.phase,
-            );
-            const prepStep = flow[Math.min(currentIndex + 1, flow.length - 1)];
-            applyStep(freshSession, prepStep);
-            freshSession.currentTurn.timeRemaining = prepStep.timeLimit || 0;
-            freshSession.currentTurn.startTime = new Date();
-            await freshSession.save();
-            room.currentPhase = prepStep.phase;
-            await room.save();
-
-            timerService.start(roomId, prepStep.timeLimit || 0, prepStep.phase, () => {
-              triggerTransition(roomId).catch(console.error);
-            });
-
-            io.to(roomId).emit('debate:phase-change', {
-              phase: prepStep.phase,
-              phaseStatus: 'active',
-              speaker: prepStep.speaker,
-            });
-            io.to(roomId).emit('debate:turn-status-change', {
-              turnStatus: 'active',
-              phaseStatus: 'active',
-            });
-
-            const { buildRoomStatePayload } = await import('./room.socket.js');
-            const state = await buildRoomStatePayload(roomId, userId);
-            if (state) io.to(roomId).emit('room:state-restore', state);
+            const { advanceFromMotionToPrep } = await import('../features/debate/debate.service.js');
+            await advanceFromMotionToPrep(roomId);
             return;
           }
 
@@ -176,15 +138,7 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
       const room = await DebateRoom.findById(roomId);
       if (!room) return;
 
-      const participant = room.participants.find((p: any) => p.userId?.toString() === userId);
-      const effectiveRole = participant ? (participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole) : null;
-      const isHost = effectiveRole === 'host';
-      const isJudgeS1 =
-        room.hostType !== 'human' &&
-        effectiveRole === 'judge' &&
-        (participant as any).speakerSlot === 'S1';
-
-      if (!isHost && !isJudgeS1) {
+      if (!hasControlPanel(room, userId)) {
         socket.emit('debate:error', { message: 'Only the host or Judge S1 can advance phases' });
         return;
       }
@@ -281,89 +235,6 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
     }
   });
 
-  /**
-   * No-Host: S1 debaters press Start to begin the debate.
-   * Both S1 debaters (one from each team) must press Start.
-   * When consensus is reached, transition to motion phase.
-   */
-  socket.on('debater:s1-start', async ({ roomId }: { roomId: string }, ack?: (res: { ok?: boolean; error?: { message: string } }) => void) => {
-    try {
-      const room = await DebateRoom.findById(roomId);
-      if (!room) {
-        ack?.({ error: { message: 'Room not found' } });
-        return;
-      }
-
-      // Only for no-host rooms (both 'ai' and 'none' hostType qualify)
-      if (room.hostType === 'human') {
-        ack?.({ error: { message: 'S1 start is only available in no-host rooms' } });
-        return;
-      }
-
-      const session = await DebateSession.findOne({ roomId: room._id });
-      if (!session) {
-        ack?.({ error: { message: 'Session not found' } });
-        return;
-      }
-
-      // Must be in waiting_s1 phase
-      if (session.currentTurn.phase !== 'waiting_s1') {
-        ack?.({ error: { message: 'Room is not waiting for S1 start' } });
-        return;
-      }
-
-      const participant = room.participants.find(
-        (p) => p.userId.toString() === userId,
-      );
-      if (!participant) {
-        ack?.({ error: { message: 'You are not in this room' } });
-        return;
-      }
-      const role = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
-      if (role !== 'debater') {
-        ack?.({ error: { message: 'Only debaters can start this phase' } });
-        return;
-      }
-      const speakerSlot = (participant as any).speakerSlot;
-      if (speakerSlot !== 'S1') {
-        ack?.({ error: { message: 'Only S1 debaters can start this phase' } });
-        return;
-      }
-
-      // Track consensus
-      let consensusSet = s1StartConsensus.get(roomId);
-      if (!consensusSet) {
-        consensusSet = new Set<string>();
-        s1StartConsensus.set(roomId, consensusSet);
-      }
-      consensusSet.add(userId);
-
-      // Count total S1 debaters needed
-      const s1Debaters = room.participants.filter(
-        (p) => {
-          const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
-          return role === 'debater' && (p as any).speakerSlot === 'S1';
-        },
-      );
-
-      // Broadcast update
-      io.to(roomId).emit('debate:s1-start-update', {
-        readyUserIds: Array.from(consensusSet),
-        totalS1: s1Debaters.length,
-      });
-      ack?.({ ok: true });
-
-      // If all S1 debaters are ready, start the debate
-      if (consensusSet.size >= s1Debaters.length && s1Debaters.length > 0) {
-        consensusSet.clear();
-        // Transition: move from WAITING_S1_START to motion step
-        await triggerTransition(roomId);
-      }
-    } catch (error) {
-      console.error('Socket debater:s1-start error:', error);
-      ack?.({ error: { message: 'Failed to start S1 consensus' } });
-    }
-  });
 
   // Judge: Vote for Next Phase during Judge Feedback phase (no-host mode)
   socket.on('judge:next-phase', async ({ roomId }: { roomId: string }) => {

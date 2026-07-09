@@ -110,8 +110,6 @@
       "submitEvaluation": "Gửi đánh giá",
       "currentStandings": "Bảng điểm hiện tại",
       "roundScores": "Điểm các vòng",
-      "aggregateScores": "Tổng hợp điểm",
-      "determineWinner": "Xác định người thắng",
       "notYetSubmitted": "Chưa có điểm được nộp cho vòng này.",
       "noSubmitted": "Chưa nộp điểm.",
       "speech": "Diễn thuyết",
@@ -187,14 +185,7 @@
       "oppSlot": "VÃNG {{slot}}"
     },
 
-    "noHost": {
-      "waitingForS1": "Đang chờ S1 bắt đầu",
-      "s1MustStart": "Cả hai đội S1 phải bấm Bắt đầu để tiến hành trận đấu.",
-      "judgeS1Responsible": "Với vai trò Giám khảo S1, bạn chịu trách nhiệm bắt đầu trận đấu.",
-      "youHaveStarted": "Bạn đã bấm Bắt đầu",
-      "youHaveNotStarted": "Bạn chưa bấm Bắt đầu",
-      "started": "Đã bắt đầu"
-    },
+
 
     "preparation": {
       "endPreparation": "Kết thúc chuẩn bị",
@@ -222,6 +213,19 @@
 
     "rules": {
       "title": "Nội quy phòng tranh luận",
+      "configLabel": "Cấu hình hiện tại:",
+      "adaptiveHint": "Nội quy bên dưới sẽ tự thích ứng theo cấu hình này.",
+      "backToRoom": "Quay lại phòng tranh luận",
+      "format": {
+        "1v1": "1 vs 1",
+        "3v3": "3 vs 3"
+      },
+      "hostHuman": "Host là người",
+      "hostAi": "Không có Host (tự động)",
+      "judgeHuman": "Giám khảo người",
+      "judgeAi": "Giám khảo AI",
+      "matchControl": "Điều khiển trận đấu & phase",
+      "matchControlDesc": "Người có pannel control hiện ở cuối trang này (Host hoặc Judge S1 trong phòng không có Host) sẽ chịu trách nhiệm bắt đầu trận đấu, bắt đầu mỗi phase, và Skip / End phase — kể cả Prep, Speech hay Cross-Exam. Mọi người khác cứ theo — pannel control của bạn là nguồn chính xác nhất cho biết bạn có thể bấm gì.",
       "generalStructure": "Cấu trúc chung",
       "structureDesc": "Cuộc tranh luận này tuân theo cấu trúc luân phiên chính thức với việc chấm điểm liên tục:",
       "motion": "Chủ đề / Vấn đề tranh luận",
@@ -241,6 +245,17 @@
       "s2Desc": "Mở rộng điểm arguments và phản bác trường phái đối lập.",
       "s3": "S3 (Diễn giả 3 — Kết luận)",
       "s3Desc": "Tóm tắt cuộc tranh luận. Không có chất vấn sau S3.",
+      "s1v1Note": "Trong 1 vs 1, cùng 1 diễn giả đảm nhiệm cả 3 vòng (S1, S2, S3).",
+      "judgingTitle": "Chấm điểm",
+      "humanJudgeScoringDesc": "Giám khảo người chấm điểm độc lập cho mỗi round:",
+      "judgeScorePerRound": "Mỗi giám khảo nộp điểm cho mỗi round (Logic, Phản bác, Bằng chứng, CE, Chiến lược, Giao tiếp).",
+      "judgeFeedbackNotes": "Giám khảo có thể viết ghi chú ngắn sau mỗi round.",
+      "judgeFinalSubmit": "Phán quyết cuối cùng được xác định sau khi tất cả round được chấm.",
+      "aiJudgeDesc": "Giám khảo AI tự động chấm điểm và phản hồi:",
+      "aiJudgeCollect": "AI thu thập transcript của mỗi bài phát biểu.",
+      "aiJudgeFeedback": "AI sinh feedback sau mỗi round (hiển thị trong Free Time).",
+      "aiJudgeScore": "AI chấm điểm mỗi round theo cùng tiêu chí.",
+      "aiJudgeFinal": "AI nộp phán quyết cuối cùng sau Round 3.",
       "scoringCriteria": "Tiêu chí chấm điểm",
       "scoringCriteriaDesc": "Giám khảo chấm điểm theo {{max}} tiêu chí:",
       "logic": "Logic ({{max}} điểm)",
@@ -255,6 +270,13 @@
       "strategyDesc": "Cấu trúc và ưu tiên các điểm arguments.",
       "communication": "Giao tiếp ({{max}} điểm)",
       "communicationDesc": "Cách trình bày, rõ ràng và kiểm soát giọng nói.",
+      "privateRoomsTitle": "Phòng riêng",
+      "propPrivateRoom": "Phòng riêng đội Proposition — chỉ diễn giả Proposition.",
+      "oppPrivateRoom": "Phòng riêng đội Opposition — chỉ diễn giả Opposition.",
+      "judgePrivateRoom": "Phòng riêng giám khảo — tất cả giám khảo (và Host nếu có) có thể vào.",
+      "surrenderDrawTitle": "Đầu hàng & Hòa",
+      "surrenderDesc": "Bất kỳ đội nào cũng có thể Đầu hàng bất kỳ lúc nào. Đội còn lại thắng ngay.",
+      "drawDesc": "Bất kỳ đội nào cũng có thể Yêu cầu Hòa. Nếu đội kia chấp nhận, trận đấu kết thúc với tỉ số hòa.",
       "closeRules": "Đóng nội quy"
     },
 

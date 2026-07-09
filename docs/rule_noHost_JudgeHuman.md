@@ -300,15 +300,15 @@ ROUND 2 — Deep Clash
 ROUND 3 — Final Summary (chỉ có trình bày, không có CE)
 ══════════════════════════
 
-[S3 Opposition trình bày — 3 phút]
-Kết thúc khi: hết 3p | S3 Oppo skip | Judge S1 skip
+[S3 Proposition trình bày — 3 phút]
+Kết thúc khi: hết 3p | S3 Prop skip | Judge S1 skip
 
-↓ Mute + Lock Chat (3s) — popup: "Tới lượt Proposition"
+↓ Mute + Lock Chat (3s) — popup: "Tới lượt Opposition"
 
 ↓ Judge S1 nhấn Start → Đếm ngược 3s
 
-[S3 Proposition trình bày — 3 phút]
-Kết thúc khi: hết 3p | S3 Prop skip | Judge S1 skip
+[S3 Opposition trình bày — 3 phút]
+Kết thúc khi: hết 3p | S3 Oppo skip | Judge S1 skip
 
 ↓ Mute + Lock Chat (3s) — popup: "Finish Debate" → Đếm ngược 3s
 

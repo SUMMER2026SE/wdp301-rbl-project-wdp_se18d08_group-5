@@ -7,13 +7,13 @@
   "debateArenaConcluded": "討論アリーナ終了",
   "motionSelection": "モーション選択",
   "winner": "勝者",
-  "propositionWins": "olvableの勝利",
-  "oppositionWins": "否定側の勝利",
+  "propositionWins": "Propositionの勝利",
+  "oppositionWins": "Oppositionの勝利",
   "drawMatch": "引き分け",
 
   "finalScoreboard": "最終スコアボード",
-  "proposition": "olvable",
-  "opposition": "否定側",
+  "proposition": "Proposition",
+  "opposition": "Opposition",
   "points": "ポイント",
 
   "aiSummaryVerdict": "AIサマリー判定",
@@ -27,8 +27,8 @@
   "round": "ラウンド {{num}}",
   "speech": "スピーチ",
   "ce": "CE",
-  "noScoresForRound": "この라운드에提交されたスコアはありません。",
-  "notSubmitted": "未提交。",
+  "noScoresForRound": "このラウンドに提出されたスコアはありません。",
+  "notSubmitted": "未提出。",
 
   "viewReplay": "リプレイを見る"
 }

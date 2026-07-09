@@ -93,9 +93,24 @@ export default function CreateRoomPage() {
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label>Judge count</Form.Label>
-                      <Form.Select value={form.judgeCount} onChange={(event) => updateField('judgeCount', Number(event.target.value))}>
-                        {[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}
+                      <Form.Select
+                        value={form.judgeCount}
+                        onChange={(event) => updateField('judgeCount', Number(event.target.value) as 1 | 3)}
+                        disabled={form.judgeType === 'ai'}
+                      >
+                        {/* Per rule: Human Judge = 1 or 3 only. AI Judge always 1. */}
+                        {form.judgeType === 'ai' ? (
+                          <option value={1}>1 (AI Judge)</option>
+                        ) : (
+                          <>
+                            <option value={1}>1 Judge</option>
+                            <option value={3}>3 Judges</option>
+                          </>
+                        )}
                       </Form.Select>
+                      {form.judgeType === 'ai' && (
+                        <Form.Text className="text-muted">AI Judge always uses exactly 1 judge.</Form.Text>
+                      )}
                     </Form.Group>
                   </Col>
                 </Row>
@@ -113,7 +128,15 @@ export default function CreateRoomPage() {
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label>Judge</Form.Label>
-                      <Form.Select value={form.judgeType} onChange={(event) => updateField('judgeType', event.target.value as JudgeType)}>
+                      <Form.Select
+                        value={form.judgeType}
+                        onChange={(event) => {
+                          const next = event.target.value as JudgeType;
+                          // AI Judge: always exactly 1; reset to satisfy schema.
+                          updateField('judgeType', next);
+                          if (next === 'ai') updateField('judgeCount', 1);
+                        }}
+                      >
                         <option value="ai">AI</option>
                         <option value="human">Human</option>
                       </Form.Select>

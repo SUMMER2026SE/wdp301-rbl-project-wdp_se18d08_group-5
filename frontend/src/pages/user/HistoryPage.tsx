@@ -102,7 +102,7 @@ export default function HistoryPage() {
                       </div>
                     </div>
                     <div className="d-flex align-items-start">
-                      <Button onClick={() => navigate(`/replay/${item.sessionId}`)} variant="outline-secondary" size="sm">
+                      <Button onClick={() => navigate(`/result/${item.sessionId}`)} variant="outline-secondary" size="sm">
                         View replay
                       </Button>
                     </div>
