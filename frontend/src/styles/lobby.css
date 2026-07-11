@@ -1,0 +1,121 @@
+/* ============================================================
+   LOBBY DESIGN SYSTEM — CYBER ARENA PRE-STAGE
+   ============================================================ */
+
+.lobby-page-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: lobbyFadeIn 0.5s ease-out;
+}
+
+@keyframes lobbyFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Custom Lobbies Card styling ── */
+.lobby-page-container .card {
+  background: var(--bg-card);
+  background-image: var(--gradient-card);
+  border: 1px solid var(--border-neon);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.lobby-page-container .card-body {
+  padding: 1.5rem;
+}
+
+.lobby-page-container .card-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid rgba(0, 245, 255, 0.15);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Custom table elements ── */
+.lobby-page-container .table {
+  background: transparent !important;
+  color: var(--text-secondary);
+}
+
+.lobby-page-container .table th {
+  background: rgba(10, 10, 15, 0.95);
+  color: var(--text-muted);
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lobby-page-container .table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.lobby-page-container .table tr:hover {
+  background: rgba(0, 245, 255, 0.02);
+}
+
+/* ── Custom button groups and switches ── */
+.lobby-page-container .btn-primary {
+  background: var(--bs-primary);
+  border: none;
+  color: #000;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+}
+
+.lobby-page-container .btn-primary:hover {
+  background: #00d4ff;
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.35);
+}
+
+.lobby-page-container .btn-outline-primary {
+  border-color: rgba(0, 245, 255, 0.4);
+  color: var(--bs-primary);
+}
+
+.lobby-page-container .btn-outline-primary:hover,
+.lobby-page-container .btn-outline-primary:active {
+  background: rgba(0, 245, 255, 0.12);
+  border-color: var(--bs-primary);
+  color: #fff;
+}
+
+/* ── Modal styling ── */
+.dark-theme-modal .modal-content {
+  background: var(--bg-card) !important;
+  background-image: var(--gradient-card) !important;
+  border: 1px solid var(--border-neon) !important;
+  border-radius: 16px !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 15px 40px rgba(0, 245, 255, 0.15) !important;
+}
+
+.dark-theme-modal .modal-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 1.5rem !important;
+}
+
+.dark-theme-modal .modal-header .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.dark-theme-modal .modal-body {
+  padding: 1.5rem !important;
+}
