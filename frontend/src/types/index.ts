@@ -335,7 +335,7 @@ export interface DebateSession {
     startTime: string;
     timeLimit: number;
     timeRemaining: number;
-    status: 'active' | 'paused' | 'completed';
+    status: 'active' | 'paused' | 'completed' | 'waiting_to_start' | 'transition';
     ceState?: {
       askingTeam: Team;
       answeringTeam: Team;
