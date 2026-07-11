@@ -34,7 +34,7 @@ import { DisconnectTimer } from '@components/debate/DisconnectTimer';
 import { TransitionPopup } from '@components/debate/TransitionPopup';
 import { ResultBanner } from '@components/debate/ResultBanner';
 import { AIFeedbackPopup } from '@components/debate/AIFeedbackPopup';
-import { RoundJudgeForm } from '@components/debate/RoundJudgeForm';
+import { RoundJudgeForm, detectCurrentRound } from '@components/debate/RoundJudgeForm';
 import { DebateRoomHeader } from '@components/debate/dashboard/DebateRoomHeader';
 import { DebateParticipantPodium } from '@components/debate/dashboard/DebateParticipantPodium';
 import { DebateMotionStage } from '@components/debate/dashboard/DebateMotionStage';
@@ -784,25 +784,42 @@ export default function DebateRoomPage() {
 
   const currentWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex] : null;
 
+  const storeScoringRound = useMemo(
+    () => getScoringRoundFromPhaseSpeaker(currentPhase, currentSpeaker),
+    [currentPhase, currentSpeaker],
+  );
+  const sessionScoringRound = useMemo(
+    () => getScoringRoundFromPhaseSpeaker(session?.currentTurn?.phase, session?.currentTurn?.speaker),
+    [session?.currentTurn?.phase, session?.currentTurn?.speaker],
+  );
+  const activeScoringRound = useMemo(() => {
+    const storeHasPhase = Boolean(currentPhase);
+    const storeIsScoringPhase = isScoringPhase(currentPhase);
+    const sessionIsScoringPhase = isScoringPhase(session?.currentTurn?.phase);
+
+    if (storeHasPhase && !storeIsScoringPhase) return 0;
+    if (!storeHasPhase && session?.currentTurn?.phase && !sessionIsScoringPhase) return 0;
+    if (storeIsScoringPhase && !sessionIsScoringPhase) return storeScoringRound;
+    if (!storeIsScoringPhase && sessionIsScoringPhase) return sessionScoringRound;
+
+    const rounds = [storeScoringRound, sessionScoringRound].filter((round): round is 1 | 2 | 3 => round > 0);
+    if (!rounds.length) return 0;
+    return Math.max(...rounds) as 1 | 2 | 3;
+  }, [
+    currentPhase,
+    session?.currentTurn?.phase,
+    storeScoringRound,
+    sessionScoringRound,
+  ]);
+
   const currentRound = useMemo(() => {
+    if (activeScoringRound) return activeScoringRound;
     return getRoundForStepIndex(currentWorkflowIndex, room?.format, room?.hostType);
-  }, [currentWorkflowIndex, room?.format, room?.hostType]);
+  }, [activeScoringRound, currentWorkflowIndex, room?.format, room?.hostType]);
 
   const isScoringAllowed = useMemo(() => {
-    const phase = currentPhase || session?.currentTurn?.phase;
-    const speaker = (currentSpeaker || session?.currentTurn?.speaker) as string;
-    // Round 3: accept scoring at JUDGES_FB_3 (exists in ALL 4 flows)
-    if (currentRound === 3) {
-      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_3';
-    }
-    if (currentRound === 1) {
-      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_1';
-    }
-    if (currentRound === 2) {
-      return phase === 'judge_feedback' && speaker === 'JUDGES_FB_2';
-    }
-    return false;
-  }, [currentRound, currentPhase, session?.currentTurn?.phase, currentSpeaker, session?.currentTurn?.speaker]);
+    return activeScoringRound > 0;
+  }, [activeScoringRound]);
 
   const isJudge3 = useMemo(() => {
     const phase = currentPhase || session?.currentTurn?.phase;
@@ -1675,6 +1692,24 @@ export function resolveOppSpeakerForRound(round: number, _format?: string): Spea
   if (round === 1) return 'OPP_S1';
   if (round === 2) return 'OPP_S2';
   return 'OPP_S3';
+}
+
+export function getScoringRoundFromPhaseSpeaker(
+  phase?: string | null,
+  speaker?: string | null,
+): 0 | 1 | 2 | 3 {
+  const detectedRound = detectCurrentRound(phase, speaker);
+  if (detectedRound) return detectedRound;
+  if (phase !== 'judge_feedback' || !speaker) return 0;
+
+  const ceMatch = /CE_ROUND_(\d)/i.exec(speaker);
+  if (!ceMatch) return 0;
+  const round = Number(ceMatch[1]);
+  return [1, 2, 3].includes(round) ? (round as 1 | 2 | 3) : 0;
+}
+
+export function isScoringPhase(phase?: string | null): boolean {
+  return phase === 'judge_feedback' || phase === 'final_judging';
 }
 
 export function getRoundForStepIndex(index: number, format?: string, _hostType?: string): 1 | 2 | 3 {

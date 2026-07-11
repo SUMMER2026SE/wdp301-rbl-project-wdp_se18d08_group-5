@@ -3,12 +3,14 @@ import { DebateSession } from '../../models/DebateSession.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/AppError.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { aggregateFinalScores } from '../../utils/scoring.js';
+import { hasControlPanel } from '../../utils/roomPermissions.js';
 
 const SPEECH_SECONDS = 3 * 60;
 const CE_SECONDS = 2 * 60;
 const PREP_SECONDS = 7 * 60;
 const TRANSITION_MUTE_SECONDS = 3;
 const AUTO_TRANSITION_COUNTDOWN = 0;
+const noHostAiStartConsensus = new Map<string, Set<string>>();
 
 type DebateStep = {
   speaker: string;
@@ -61,10 +63,10 @@ const DEBATE_FLOW_HOST_3V3: DebateStep[] = [
   },
   // 9: Judge Feedback 2 — free, no timer
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 10: OPP3 speech (OPP_S3) — Rule: Opp speaks FIRST in Round 3
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 11: PROP3 speech (PRO_S3) — "Finish Debate" after this
+  // 10: PROP3 speech (PRO_S3) - Prop speaks FIRST in Round 3
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  // 11: OPP3 speech (OPP_S3) - "Finish Debate" after this
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   // 12: Judge Feedback 3 — judges submit R3 scores (no CE in R3)
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
   // 13: Final Judging — "Finish Debate" → host clicks End → match ends
@@ -96,9 +98,9 @@ const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
     ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // Round 3: Opp → Prop (no CE), JUDGES_FB_3, Final Judging
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  // Round 3: Prop -> Opp (no CE), JUDGES_FB_3, Final Judging
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
   { speaker: 'FINAL_JUDGING', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
   { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
@@ -140,9 +142,9 @@ const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
     ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 3: Opp → Prop (no CE) — Opp FIRST per rule
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  // Round 3: Prop -> Opp (no CE) - Prop FIRST per rule
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   // Judge Feedback 3 (human judges submit R3 scores)
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // Final Judging — auto score + redirect (no-host AI) or wait for score (no-host human)
@@ -175,9 +177,9 @@ const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
     ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
   },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 3: Opp → Prop (no CE) — Opp FIRST per rule
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  // Round 3: Prop -> Opp (no CE) - Prop FIRST per rule
   { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
+  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
   // Judge Feedback 3 (human judges submit R3 scores)
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
   // Final Judging
@@ -363,7 +365,7 @@ export async function startDebate(roomId: string, userId: string) {
       isAuthorized = effectiveRole === 'debater' && (participant as any).speakerSlot === 'S1';
     } else {
       // No-Host + Human Judge: only Judge S1 starts the debate
-      isAuthorized = effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1';
+      isAuthorized = effectiveRole === 'judge' && hasControlPanel(room, userId);
     }
   }
 
@@ -379,6 +381,37 @@ export async function startDebate(roomId: string, userId: string) {
   }
   const existingSession = await DebateSession.findOne({ roomId: room._id });
   if (existingSession) throw new BadRequestError('Debate session already exists');
+
+  if (isNoHost && isAIJudge) {
+    const roomKey = room._id.toString();
+    const consensusSet = noHostAiStartConsensus.get(roomKey) || new Set<string>();
+    consensusSet.add(userId);
+    noHostAiStartConsensus.set(roomKey, consensusSet);
+
+    const s1Debaters = room.participants.filter((p: any) => {
+      const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
+      return role === 'debater' && p.speakerSlot === 'S1' && p.team;
+    });
+    const requiredUserIds = s1Debaters.map((p: any) => p.userId.toString());
+    const allS1DebatersReady =
+      requiredUserIds.length >= 2 &&
+      requiredUserIds.every((requiredUserId: string) => consensusSet.has(requiredUserId));
+
+    if (!allS1DebatersReady) {
+      return {
+        room,
+        session: null,
+        pendingStart: true,
+        readyUserIds: Array.from(consensusSet),
+        requiredUserIds,
+        totalDebaters: requiredUserIds.length,
+      };
+    }
+
+    noHostAiStartConsensus.delete(roomKey);
+  } else {
+    noHostAiStartConsensus.delete(room._id.toString());
+  }
 
   const session = new DebateSession({ roomId: room._id });
   const flow = getFlow((room.format as '1v1' | '3v3') || '3v3', (room.hostType as 'human' | 'ai') || undefined);
@@ -412,7 +445,7 @@ export async function startPhase(roomId: string, userId: string) {
     const isJudgeS1 =
       participant &&
       effectiveRole === 'judge' &&
-      (participant as any).speakerSlot === 'S1';
+      hasControlPanel(room, userId);
     if (!isJudgeS1) {
       throw new ForbiddenError('Only Judge S1 can start phases in No-Host + Human Judge rooms');
     }
@@ -449,7 +482,7 @@ export async function endPhaseByHost(roomId: string, userId: string, transcript 
     const isJudgeS1 =
       participant &&
       effectiveRole === 'judge' &&
-      (participant as any).speakerSlot === 'S1';
+      hasControlPanel(room, userId);
     if (!isJudgeS1) {
       throw new ForbiddenError('Only Judge S1 can control this phase');
     }
@@ -500,10 +533,15 @@ export async function endPhaseBySpeaker(roomId: string, userId: string, transcri
   const effectiveRole = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
   const participantTeam = participant.team === 'proposition' ? 'PRO' : 'OPP';
   const participantSpeaker = participant.speakerSlot ? `${participantTeam}_${participant.speakerSlot}` : null;
-  const isJudgeS1 = room.hostType !== 'human' && effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1';
+  const isJudgeS1 = room.hostType !== 'human' && effectiveRole === 'judge' && hasControlPanel(room, userId);
   const hasHostControl = effectiveRole === 'host' || isJudgeS1;
+  const isSameTeam1v1Speaker =
+    room.format === '1v1' &&
+    effectiveRole === 'debater' &&
+    ((participant.team === 'proposition' && String(turn.speaker).startsWith('PRO_')) ||
+      (participant.team === 'opposition' && String(turn.speaker).startsWith('OPP_')));
 
-  if (participantSpeaker !== turn.speaker && !hasHostControl) {
+  if (participantSpeaker !== turn.speaker && !isSameTeam1v1Speaker && !hasHostControl) {
     throw new ForbiddenError('Only the active speaker (or host) can end the speech');
   }
   
@@ -524,7 +562,7 @@ export async function advanceTurn(roomId: string, userId: string, transcript = '
     const isJudgeS1 =
       participant &&
       effectiveRole === 'judge' &&
-      (participant as any).speakerSlot === 'S1';
+      hasControlPanel(room, userId);
     if (!isJudgeS1) {
       throw new ForbiddenError('Only Judge S1 can advance the debate');
     }
@@ -575,9 +613,9 @@ function computeTransitionAnnouncement(
     return 'End of Round 3';
   }
 
-  // PRO_S3 -> JUDGES_FB_3: "Proposition turn" (proposition's final summary starts)
-  if (curr === 'PRO_S3' && nextPhase === 'judge_feedback') {
-    return 'Proposition turn';
+  // PRO_S3 -> OPP_S3: opposition's final summary starts.
+  if (curr === 'PRO_S3' && next === 'OPP_S3') {
+    return 'Opposition turn';
   }
 
   // After JUDGES_FB_3 (R3 feedback) -> FINAL_JUDGING: "AI Verdict" (all 4 docs)
@@ -1187,7 +1225,7 @@ export async function finishPhase(roomId: string, userId: string, transcript = '
 
   if (room.hostType !== 'human' && room.judgeType !== 'ai') {
     // No-host + Human judge: Judge S1 can end phases (acts as host)
-    const isJudgeS1 = effectiveRole === 'judge' && (participant as any).speakerSlot === 'S1';
+    const isJudgeS1 = effectiveRole === 'judge' && hasControlPanel(room, userId);
     if (isJudgeS1) {
       return endPhaseByHost(roomId, userId, transcript);
     }
@@ -1290,7 +1328,7 @@ export async function endDebate(roomId: string, userId: string, summary = ''): P
     const isJudgeS1 =
       participant &&
       effectiveRole === 'judge' &&
-      (participant as any).speakerSlot === 'S1';
+      hasControlPanel(room, userId);
     if (!isJudgeS1) {
       throw new ForbiddenError('Only Judge S1 can end the debate');
     }
