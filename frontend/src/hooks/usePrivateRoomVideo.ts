@@ -194,7 +194,8 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       );
     };
 
-    const handleUserJoined = (payload: { socketId: string; userId: string }) => {
+    const handleUserJoined = (payload: { socketId: string; userId: string; team?: string }) => {
+      if (payload.team !== team) return;
       ensurePeerConnection(payload.socketId);
       setPeers((prev) => {
         if (prev.find((p) => p.socketId === payload.socketId)) return prev;
@@ -205,11 +206,13 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       }
     };
 
-    const handleUserLeft = (payload: { socketId: string }) => {
+    const handleUserLeft = (payload: { socketId: string; team?: string }) => {
+      if (payload.team !== team) return;
       closePeer(payload.socketId);
     };
 
-    const handleVideoState = (payload: { userId: string; active: boolean }) => {
+    const handleVideoState = (payload: { userId: string; active: boolean; team?: string }) => {
+      if (payload.team !== team) return;
       setGlobalCameraActive(payload.userId, payload.active);
     };
 

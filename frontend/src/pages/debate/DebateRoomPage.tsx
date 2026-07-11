@@ -2,13 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Alert,
-  Badge,
   Button,
   Card,
   Col,
   Container,
   Form,
-  ListGroup,
   ProgressBar,
   Row,
   Spinner,
@@ -25,12 +23,9 @@ import { useDebateSocket } from '@hooks/useDebateSocket';
 import { useSocket, getSocket } from '@hooks/useSocket';
 import { useDebateVideo } from '@hooks/useDebateVideo';
 import { useDebateRoomTracker, clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
-import { CameraGrid } from '@components/debate/CameraGrid';
-import { CountdownTimer } from '@components/debate/CountdownTimer';
 import { CrossExamPanel } from '@components/debate/CrossExamPanel';
 import { MicToggle } from '@components/debate/MicToggle';
 import { LiveTranslationCaptions, type CaptionMode } from '@components/debate/LiveTranslationCaptions';
-import { PrivateRoomPanel } from '@components/debate/PrivateRoomPanel';
 import { MainRoomChat } from '@components/chat/MainRoomChat';
 import { ViewerChat } from '@components/chat/ViewerChat';
 import { ReconnectOverlay } from '@components/common/ReconnectOverlay';
@@ -40,11 +35,16 @@ import { TransitionPopup } from '@components/debate/TransitionPopup';
 import { ResultBanner } from '@components/debate/ResultBanner';
 import { AIFeedbackPopup } from '@components/debate/AIFeedbackPopup';
 import { RoundJudgeForm, detectCurrentRound } from '@components/debate/RoundJudgeForm';
+import { DebateRoomHeader } from '@components/debate/dashboard/DebateRoomHeader';
+import { DebateParticipantPodium } from '@components/debate/dashboard/DebateParticipantPodium';
+import { DebateMotionStage } from '@components/debate/dashboard/DebateMotionStage';
+import type { DebateMotionNotification } from '@components/debate/dashboard/DebateMotionStage';
+import { DebateRightRail } from '@components/debate/dashboard/DebateRightRail';
+import { DebateHostControlPanel } from '@components/debate/dashboard/DebateHostControlPanel';
+import '../../styles/customRoom.css';
 import type {
   RoomParticipant,
-  ScoreBreakdown,
   SpeakerTurn,
-  SpeakerSlot,
 } from '@/types';
 
 
@@ -161,7 +161,6 @@ export default function DebateRoomPage() {
   // Track debate room for return-to-debate banner
   const trackedRoom = useDebateStore((s) => s.room);
   useDebateRoomTracker(roomId, trackedRoom?.title);
-  const cameraActiveMap = useDebateStore((s) => s.cameraActive);
   const cameraLockedByHost = useDebateStore((s) => s.cameraLockedByHost);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [joinPassword, setJoinPassword] = useState('');
@@ -332,7 +331,6 @@ export default function DebateRoomPage() {
   const turnStatus = useDebateStore((s) => s.turnStatus);
   const speakingAllowed = useDebateStore((s) => s.speakingAllowed);
   const prepConsensusReadyUserIds = useDebateStore((s) => s.prepConsensusReadyUserIds);
-  const prepConsensusTotalDebaters = useDebateStore((s) => s.prepConsensusTotalDebaters);
 
   const finalScores = useDebateStore((s) => s.finalScores);
 
@@ -504,15 +502,18 @@ export default function DebateRoomPage() {
     (roomFromStore && roomFromStore._id === roomId && roomFromStore.startedAt) ||
       room?.startedAt,
   );
-  const { cameraActive, peers: videoPeers, startCamera, stopCamera, localStream } =
+  const { cameraActive, peers: videoPeers, localStream, startCamera, stopCamera } =
     useDebateVideo({ roomId, enabled: debateStartedEffective });
 
-  // Local speaker-turn mic state — the primary WebRTC mic is managed by the
-  // <MicToggle> component; these stubs drive the secondary "Speak / Mute mic"
-  // toggle button shown to the active speaker during their speech phase.
-  const [isListening, setIsListening] = useState(false);
-  const startMic = useCallback(() => setIsListening(true), []);
-  const stopMic = useCallback(() => setIsListening(false), []);
+  const remoteVideoStreamsByUserId = useMemo(() => {
+    const streams = new Map<string, MediaStream>();
+    videoPeers.forEach((peer) => {
+      if (peer.userId && peer.stream) {
+        streams.set(peer.userId, peer.stream);
+      }
+    });
+    return streams;
+  }, [videoPeers]);
 
   // Auto redirect handled by ResultBanner (10s countdown with View Result button).
   // We only clear the debate-room storage here so the return-to-debate banner
@@ -684,12 +685,9 @@ export default function DebateRoomPage() {
     effectiveRole === 'debater' && ['active', 'paused'].includes(room?.status || '');
   const isJudge = effectiveRole === 'judge';
   const isViewer = effectiveRole === 'viewer' || !isParticipant;
-  // Viewer chat is read-only for Host/Owner/Judge; send-only for Viewer.
-  const canAccessViewerChat = isViewer || effectiveRole === 'host' || effectiveRole === 'owner' || isJudge;
-  const debaters: RoomParticipant[] = room?.participants.filter((p) => {
-    const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
-    return role === 'debater';
-  }) || [];
+  // Keep both chat channels visible to every room participant. ViewerChat
+  // remains responsible for role-based send permissions.
+  const canAccessViewerChat = isParticipant || isViewer;
   const judges: RoomParticipant[] = room?.participants.filter((p) => {
     const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
     return role === 'judge';
@@ -745,17 +743,12 @@ export default function DebateRoomPage() {
     return Math.max(0, Math.min(100, (timeRemaining / totalTime) * 100));
   }, [timeRemaining, totalTime]);
 
-  // Turn off mic and camera locally when the debate is paused
+  // MicToggle observes isPaused through its disabled prop and stops its stream.
   useEffect(() => {
-    if (isPaused) {
-      if (cameraActive) {
-        stopCamera();
-      }
-      if (isListening) {
-        stopMic();
-      }
+    if (isPaused && cameraActive) {
+      stopCamera();
     }
-  }, [isPaused, cameraActive, isListening, stopCamera, stopMic]);
+  }, [isPaused, cameraActive, stopCamera]);
 
   useEffect(() => {
     if (!opponentPendingDraw || !pendingDrawRequest) return;
@@ -765,15 +758,6 @@ export default function DebateRoomPage() {
     toast(`${pendingDrawRequest.requestedByName || 'Opponent'} requested a draw`);
   }, [opponentPendingDraw, pendingDrawRequest]);
   
-  // Sidebar Tab State
-  const [sidebarTab, setSidebarTab] = useState<'scoring' | 'admin' | 'private' | 'viewer-chat'>('scoring');
-
-  useEffect(() => {
-    if (isViewer) {
-      setSidebarTab('viewer-chat');
-    }
-  }, [isViewer]);
-
   // Derived speaker and slot structures
   const speakerLabel = currentSpeaker || session?.currentTurn?.speaker || '—';
   const serverTime = session?.currentTurn?.timeRemaining ?? 0;
@@ -799,7 +783,6 @@ export default function DebateRoomPage() {
   }, [currentPhase, currentSpeaker, session?.currentTurn?.phase, session?.currentTurn?.speaker]);
 
   const currentWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex] : null;
-  const nextWorkflowStep = currentWorkflowIndex >= 0 ? debateWorkflow[currentWorkflowIndex + 1] : debateWorkflow[0];
 
   const storeScoringRound = useMemo(
     () => getScoringRoundFromPhaseSpeaker(currentPhase, currentSpeaker),
@@ -889,66 +872,52 @@ export default function DebateRoomPage() {
 
   const activeSpeakerName = activeSpeakerParticipant?.username || speakerLabel;
 
-  const slots = useMemo(() => (room?.format === '1v1' ? ['S1'] : ['S1', 'S2', 'S3']) as SpeakerSlot[], [room?.format]);
+  const motionNotifications = useMemo<DebateMotionNotification[]>(() => {
+    const entries: Array<{ notification: DebateMotionNotification; timestamp: number }> = [];
 
-  // Unified announcements log
-  const announcements = useMemo(() => {
-    const list: string[] = [];
+    (session?.finalScores?.judgeVerdicts || []).forEach((verdict, index) => {
+      const speaker = String(verdict.speaker || '');
+      const team = speaker.startsWith('PRO_') ? 'Proposition' : speaker.startsWith('OPP_') ? 'Opposition' : 'Speaker';
+      const roundMatch = speaker.match(/_S(\d)$/);
+      const round = roundMatch ? `Round ${roundMatch[1]}` : speaker.replace(/_/g, ' ');
+      const speakScore = Number(verdict.score?.logic ?? 0);
+      const crossExamScore = Number(verdict.score?.crossExam ?? 0);
+      const overallScore = Number(verdict.score?.overall ?? speakScore + crossExamScore);
+      const scoreSummary = `Speak ${speakScore}/20 · CE ${crossExamScore}/20 · Overall ${overallScore}`;
+      const notes = verdict.notes?.trim();
+      const submittedAt = verdict.submittedAt ? new Date(verdict.submittedAt) : null;
 
-    // 1. System messages
-    messages.forEach((msg) => {
-      if (msg.type === 'system' || msg.senderId === 'system') {
-        list.push(msg.content);
-      }
+      entries.push({
+        notification: {
+          id: `judge-${verdict.judgeId || verdict.source || 'unknown'}-${speaker}-${index}`,
+          title: `${verdict.judgeName || (verdict.source === 'ai' ? 'AI Judge' : 'Judge')} scored ${team} · ${round}`,
+          detail: notes ? `${scoreSummary} — ${notes}` : scoreSummary,
+          meta: verdict.source === 'ai' ? 'AI' : 'Judge',
+          tone: 'score',
+        },
+        timestamp: submittedAt && !Number.isNaN(submittedAt.getTime()) ? submittedAt.getTime() : index,
+      });
     });
 
-    // 2. Judge verdicts — group by judge+round and display per-team notes
-    const verdicts = session?.finalScores?.judgeVerdicts || [];
-    const isRoundBased = verdicts.some((v: any) => v.round !== undefined);
-
-    if (isRoundBased) {
-      // Group by judge + round
-      const byJudgeRound = new Map<string, Map<number, any>>();
-      verdicts.forEach((v: any) => {
-        const key = v.judgeName || td('debateRoom.roles.judge');
-        if (!byJudgeRound.has(key)) byJudgeRound.set(key, new Map());
-        const roundNum = Number(v.round) || 0;
-        const existing = byJudgeRound.get(key)!.get(roundNum);
-        if (!existing || !existing.speaker) {
-          byJudgeRound.get(key)!.set(roundNum, v);
-        }
+    messages.forEach((message, index) => {
+      if (message.type !== 'system' && message.senderId !== 'system') return;
+      const createdAt = message.timestamp ? new Date(message.timestamp) : null;
+      entries.push({
+        notification: {
+          id: `system-${message._id || index}`,
+          title: 'System update',
+          detail: message.content,
+          meta: 'System',
+          tone: 'system',
+        },
+        timestamp: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.getTime() : index,
       });
+    });
 
-      byJudgeRound.forEach((roundMap, judgeName) => {
-        roundMap.forEach((v, roundNum) => {
-          const propNotes = v.notes || '—';
-          // Find the opposing verdict for the same round
-          const oppVerdict = verdicts.find((ov: any) =>
-            ov.judgeName === judgeName &&
-            Number(ov.round) === roundNum &&
-            String(ov.speaker).startsWith('OPP_'),
-          );
-          const oppNotes = oppVerdict?.notes || '—';
-          list.push(
-            `Judge ${judgeName} — Round ${roundNum}:\n  Propo team: ${propNotes}\n  Oppo team: ${oppNotes}`,
-          );
-        });
-      });
-    } else {
-      verdicts.forEach((v: any) => {
-        list.push(
-          `Judge ${v.judgeName || 'assigned'} — Notes: "${v.notes || 'No notes'}"`,
-        );
-      });
-    }
-
-    // 3. Match completed
-    if (session?.finalScores?.winner && room?.status === 'completed') {
-      list.push(td('debateRoom.debateEnded', { winner: session.finalScores.winner.toUpperCase() }));
-    }
-
-    return list;
-  }, [messages, session]);
+    return entries
+      .sort((left, right) => right.timestamp - left.timestamp)
+      .map((entry) => entry.notification);
+  }, [messages, session?.finalScores?.judgeVerdicts]);
 
   // Show loading spinner until REST room data lands. Once we have the room
   // we render the body even if the socket is still mid-reconnect — the
@@ -1069,6 +1038,91 @@ export default function DebateRoomPage() {
   const phaseLabel = t(`debate.phases.${currentPhase || session.currentTurn?.phase}`, {
     defaultValue: currentPhase || session.currentTurn?.phase || '',
   });
+
+  const scorePanelContent = (
+    <div className="debate-rail-score-workspace">
+      <div className="debate-rail-score-summary">
+        <div className="debate-operation-section-heading">
+          <span>Current standings</span>
+          <Button size="sm" variant="outline-info" onClick={() => setShowPreviousScoresModal(true)}>
+            <i className="bi bi-journal-text" aria-hidden="true" /> Rounds
+          </Button>
+        </div>
+        <ScoreBreakdown finalScores={session.finalScores} />
+        <div className="debate-assigned-judges">
+          <span>Assigned judges</span>
+          <div>
+            {judges.length ? judges.map((judge) => (
+              <span key={judge.userId}><i className="bi bi-award-fill" aria-hidden="true" /> {judge.username}</span>
+            )) : <small>No judges assigned</small>}
+          </div>
+        </div>
+      </div>
+
+      {isJudge && (
+        <div className="debate-rail-judge-workspace">
+          <div className="debate-judge-reactions">
+            <span>Quick reaction</span>
+            <div>
+              <Button
+                size="sm"
+                variant="outline-info"
+                onClick={() => getSocket()?.emit('judge:reaction', { roomId, type: 'agree' })}
+              >
+                <i className="bi bi-hand-thumbs-up-fill" aria-hidden="true" /> Agree
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-danger"
+                onClick={() => getSocket()?.emit('judge:reaction', { roomId, type: 'disagree' })}
+              >
+                <i className="bi bi-hand-thumbs-down-fill" aria-hidden="true" /> Disagree
+              </Button>
+            </div>
+          </div>
+          <RoundJudgeForm
+            round={currentRound}
+            propSpeaker={resolvePropSpeakerForRound(currentRound, room.format)}
+            oppSpeaker={resolveOppSpeakerForRound(currentRound, room.format)}
+            propSpeak={roundPropSpeak}
+            propCe={roundPropCe}
+            propNotes={roundPropNotes}
+            oppSpeak={roundOppSpeak}
+            oppCe={roundOppCe}
+            oppNotes={roundOppNotes}
+            onPropSpeakChange={setRoundPropSpeak}
+            onPropCeChange={setRoundPropCe}
+            onPropNotesChange={setRoundPropNotes}
+            onOppSpeakChange={setRoundOppSpeak}
+            onOppCeChange={setRoundOppCe}
+            onOppNotesChange={setRoundOppNotes}
+            onSubmit={() => {
+              const propSpeaker = resolvePropSpeakerForRound(currentRound, room.format);
+              const oppSpeaker = resolveOppSpeakerForRound(currentRound, room.format);
+              if (!propSpeaker || !oppSpeaker) return;
+              roundScoreMutation.mutate({
+                round: currentRound,
+                proposition: {
+                  speaker: propSpeaker,
+                  speak: roundPropSpeak,
+                  ce: currentRound === 3 ? 0 : roundPropCe,
+                  notes: roundPropNotes,
+                },
+                opposition: {
+                  speaker: oppSpeaker,
+                  speak: roundOppSpeak,
+                  ce: currentRound === 3 ? 0 : roundOppCe,
+                  notes: roundOppNotes,
+                },
+              });
+            }}
+            isPending={roundScoreMutation.isPending}
+            isSubmitEnabled={isScoringAllowed}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   // Render the body even when the socket is still mid-reconnect so the user
   // sees the workflow timeline, chat, etc. — but show a thin banner above
@@ -1195,7 +1249,7 @@ export default function DebateRoomPage() {
 
       {/* Main container - use 100dvh for mobile browser address bar compatibility */}
       <div
-        className="d-flex flex-column text-white"
+        className="debate-room-shell d-flex flex-column text-white"
         style={{
           height: '100dvh',
           background: '#0a0a0f',
@@ -1205,6 +1259,85 @@ export default function DebateRoomPage() {
         }}
       >
         
+        <DebateRoomHeader
+          roomTitle={room.title}
+          roomCode={room._id.slice(-6).toUpperCase()}
+          phaseLabel={phaseLabel}
+          status={room.status}
+          workflowSteps={debateWorkflow}
+          currentWorkflowIndex={currentWorkflowIndex}
+          actions={(
+            <div className="debate-header-action-list">
+              {canUseDebaterActions && (
+                <>
+                  <Button
+                    size="sm"
+                    className="action-pause"
+                    onClick={() => room.status === 'paused' ? debaterResumeMutation.mutate() : debaterPauseMutation.mutate()}
+                    disabled={debaterPauseMutation.isPending || debaterResumeMutation.isPending}
+                    title={room.status === 'paused' ? 'Resume debate' : 'Use team pause'}
+                  >
+                    <i className={`bi ${room.status === 'paused' ? 'bi-play-fill' : 'bi-pause-fill'}`} aria-hidden="true" />
+                    <span>{room.status === 'paused' ? 'Resume' : `Pause (${3 - (currentParticipant?.team && session?.pausesUsed?.[currentParticipant.team as 'proposition' | 'opposition'] || 0)})`}</span>
+                  </Button>
+                  {currentPhase === 'prep_7' && (
+                    <Button
+                      size="sm"
+                      className="action-ready"
+                      onClick={() => getSocket()?.emit('debate:end-prep-early', { roomId })}
+                      disabled={!isS1Debater || prepConsensusReadyUserIds.includes(user?._id || '')}
+                      title="End preparation when both teams are ready"
+                    >
+                      <i className="bi bi-check-circle-fill" aria-hidden="true" />
+                      <span>{prepConsensusReadyUserIds.includes(user?._id || '') ? 'Ready' : 'End prep'}</span>
+                    </Button>
+                  )}
+                  {turnStatus === 'active' && currentPhase === 'speech' && isMyTurnToSpeak && (
+                    <Button
+                      size="sm"
+                      className="action-skip"
+                      onClick={() => controlMutation.mutate('finish')}
+                      disabled={controlMutation.isPending || isTransitioning}
+                      title="Finish your speech"
+                    >
+                      <i className="bi bi-skip-forward-fill" aria-hidden="true" /><span>Skip</span>
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="action-surrender"
+                    onClick={() => { if (window.confirm(td('debateRoom.actions.surrenderConfirm'))) playerActionMutation.mutate('surrender'); }}
+                    disabled={playerActionMutation.isPending}
+                  >
+                    <i className="bi bi-flag-fill" aria-hidden="true" /><span>{td('debateRoom.actions.surrender')}</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="action-draw"
+                    onClick={() => playerActionMutation.mutate('draw')}
+                    disabled={playerActionMutation.isPending || ownTeamPendingDraw}
+                  >
+                    <i className="bi bi-dash-circle-fill" aria-hidden="true" /><span>{td('debateRoom.actions.draw')}</span>
+                  </Button>
+                </>
+              )}
+              <Button
+                size="sm"
+                className="action-leave"
+                onClick={() => {
+                  const isOwner = currentParticipant?.roomRole === 'owner';
+                  const otherParticipants = room.participants.filter((participant) => participant.userId !== user?._id);
+                  if (isOwner && otherParticipants.length > 0) setShowLeaveConfirmModal(true);
+                  else leaveMutation.mutate(undefined);
+                }}
+                disabled={leaveMutation.isPending}
+              >
+                <i className="bi bi-box-arrow-right" aria-hidden="true" /><span>Leave room</span>
+              </Button>
+            </div>
+          )}
+        />
+
         {/* === HEADER PROGRESS LINE === */}
         <div className="flex-shrink-0" style={{ height: '3px', background: 'rgba(255, 255, 255, 0.05)' }}>
           <div
@@ -1218,66 +1351,11 @@ export default function DebateRoomPage() {
           />
         </div>
 
-        {/* === CAMERA GRID === */}
-        {debateStartedEffective && !isViewer && (
-          <div
-            className="flex-shrink-0 p-2"
-            style={{ background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(0,245,255,0.2)' }}
-          >
-            <div className="d-flex align-items-center justify-content-between mb-1 px-1">
-              <span
-                className="text-uppercase text-muted"
-                style={{ fontFamily: 'Orbitron', fontSize: '0.65rem', letterSpacing: '0.1em' }}
-              >
-                <i className="bi bi-camera-video-fill me-1" />
-                Camera
-              </span>
-            </div>
-            <CameraGrid
-              peers={videoPeers}
-              participants={room?.participants || []}
-              localUserId={user?._id}
-              localUsername={user?.username || 'You'}
-              localStream={localStream}
-              localMuted={false}
-              resolveUserId={(peer) => peer.userId}
-            />
-
-          </div>
-        )}
-
-        {/* === VIEWER-ONLY CAMERA PREVIEW (read-only, when host enabled it for viewer) === */}
-        {debateStartedEffective && isViewer && Object.values(cameraActiveMap).some(Boolean) && (
-          <div
-            className="flex-shrink-0 p-2"
-            style={{ background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(0,245,255,0.2)' }}
-          >
-            <div className="d-flex align-items-center justify-content-between mb-1 px-1">
-              <span
-                className="text-uppercase text-muted"
-                style={{ fontFamily: 'Orbitron', fontSize: '0.65rem', letterSpacing: '0.1em' }}
-              >
-                <i className="bi bi-camera-video-fill me-1" />
-                Live camera
-              </span>
-              <small className="text-muted" style={{ fontSize: '0.7rem' }}>
-                Viewer-only mode
-              </small>
-            </div>
-            <CameraGrid
-              peers={videoPeers}
-              participants={room?.participants || []}
-              localStream={null}
-              resolveUserId={(peer) => peer.userId}
-            />
-          </div>
-        )}
-
         {/* === MAIN WORKSPACE === */}
-        <div className="flex-grow-1 d-flex flex-row overflow-hidden" style={{ minHeight: 0, maxWidth: '100%' }}>
+        <div className="debate-room-main flex-grow-1 d-flex flex-row overflow-hidden" style={{ minHeight: 0, maxWidth: '100%' }}>
 
           {/* Main Arena Floor - scrollable container */}
-          <div className="flex-grow-1 d-flex flex-column overflow-y-auto p-2 gap-2" style={{ minHeight: 0 }}>
+          <div className="debate-room-arena flex-grow-1 d-flex flex-column overflow-y-auto p-2 gap-2" style={{ minHeight: 0 }}>
             
             {/* Draw request alerts */}
             {opponentPendingDraw && (
@@ -1299,359 +1377,92 @@ export default function DebateRoomPage() {
                 )}
               </Alert>
             )}
-            <LiveTranslationCaptions
-              roomId={roomId}
-              captionMode={captionMode}
-              onCaptionModeChange={setCaptionMode}
-              onOwnSourceTranscript={handleOwnSourceTranscript}
-            />
             {ownTeamPendingDraw && <Alert variant="info" className="py-2 px-3 mb-0 small flex-shrink-0">{td('debateRoom.actions.drawRequested')}</Alert>}
 
-            {/* Row 1: Mirrored Teams & Motion/Timer */}
-            <div className="flex-shrink-0">
-              <Row className="g-2 align-items-stretch gx-2">
+            <DebateParticipantPodium
+              participants={room.participants}
+              format={room.format}
+              currentSpeaker={currentSpeaker || session.currentTurn?.speaker || null}
+              localUserId={user?._id}
+              localStream={localStream}
+              localCameraActive={cameraActive}
+              remoteStreamsByUserId={remoteVideoStreamsByUserId}
+            />
 
-                {/* Left side: Proposition speakers list */}
-                <Col xl={3} md={4} className="d-flex flex-column">
-                  <div className="text-neon-cyan mb-1" style={{ fontFamily: 'Orbitron', fontSize: '10px', letterSpacing: '0.05em' }}>
-                    <i className="bi bi-people-fill text-neon-cyan me-1"></i> PROPOSITION
-                  </div>
-                  <div className="d-flex flex-column gap-1 flex-grow-1 justify-content-around">
-                    {slots.map((slot) => {
-                      const participant = debaters.find((p) => p.team === 'proposition' && p.speakerSlot === slot);
-                      const expected = `PRO_${slot}`;
-                      const isCurrent = speakerLabel === expected;
-
-                      return (
-                        <div
-                          key={slot}
-                          className={`p-1 px-2 rounded-2 d-flex align-items-center gap-2 position-relative ${
-                            isCurrent ? 'glass-card border-neon' : 'bg-secondary bg-opacity-10 border border-secondary border-opacity-25'
-                          }`}
-                          style={{
-                            borderTop: isCurrent ? '2px solid #00f5ff' : undefined,
-                            boxShadow: isCurrent ? '0 0 15px rgba(0, 245, 255, 0.15)' : undefined,
-                            opacity: isCurrent ? 1 : 0.65,
-                          }}
-                        >
-                          <div
-                            className="d-flex align-items-center justify-content-center rounded-circle border flex-shrink-0"
-                            style={{
-                              width: '26px',
-                              height: '26px',
-                              background: isCurrent ? 'rgba(0, 245, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                              borderColor: isCurrent ? 'rgba(0, 245, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                            }}
-                          >
-                            <i className={`bi bi-person-fill ${isCurrent ? 'text-neon-cyan' : 'text-muted'}`} style={{ fontSize: '0.8rem' }}></i>
-                          </div>
-                          <div className="min-width-0">
-                            <p className="mb-0 text-white text-truncate" style={{ fontSize: '11px', lineHeight: 1.2 }}>
-                              {participant ? participant.username : `Empty (${slot})`}
-                            </p>
-                            <p className="mb-0 text-uppercase" style={{ fontSize: '8px', letterSpacing: '0.05em', color: isCurrent ? '#00f5ff' : 'var(--text-muted)', lineHeight: 1.2 }}>
-                              {isCurrent ? td('debateRoom.speakerStatus.speaking') : participant ? td('debateRoom.speakerStatus.waiting') : td('debateRoom.speakerStatus.empty')}
-                            </p>
-                          </div>
-                          {isCurrent && (
-                            <div className="position-absolute" style={{ right: '8px', top: '50%', transform: 'translateY(-50%)' }}>
-                              <i className="bi bi-mic-fill text-neon-cyan speaking-pulse" style={{ fontSize: '0.8rem' }}></i>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Col>
-
-                {/* Center: Motion & Time countdown header */}
-                <Col xl={6} md={4} className="d-flex flex-column justify-content-between align-items-stretch text-center px-2 bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 py-1">
-                  <div className="w-100 d-flex justify-content-between align-items-start gap-1">
-                    <h2 className="m-0 text-muted text-start flex-grow-1 text-truncate" style={{ fontFamily: 'Orbitron', fontSize: '10px', lineHeight: 1.3 }}>
-                      &ldquo;{room.motion}&rdquo;
-                    </h2>
-                    <div className="d-flex align-items-center gap-1 flex-shrink-0">
-                      {canAccessPrivateRooms && (
-                        <Button
-                          size="sm"
-                          variant="outline-warning"
-                          onClick={() => setSidebarTab('private')}
-                          style={{ fontSize: '9px', fontFamily: 'Orbitron', padding: '0.1rem 0.3rem' }}
-                        >
-                          Private room
-                        </Button>
-                        )}
+            <div className={`debate-motion-dashboard-row ${hasHostControl ? 'has-host-panel' : ''}`}>
+              <DebateMotionStage
+                motion={room.motion}
+                phaseLabel={phaseLabel}
+                speakerName={activeSpeakerName}
+                speakerCode={speakerLabel}
+                format={room.format}
+                hostType={room.hostType}
+                judgeType={room.judgeType}
+                timeRemaining={displayTime}
+                totalTime={displayTotal}
+                isPaused={isPaused}
+                isTransitioning={isTransitioning}
+                viewerCount={room.participants.filter((participant) => {
+                  const role = participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole;
+                  return role === 'viewer';
+                }).length}
+                isViewer={isViewer}
+                notifications={motionNotifications}
+                onOpenRules={() => navigate(`/debate/${roomId}/rules`)}
+                onOpenPrivateRoom={canAccessPrivateRooms && (isJudge || currentParticipant?.team) ? () => {
+                  const target = isJudge ? 'judge' : currentParticipant?.team;
+                  if (target) navigate(`/debate/${roomId}/private/${target}`);
+                } : undefined}
+                captionsPanel={
+                  <LiveTranslationCaptions
+                    roomId={roomId}
+                    captionMode={captionMode}
+                    onCaptionModeChange={setCaptionMode}
+                    onOwnSourceTranscript={handleOwnSourceTranscript}
+                    includeOwnCaptions
+                  />
+                }
+                mediaControls={
+                  ((myRole && ['host', 'owner', 'debater', 'judge'].includes(myRole)) || isMyTurnToSpeak || (isViewer && speakingAllowed)) ? (
+                    <div className="debate-motion-media-controls">
+                      <MicToggle roomId={roomId} disabled={isTransitioning || currentParticipant?.muted || isPaused} />
                       <Button
                         size="sm"
-                        variant="outline-info"
-                        onClick={() => navigate(`/debate/${roomId}/rules`)}
-                        style={{ fontSize: '9px', fontFamily: 'Orbitron', padding: '0.1rem 0.3rem' }}
+                        variant={cameraActive ? 'outline-danger' : 'outline-info'}
+                        onClick={cameraActive ? stopCamera : startCamera}
+                        disabled={!cameraActive && (cameraLockedByHost || currentParticipant?.cameraMuted)}
+                        aria-label={cameraActive ? 'Turn camera off' : 'Turn camera on'}
                       >
-                        Rules
+                        <i className={`bi ${cameraActive ? 'bi-camera-video-off-fill' : 'bi-camera-video-fill'}`} aria-hidden="true" />
                       </Button>
                     </div>
-                  </div>
-
-                  <div className="mt-1 w-100 d-flex align-items-center justify-content-between border-top border-secondary border-opacity-20 pt-1">
-                    <div className="text-start min-width-0">
-                      <div className="d-flex align-items-center gap-1 flex-wrap">
-                        <span className="text-neon-cyan text-uppercase fw-bold d-block" style={{ fontSize: '9px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                          {phaseLabel}
-                        </span>
-                        {isViewer && (
-                          <Badge bg="info" className="px-1 py-0 text-uppercase d-none d-sm-inline-flex" style={{ fontSize: '8px', fontFamily: 'Orbitron', letterSpacing: '0.05em' }}>
-                            <i className="bi bi-eye-fill me-0.5"></i> {td('debateRoom.spectator')}
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-white small text-truncate d-block" style={{ fontSize: '10px' }}>
-                        {activeSpeakerName} ({speakerLabel})
-                      </span>
-                    </div>
-
-                    <div className="d-flex align-items-center gap-2 flex-shrink-0">
-                      {((myRole && ['host', 'owner', 'debater', 'judge'].includes(myRole)) || isMyTurnToSpeak || (isViewer && speakingAllowed)) && (
-                        <div className="d-flex align-items-center gap-2">
-                          {isMyTurnToSpeak && (
-                            <Button
-                              size="sm"
-                              variant={isListening ? 'danger' : 'success'}
-                              onClick={isListening ? stopMic : startMic}
-                              disabled={isTransitioning}
-                              style={{ fontSize: '8px', padding: '0.15rem 0.3rem' }}
-                            >
-                              {isListening ? 'Mute mic' : 'Speak'}
-                            </Button>
-                          )}
-                          <MicToggle roomId={roomId} disabled={isTransitioning || currentParticipant?.muted || isPaused} />
-                          {cameraActive ? (
-                            <Button
-                              size="sm"
-                              variant="outline-danger"
-                              onClick={stopCamera}
-                              style={{ fontSize: '10px', padding: '0.15rem 0.35rem' }}
-                              title={td('debateRoom.actions.turnCameraOff')}
-                            >
-                              <i className="bi bi-camera-video-off-fill" />
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline-info"
-                              onClick={startCamera}
-                              disabled={cameraLockedByHost || currentParticipant?.cameraMuted}
-                              style={{ fontSize: '10px', padding: '0.15rem 0.35rem' }}
-                              title={cameraLockedByHost || currentParticipant?.cameraMuted ? 'Locked by host' : 'Turn camera on'}
-                            >
-                              <i className="bi bi-camera-video-fill" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      <div className="d-flex align-items-center gap-1 text-muted px-1 py-0.5 rounded bg-dark bg-opacity-35 border border-secondary border-opacity-15" title={td('debateRoom.viewerCount')} style={{ height: 'fit-content' }}>
-                        <i className="bi bi-eye-fill text-neon-cyan" style={{ fontSize: '0.7rem' }}></i>
-                        <span className="small fw-bold text-white" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>
-                          {(room?.participants || []).filter((p: any) => {
-                            const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
-                            return role === 'viewer';
-                          }).length}
-                        </span>
-                      </div>
-                      <div className="text-white text-end font-weight-bold" style={{ fontFamily: 'Orbitron, monospace', fontSize: '1.4rem', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                        <CountdownTimer
-                          timeRemaining={displayTime}
-                          totalTime={displayTotal}
-                          isPaused={isPaused}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Col>
-
-                {/* Right side: Opposition speakers list */}
-                <Col xl={3} md={4} className="d-flex flex-column text-end">
-                  <div className="text-neon-pink mb-1" style={{ fontFamily: 'Orbitron', fontSize: '10px', letterSpacing: '0.05em' }}>
-                    OPPOSITION <i className="bi bi-people-fill text-neon-pink ms-1"></i>
-                  </div>
-                  <div className="d-flex flex-column gap-1 flex-grow-1 justify-content-around">
-                    {slots.map((slot) => {
-                      const participant = debaters.find((p) => p.team === 'opposition' && p.speakerSlot === slot);
-                      const expected = `OPP_${slot}`;
-                      const isCurrent = speakerLabel === expected;
-
-                      return (
-                        <div
-                          key={slot}
-                          className={`p-1 px-2 rounded-2 d-flex align-items-center gap-2 justify-content-end text-end position-relative ${
-                            isCurrent ? 'glass-card' : 'bg-secondary bg-opacity-10 border border-secondary border-opacity-25'
-                          }`}
-                          style={{
-                            borderTop: isCurrent ? '2px solid #ff006e' : undefined,
-                            boxShadow: isCurrent ? '0 0 15px rgba(255, 0, 110, 0.15)' : undefined,
-                            borderColor: isCurrent ? '#ff006e' : undefined,
-                            opacity: isCurrent ? 1 : 0.65,
-                          }}
-                        >
-                          {isCurrent && (
-                            <div className="position-absolute" style={{ left: '8px', top: '50%', transform: 'translateY(-50%)' }}>
-                              <i className="bi bi-mic-fill text-neon-pink speaking-pulse" style={{ fontSize: '0.8rem' }}></i>
-                            </div>
-                          )}
-                          <div className="min-width-0">
-                            <p className="mb-0 text-white text-truncate" style={{ fontSize: '11px', lineHeight: 1.2 }}>
-                              {participant ? participant.username : `Empty (${slot})`}
-                            </p>
-                            <p className="mb-0 text-uppercase" style={{ fontSize: '8px', letterSpacing: '0.05em', color: isCurrent ? '#ff006e' : 'var(--text-muted)', lineHeight: 1.2 }}>
-                              {isCurrent ? td('debateRoom.speakerStatus.speaking') : participant ? td('debateRoom.speakerStatus.waiting') : td('debateRoom.speakerStatus.empty')}
-                            </p>
-                          </div>
-                          <div
-                            className="d-flex align-items-center justify-content-center rounded-circle border flex-shrink-0"
-                            style={{
-                              width: '26px',
-                              height: '26px',
-                              background: isCurrent ? 'rgba(255, 0, 110, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                              borderColor: isCurrent ? 'rgba(255, 0, 110, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                            }}
-                          >
-                            <i className={`bi bi-person-fill ${isCurrent ? 'text-neon-pink' : 'text-muted'}`} style={{ fontSize: '0.8rem' }}></i>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Col>
-
-              </Row>
+                  ) : undefined
+                }
+              />
+              {hasHostControl && (
+                <DebateHostControlPanel
+                  phaseLabel={phaseLabel}
+                  roomStatus={room.status}
+                  roomId={roomId}
+                  participants={room.participants}
+                  startDisabled={startPhaseMutation.isPending || isJudge3 || turnStatus !== 'waiting_to_start'}
+                  skipDisabled={isJudge3 || (turnStatus !== 'active' && currentPhase !== 'judge_feedback' && currentPhase !== 'final_judging')}
+                  controlsPending={controlMutation.isPending}
+                  cameraPending={toggleCameraMutation.isPending}
+                  micPending={toggleMicMutation.isPending}
+                  chatPending={toggleChatMutation.isPending}
+                  onStart={() => startPhaseMutation.mutate()}
+                  onSkip={() => controlMutation.mutate('finish')}
+                  onPauseOrResume={() => controlMutation.mutate(room.status === 'paused' ? 'resume' : 'pause')}
+                  onEnd={() => controlMutation.mutate('end')}
+                  onToggleCamera={(userId, action) => toggleCameraMutation.mutate({ userId, action })}
+                  onToggleMic={(userId, action) => toggleMicMutation.mutate({ userId, action })}
+                  onToggleChat={(userId, action) => toggleChatMutation.mutate({ userId, action })}
+                  onJoinPrivateRoom={canAccessPrivateRooms ? (team) => navigate(`/debate/${roomId}/private/${team}`) : undefined}
+                />
+              )}
             </div>
 
-            {/* Row 2: Debate workflow + Host/Judge announcements - condensed */}
-            <div className="d-flex gap-2 flex-shrink-0" style={{ height: '160px', minHeight: 0 }}>
-              <div className="d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 p-2" style={{ width: '50%', flexShrink: 0, minHeight: 0 }}>
-                <div className="d-flex align-items-center justify-content-between mb-1 flex-shrink-0">
-                  <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                    <i className="bi bi-diagram-3-fill me-1"></i> {td('debateRoom.workflow')}
-                  </span>
-                  <Badge bg="secondary" style={{ fontSize: '8px' }}>
-                    {currentWorkflowIndex >= 0 ? `${currentWorkflowIndex + 1}/${debateWorkflow.length}` : 'Waiting'}
-                  </Badge>
-                </div>
-
-                <div className="d-flex gap-2 mb-1 flex-shrink-0">
-                  <div className="flex-fill rounded-2 border border-info border-opacity-25 bg-info bg-opacity-10 p-1.5">
-                    <div className="text-neon-cyan text-uppercase fw-bold mb-0.5" style={{ fontSize: '8px', letterSpacing: '0.05em' }}>{td('debateRoom.current')}</div>
-                    <div className="fw-bold text-white text-truncate" style={{ fontSize: '11px' }}>{currentWorkflowStep?.label || phaseLabel || 'Waiting'}</div>
-                    <div className="text-muted text-truncate" style={{ fontSize: '9px' }}>{activeSpeakerName}</div>
-                  </div>
-                  <div className="flex-fill rounded-2 border border-warning border-opacity-25 bg-warning bg-opacity-10 p-1.5">
-                    <div className="text-neon-yellow text-uppercase fw-bold mb-0.5" style={{ fontSize: '8px', letterSpacing: '0.05em' }}>{td('debateRoom.next')}</div>
-                    <div className="fw-bold text-white text-truncate" style={{ fontSize: '11px' }}>{nextWorkflowStep?.label || 'Result'}</div>
-                    <div className="text-muted text-truncate" style={{ fontSize: '9px' }}>{nextWorkflowStep?.detail || 'Completed'}</div>
-                  </div>
-                </div>
-
-                {/* Compact horizontal scrollable timeline */}
-                <div
-                  className="flex-fill overflow-x-auto overflow-y-hidden"
-                  style={{
-                    minHeight: 0,
-                    overscrollBehavior: 'contain',
-                    scrollbarColor: 'rgba(0, 245, 255, 0.4) transparent',
-                    scrollbarWidth: 'thin',
-                  }}
-                >
-                  <div className="d-flex gap-1 py-1" style={{ minWidth: 'max-content' }}>
-                    {debateWorkflow.map((step, idx) => {
-                      const isDone = currentWorkflowIndex > idx;
-                      const isActive = currentWorkflowIndex === idx;
-                      const isNext = currentWorkflowIndex + 1 === idx;
-
-                      return (
-                        <div
-                          key={`${step.speaker}-${step.phase}-${idx}`}
-                          className={`flex-shrink-0 rounded-2 border px-2 py-1 text-center ${isActive ? 'border-neon' : ''}`}
-                          style={{
-                            width: '72px',
-                            background: isActive
-                              ? 'rgba(0, 245, 255, 0.15)'
-                              : isNext
-                                ? 'rgba(255, 214, 10, 0.1)'
-                                : 'rgba(255,255,255,0.03)',
-                            borderColor: isActive
-                              ? 'rgba(0,245,255,0.5)'
-                              : isNext
-                                ? 'rgba(255,214,10,0.3)'
-                                : 'rgba(255,255,255,0.1)',
-                            opacity: isDone ? 0.5 : 1,
-                          }}
-                        >
-                          <div
-                            className="d-flex align-items-center justify-content-center rounded-circle mx-auto mb-1"
-                            style={{
-                              width: '16px',
-                              height: '16px',
-                              fontSize: '8px',
-                              background: isActive ? '#00f5ff' : isDone ? '#198754' : isNext ? 'rgba(255, 214, 10, 0.3)' : 'rgba(255,255,255,0.1)',
-                              borderColor: isActive ? '#00f5ff' : isDone ? '#198754' : isNext ? '#ffd60a' : 'rgba(255,255,255,0.2)',
-                              color: isActive ? '#050812' : '#fff',
-                            }}
-                          >
-                            {isDone ? '✓' : idx + 1}
-                          </div>
-                          <div className="text-white fw-semibold text-truncate" style={{ fontSize: '9px', lineHeight: 1.2 }}>
-                            {step.label}
-                          </div>
-                          <div className="text-muted text-truncate" style={{ fontSize: '7px', lineHeight: 1.2 }}>
-                            {step.phase.replace('_', ' ')}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-grow-1 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 p-2" style={{ minHeight: 0 }}>
-                <div className="d-flex align-items-center justify-content-between mb-1 flex-shrink-0">
-                  <span className="text-neon-yellow text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                    <i className="bi bi-bell-fill me-1"></i> {td('debateRoom.notifications')}
-                  </span>
-                </div>
-
-                <div
-                  className="flex-fill overflow-y-auto"
-                  style={{
-                    minHeight: 0,
-                    overscrollBehavior: 'contain',
-                    scrollbarColor: 'rgba(255, 214, 10, 0.4) transparent',
-                    scrollbarWidth: 'thin',
-                  }}
-                >
-                  {announcements.length === 0 ? (
-                    <p className="text-muted small italic text-center py-2">{td('debateRoom.noNotifications')}</p>
-                  ) : (
-                    announcements.slice(-8).map((ann, idx) => (
-                      <div key={idx} className="p-1.5 mb-1 bg-secondary bg-opacity-10 border border-secondary border-opacity-20 rounded text-white" style={{ fontSize: '10px', lineHeight: 1.3 }}>
-                        <i className="bi bi-info-circle text-neon-yellow me-1"></i>
-                        {ann.length > 80 ? ann.slice(0, 77) + '...' : ann}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Row 3: Inside Match Chat Box */}
-            <div className="flex-shrink-0 d-flex flex-column overflow-hidden bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 p-2" style={{ height: '300px', minHeight: '180px' }}>
-              <div className="d-flex align-items-center justify-content-between mb-1 flex-shrink-0">
-                <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '10px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                  <i className="bi bi-chat-dots-fill me-1"></i> {td('debateRoom.matchChat')}
-                </span>
-              </div>
-              <div className="flex-fill overflow-hidden" style={{ minHeight: 0 }}>
-                <MainRoomChat roomId={roomId} />
-              </div>
-            </div>
 
             {/* Inline Cross Exam details below the chat if CE matches - collapsible */}
             {currentPhase === 'cross_exam' && (
@@ -1660,630 +1471,18 @@ export default function DebateRoomPage() {
               </div>
             )}
 
-            {/* Row 4: Assigned Judges Badge List */}
-            <div className="flex-shrink-0 bg-secondary bg-opacity-5 rounded-2 border border-secondary border-opacity-10 px-2 py-1">
-              <div className="d-flex align-items-center justify-content-between">
-                <span className="text-muted text-uppercase fw-bold" style={{ fontSize: '9px', letterSpacing: '0.05em', fontFamily: 'Orbitron' }}>
-                  {td('debateRoom.judge.assigned')}
-                </span>
-                <div className="d-flex gap-1 flex-wrap">
-                  {judges.length ? (
-                    judges.slice(0, 6).map((j) => (
-                      <Badge key={j.userId} bg="dark" className="border border-secondary border-opacity-25 text-white py-0.5 px-1.5" style={{ fontSize: '9px' }}>
-                        <i className="bi bi-patch-check-fill text-neon-yellow me-0.5"></i>
-                        {j.username}
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-muted" style={{ fontSize: '9px' }}>{td('debateRoom.judge.noJudges')}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-
-            {/* Bottom: Dedicated Debater quick-actions bar - compact */}
-            {canUseDebaterActions && (
-              <div className="flex-shrink-0 bg-dark bg-opacity-30 border border-secondary border-opacity-20 rounded-2 p-1.5 text-center">
-                <span className="text-muted me-2" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>{td('debateRoom.match')}:</span>
-
-                <Button
-                  size="sm"
-                  variant={room?.status === 'paused' ? 'success' : 'outline-warning'}
-                  className="py-0.5 px-2 me-1"
-                  onClick={() => {
-                    if (room?.status === 'paused') {
-                      debaterResumeMutation.mutate();
-                    } else {
-                      debaterPauseMutation.mutate();
-                    }
-                  }}
-                  disabled={
-                    debaterPauseMutation.isPending || 
-                    debaterResumeMutation.isPending
-                  }
-                  style={{ fontSize: '9px', fontFamily: 'Orbitron' }}
-                >
-                  {room?.status === 'paused'
-                    ? td('debateRoom.actions.resume')
-                    : `Pause (${3 - (currentParticipant?.team && session?.pausesUsed?.[currentParticipant.team as 'proposition' | 'opposition'] || 0)} left)`}
-                </Button>
-
-                {currentPhase === 'prep_7' && (
-                  <Button
-                    size="sm"
-                    variant="success"
-                    className="py-0.5 px-2 me-1"
-                    style={{ fontSize: '9px', boxShadow: '0 0 6px rgba(40, 167, 69, 0.4)' }}
-                    onClick={() => {
-                      import('@hooks/useSocket').then(({ getSocket }) => {
-                        getSocket()?.emit('debate:end-prep-early', { roomId });
-                      });
-                    }}
-                    disabled={!isS1Debater || prepConsensusReadyUserIds.includes(user?._id || '')}
-                  >
-                    {prepConsensusReadyUserIds.includes(user?._id || '')
-                      ? `Ready (${prepConsensusReadyUserIds.length}/${prepConsensusTotalDebaters || 2})`
-                      : `End preparation (${prepConsensusReadyUserIds.length}/${prepConsensusTotalDebaters || 2})`}
-                  </Button>
-                )}
-
-                {turnStatus === 'active' && currentPhase === 'speech' && isMyTurnToSpeak && (
-                  <Button
-                    size="sm"
-                    className="py-0.5 px-2 me-1"
-                    style={{ fontSize: '9px', background: '#ff006e', color: '#fff', border: 'none', boxShadow: '0 0 8px #ff006e' }}
-                    onClick={() => controlMutation.mutate('finish')}
-                    disabled={controlMutation.isPending || isTransitioning}
-                  >
-                    Skip
-                  </Button>
-                )}
-
-                <Button
-                  size="sm"
-                  variant="outline-danger"
-                  className="py-0.5 px-2 me-1"
-                  onClick={() => { if (window.confirm(td('debateRoom.actions.surrenderConfirm'))) playerActionMutation.mutate('surrender'); }}
-                  disabled={playerActionMutation.isPending}
-                  style={{ fontSize: '9px' }}
-                >
-                  {td('debateRoom.actions.surrender')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline-info"
-                  className="py-0.5 px-2"
-                  onClick={() => playerActionMutation.mutate('draw')}
-                  disabled={playerActionMutation.isPending}
-                  style={{ fontSize: '9px' }}
-                >
-                  {td('debateRoom.actions.draw')}
-                </Button>
-              </div>
-            )}
-
-            {/* Bottom: Dedicated Viewer/Leave Quick actions - compact */}
-            <div className="flex-shrink-0 text-center">
-              <Button
-                size="sm"
-                variant="outline-light"
-                onClick={() => {
-                  const isOwner = currentParticipant?.roomRole === 'owner';
-                  const otherParticipants = room?.participants.filter(p => p.userId !== user?._id) || [];
-                  if (isOwner && otherParticipants.length > 0) {
-                    setShowLeaveConfirmModal(true);
-                  } else {
-                    leaveMutation.mutate(undefined);
-                  }
-                }}
-                disabled={leaveMutation.isPending}
-                style={{ fontSize: '10px', padding: '0.2rem 0.8rem' }}
-              >
-                {td('debateRoom.leave.leaveRoom')}
-              </Button>
-            </div>
 
           </div>
 
-          {/* === RIGHT SIDEBAR (Control Panel) === */}
-          {/* Hidden on mobile, shown as fixed bottom sheet on tablet+, 320px fixed width */}
-          <aside
-            className="d-none d-md-flex flex-column border-start flex-shrink-0 overflow-hidden"
-            style={{
-              width: '320px',
-              minWidth: '320px',
-              height: '100%',
-              background: 'rgba(18, 18, 31, 0.65)',
-              backdropFilter: 'blur(10px)',
-            }}
-          >
-            
-            {/* Tabs Trigger Navigation */}
-            <div className="d-flex border-bottom bg-black bg-opacity-20 flex-shrink-0">
-              <button
-                className={`flex-1 py-2.5 text-center border-0 text-uppercase ${sidebarTab === 'scoring' ? 'text-neon-cyan font-weight-bold' : 'text-muted'}`}
-                style={{
-                  fontSize: '10px',
-                  letterSpacing: '0.05em',
-                  fontFamily: 'Orbitron',
-                  background: sidebarTab === 'scoring' ? 'rgba(0, 245, 255, 0.05)' : 'transparent',
-                  borderBottom: sidebarTab === 'scoring' ? '2px solid #00f5ff' : 'none',
-                }}
-                onClick={() => setSidebarTab('scoring')}
-              >
-                {td('debateRoom.admin.score')}
-              </button>
-              {hasHostControl && (
-                <button
-                  className={`flex-1 py-2.5 text-center border-0 text-uppercase ${sidebarTab === 'admin' ? 'text-neon-cyan font-weight-bold' : 'text-muted'}`}
-                  style={{
-                    fontSize: '10px',
-                    letterSpacing: '0.05em',
-                    fontFamily: 'Orbitron',
-                    background: sidebarTab === 'admin' ? 'rgba(0, 245, 255, 0.05)' : 'transparent',
-                    borderBottom: sidebarTab === 'admin' ? '2px solid #00f5ff' : 'none',
-                  }}
-                  onClick={() => setSidebarTab('admin')}
-                >
-                  {td('debateRoom.admin.controlPanel')}
-                </button>
-              )}
-              {canAccessPrivateRooms && (
-                <button
-                  className={`flex-1 py-2.5 text-center border-0 text-uppercase ${sidebarTab === 'private' ? 'text-neon-cyan font-weight-bold' : 'text-muted'}`}
-                  style={{
-                    fontSize: '10px',
-                    letterSpacing: '0.05em',
-                    fontFamily: 'Orbitron',
-                    background: sidebarTab === 'private' ? 'rgba(0, 245, 255, 0.05)' : 'transparent',
-                    borderBottom: sidebarTab === 'private' ? '2px solid #00f5ff' : 'none',
-                  }}
-                  onClick={() => setSidebarTab('private')}
-                >
-                  {td('debateRoom.admin.privateRoom')}
-                </button>
-              )}
-              {(canAccessViewerChat) && (
-                <button
-                  className={`flex-1 py-2.5 text-center border-0 text-uppercase ${sidebarTab === 'viewer-chat' ? 'text-neon-cyan font-weight-bold' : 'text-muted'}`}
-                  style={{
-                    fontSize: '10px',
-                    letterSpacing: '0.05em',
-                    fontFamily: 'Orbitron',
-                    background: sidebarTab === 'viewer-chat' ? 'rgba(0, 245, 255, 0.05)' : 'transparent',
-                    borderBottom: sidebarTab === 'viewer-chat' ? '2px solid #00f5ff' : 'none',
-                  }}
-                  onClick={() => setSidebarTab('viewer-chat')}
-                >
-                  {td('debateRoom.admin.chat')}
-                </button>
-              )}
-            </div>
-
-            {/* Tab Contents */}
-            <div className="flex-grow-1 overflow-y-auto d-flex flex-column" style={{ minHeight: 0 }}>
-              
-              {/* SCORING TAB PANEL */}
-              {sidebarTab === 'scoring' && (
-                <div className="p-3 d-flex flex-column gap-3">
-                  
-                  {/* Standings breakdown */}
-                  <div>
-                    <h6 className="text-uppercase text-muted mb-3" style={{ fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: '0.05em' }}>
-                      {td('debateRoom.judge.currentStandings')}
-                    </h6>
-                    <ScoreBreakdown finalScores={session.finalScores} />
-                    
-                    <Button
-                      size="sm"
-                      variant="outline-info"
-                      className="mt-3 w-100"
-                      onClick={() => setShowPreviousScoresModal(true)}
-                      style={{ fontSize: '11px', fontFamily: 'Orbitron' }}
-                    >
-                      <i className="bi bi-journal-text me-1" />
-                      {td('debateRoom.judge.roundScores')}
-                    </Button>
-
-                  </div>
-
-                  {/* List of Judges */}
-                  <div className="border-top border-secondary border-opacity-20 pt-3">
-                    <div className="text-muted small mb-2" style={{ fontFamily: 'Orbitron', fontSize: '11px' }}>{td('debateRoom.admin.title')}</div>
-                    <ListGroup>
-                      {judges.length ? (
-                        judges.map((j) => (
-                          <ListGroup.Item key={j.userId} className="bg-transparent text-white border-secondary border-opacity-25 py-2 px-3 small">
-                            {j.username}
-                          </ListGroup.Item>
-                        ))
-                      ) : (
-                        <ListGroup.Item className="bg-transparent text-muted border-secondary border-opacity-25 py-2 px-3 small text-center">
-                          {td('debateRoom.judge.noJudges')}
-                        </ListGroup.Item>
-                      )}
-                    </ListGroup>
-                  </div>
-
-                  {/* Judge Rating Form */}
-                  {isJudge && (
-                    <div className="border-top border-secondary border-opacity-20 pt-3">
-                      <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
-                        {td('debateRoom.judge.quickReaction')}
-                      </h6>
-                      <div className="d-flex gap-2 mb-4">
-                        <Button
-                          size="sm"
-                          variant="outline-info"
-                          className="flex-fill d-flex align-items-center justify-content-center gap-1"
-                          style={{ borderColor: 'rgba(0, 245, 255, 0.4)', color: '#00f5ff' }}
-                          onClick={() => {
-                            import('@hooks/useSocket').then(({ getSocket }) => {
-                              getSocket()?.emit('judge:reaction', { roomId, type: 'agree' });
-                            });
-                          }}
-                        >
-                          {td('debateRoom.judge.agree')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          className="flex-fill d-flex align-items-center justify-content-center gap-1"
-                          style={{ borderColor: 'rgba(255, 0, 110, 0.4)', color: '#ff006e' }}
-                          onClick={() => {
-                            import('@hooks/useSocket').then(({ getSocket }) => {
-                              getSocket()?.emit('judge:reaction', { roomId, type: 'disagree' });
-                            });
-                          }}
-                        >
-                          {td('debateRoom.judge.disagree')}
-                        </Button>
-                      </div>
-
-                      <h6 className="text-neon-yellow font-weight-bold mb-3" style={{ fontFamily: 'Orbitron', fontSize: '12px' }}>
-                        {td('debateRoom.judge.submitEvaluation')}
-                      </h6>
-                      <RoundJudgeForm
-                        round={currentRound}
-                        propSpeaker={resolvePropSpeakerForRound(currentRound, room?.format)}
-                        oppSpeaker={resolveOppSpeakerForRound(currentRound, room?.format)}
-                        propSpeak={roundPropSpeak}
-                        propCe={roundPropCe}
-                        propNotes={roundPropNotes}
-                        oppSpeak={roundOppSpeak}
-                        oppCe={roundOppCe}
-                        oppNotes={roundOppNotes}
-                        onPropSpeakChange={setRoundPropSpeak}
-                        onPropCeChange={setRoundPropCe}
-                        onPropNotesChange={setRoundPropNotes}
-                        onOppSpeakChange={setRoundOppSpeak}
-                        onOppCeChange={setRoundOppCe}
-                        onOppNotesChange={setRoundOppNotes}
-                        onSubmit={() => {
-                          const propSpeaker = resolvePropSpeakerForRound(currentRound, room?.format);
-                          const oppSpeaker = resolveOppSpeakerForRound(currentRound, room?.format);
-                          if (!propSpeaker || !oppSpeaker) {
-                            toast.error('Could not resolve speakers for this round');
-                            return;
-                          }
-                          // Rule: Round 3 has no Cross Examination — send ce=0
-                          const isRound3 = currentRound === 3;
-                          roundScoreMutation.mutate({
-                            round: currentRound as 1 | 2 | 3,
-                            proposition: { speaker: propSpeaker, speak: roundPropSpeak, ce: isRound3 ? 0 : roundPropCe, notes: roundPropNotes },
-                            opposition: { speaker: oppSpeaker, speak: roundOppSpeak, ce: isRound3 ? 0 : roundOppCe, notes: roundOppNotes },
-                          });
-                        }}
-                        isPending={roundScoreMutation.isPending}
-                        isSubmitEnabled={isScoringAllowed}
-                      />
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* ADMIN PANEL TAB PANEL */}
-              {sidebarTab === 'admin' && hasHostControl && (
-                <div className="p-3 d-flex flex-column gap-3">
-                  <h6 className="mb-0 text-uppercase text-muted" style={{ fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: '0.05em' }}>
-                    {td('debateRoom.admin.hostControlPanel')}
-                  </h6>
-
-
-                  {/* Host Phase & Timer Controls — only shown to authorized controllers */}
-                  {hasHostControl && (
-                  <div className="p-3 bg-secondary bg-opacity-5 border border-secondary border-opacity-25 rounded-3">
-                    <div className="text-muted small mb-2 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>{td('debateRoom.debateControls')}</div>
-                    <div className="d-flex flex-column gap-2 w-100">
-                      <div className="d-flex gap-2 w-100">
-                        <Button
-                          size="sm"
-                          className="flex-fill py-1.5 fw-bold"
-                          style={{
-                            background:
-                              turnStatus === 'waiting_to_start' && !isJudge3
-                                ? '#00ff66'
-                                : 'rgba(255,255,255,0.05)',
-                            color:
-                              turnStatus === 'waiting_to_start' && !isJudge3
-                                ? '#000'
-                                : 'rgba(255, 255, 255, 0.3)',
-                            border: 'none',
-                            boxShadow:
-                              turnStatus === 'waiting_to_start' && !isJudge3
-                                ? '0 0 10px rgba(0, 255, 102, 0.4)'
-                                : 'none',
-                            fontSize: '11px',
-                          }}
-                          onClick={() => startPhaseMutation.mutate()}
-                          disabled={
-                            startPhaseMutation.isPending ||
-                            isJudge3 ||
-                            turnStatus !== 'waiting_to_start'
-                          }
-                        >
-                          {td('debateRoom.actions.start')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline-primary"
-                          className="flex-fill py-1.5"
-                          onClick={() => controlMutation.mutate('finish')}
-                          disabled={
-                            controlMutation.isPending ||
-                            isJudge3 ||
-                            // Phase must be actively running OR in judge_feedback /
-                            // final_judging (free time per rules — Host can Skip to
-                            // advance to the next round / phase).
-                            (turnStatus !== 'active' &&
-                              currentPhase !== 'judge_feedback' &&
-                              currentPhase !== 'final_judging')
-                          }
-                          style={{ fontSize: '11px' }}
-                        >
-                          {td('debateRoom.actions.skip')}
-                        </Button>
-                      </div>
-                      <div className="d-flex gap-2 w-100">
-                        <Button
-                          size="sm"
-                          variant="outline-warning"
-                          className="flex-fill py-1.5"
-                          onClick={() => controlMutation.mutate(room?.status === 'paused' ? 'resume' : 'pause')}
-                          disabled={controlMutation.isPending}
-                          style={{ fontSize: '11px' }}
-                        >
-                          {room?.status === 'paused' ? td('debateRoom.actions.resume') : td('debateRoom.actions.pause')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          className="flex-fill py-1.5"
-                          onClick={() => controlMutation.mutate('end')}
-                          disabled={controlMutation.isPending}
-                          style={{ fontSize: '11px' }}
-                        >
-                          {td('debateRoom.actions.end')}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Participant Moderation Toggles */}
-                  <div className="p-3 bg-secondary bg-opacity-5 border border-secondary border-opacity-25 rounded-3 d-flex flex-column gap-2">
-                    <div className="text-muted small mb-1 text-uppercase fw-bold" style={{ fontFamily: 'Orbitron', fontSize: '10px' }}>{td('debateRoom.participantControls')}</div>
-                    <div className="table-responsive" style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                      <table className="table table-borderless table-sm align-middle text-white mb-0" style={{ fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr className="text-muted" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                            <th className="py-2 ps-0 fw-normal">{td('debateRoom.user')}</th>
-                            <th className="py-2 text-center fw-normal">{td('debateRoom.role')}</th>
-                            <th className="py-2 text-center fw-normal">{td('debateRoom.cam')}</th>
-                            <th className="py-2 text-center fw-normal">{td('debateRoom.mic')}</th>
-                            <th className="py-2 text-center fw-normal">{td('debateRoom.chat')}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(room?.participants || [])
-                            .filter((p) => p.userId !== user?._id)
-                            .map((p) => {
-                              const isCamMuted = Boolean(p.cameraMuted);
-                              const isMuted = Boolean(p.muted);
-                              const isChatMuted = Boolean(p.chatMuted);
-                              const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
-                              const isSpectator = role === 'viewer';
-
-                              let roleLabel = td('debateRoom.roles.viewer');
-                              let roleBadgeBg = 'rgba(108, 117, 125, 0.2)';
-                              let roleTextColor = '#a0a0a0';
-
-                              if (role === 'debater') {
-                                if (p.team === 'proposition') {
-                                  roleLabel = `${td('debateRoom.roles.prop')} ${p.speakerSlot || ''}`;
-                                  roleBadgeBg = 'rgba(0, 245, 255, 0.15)';
-                                  roleTextColor = '#00f5ff';
-                                } else if (p.team === 'opposition') {
-                                  roleLabel = `${td('debateRoom.roles.opp')} ${p.speakerSlot || ''}`;
-                                  roleBadgeBg = 'rgba(255, 0, 110, 0.15)';
-                                  roleTextColor = '#ff006e';
-                                } else {
-                                  roleLabel = td('debateRoom.roles.speaker');
-                                  roleBadgeBg = 'rgba(255, 255, 255, 0.1)';
-                                  roleTextColor = '#ffffff';
-                                }
-                              } else if (role === 'judge') {
-                                roleLabel = td('debateRoom.roles.judge');
-                                roleBadgeBg = 'rgba(255, 214, 10, 0.15)';
-                                roleTextColor = '#ffd60a';
-                              } else if (role === 'host') {
-                                roleLabel = td('debateRoom.roles.host');
-                                roleBadgeBg = 'rgba(255, 165, 0, 0.15)';
-                                roleTextColor = '#ffa500';
-                              } else if (p.roomRole === 'owner') {
-                                roleLabel = td('debateRoom.roles.owner');
-                                roleBadgeBg = 'rgba(255, 165, 0, 0.15)';
-                                roleTextColor = '#ffa500';
-                              }
-
-                              return (
-                                <tr key={p.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td className="py-2 ps-0 text-truncate fw-semibold" style={{ maxWidth: '90px' }} title={p.username}>
-                                    {p.username}
-                                  </td>
-                                  <td className="py-2 text-center">
-                                    <span
-                                      className="px-1.5 py-0.5 rounded text-uppercase font-monospace"
-                                      style={{
-                                        fontSize: '0.6rem',
-                                        background: roleBadgeBg,
-                                        color: roleTextColor,
-                                        border: `1px solid ${roleTextColor}20`,
-                                      }}
-                                    >
-                                      {roleLabel}
-                                    </span>
-                                  </td>
-                                  <td className="py-2 text-center">
-                                    {isSpectator ? (
-                                      <span className="text-muted">—</span>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="link"
-                                        className="p-0 border-0 text-decoration-none"
-                                        onClick={() => toggleCameraMutation.mutate({ userId: p.userId, action: isCamMuted ? 'unmute' : 'mute' })}
-                                        disabled={toggleCameraMutation.isPending}
-                                      >
-                                        <i className={`bi ${isCamMuted ? 'bi-camera-video-off-fill text-danger' : 'bi-camera-video-fill text-success'}`} style={{ fontSize: '0.9rem' }} />
-                                      </Button>
-                                    )}
-                                  </td>
-                                  <td className="py-2 text-center">
-                                    {isSpectator ? (
-                                      <span className="text-muted">—</span>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="link"
-                                        className="p-0 border-0 text-decoration-none"
-                                        onClick={() => toggleMicMutation.mutate({ userId: p.userId, action: isMuted ? 'unmute' : 'mute' })}
-                                        disabled={toggleMicMutation.isPending}
-                                      >
-                                        <i className={`bi ${isMuted ? 'bi-mic-mute-fill text-danger' : 'bi-mic-fill text-success'}`} style={{ fontSize: '0.9rem' }} />
-                                      </Button>
-                                    )}
-                                  </td>
-                                  <td className="py-2 text-center">
-                                    <Button
-                                      size="sm"
-                                      variant="link"
-                                      className="p-0 border-0 text-decoration-none d-inline-flex align-items-center justify-content-center"
-                                      onClick={() => toggleChatMutation.mutate({ userId: p.userId, action: isChatMuted ? 'unmute' : 'mute' })}
-                                      disabled={toggleChatMutation.isPending}
-                                      title={isChatMuted ? 'Unban chat' : 'Ban chat'}
-                                    >
-                                      {isChatMuted ? (
-                                        <span className="position-relative d-inline-flex align-items-center justify-content-center" style={{ width: '1.2rem', height: '1.2rem' }}>
-                                          <i className="bi bi-chat-fill text-danger" style={{ fontSize: '0.9rem', opacity: 0.6 }} />
-                                          <i className="bi bi-slash position-absolute text-danger fw-bold" style={{ fontSize: '1.2rem' }} />
-                                        </span>
-                                      ) : (
-                                        <i className="bi bi-chat-fill text-success" style={{ fontSize: '0.9rem' }} />
-                                      )}
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          {(room?.participants || []).filter((p) => p.userId !== user?._id).length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="text-center text-muted py-3">
-                                {td('debateRoom.errors.noOtherParticipants')}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* PRIVATE PREP ROOM TAB PANEL */}
-              {sidebarTab === 'private' && canAccessPrivateRooms && (
-                <div className="p-3">
-                  <div className="d-flex align-items-center mb-2">
-                    <h6 className="mb-0 text-uppercase text-muted" style={{ fontFamily: 'Orbitron', fontSize: '11px', letterSpacing: '0.05em' }}>
-                      {td('debateRoom.admin.privateRoom')}
-                    </h6>
-                  </div>
-                  <PrivateRoomPanel roomId={roomId} />
-                </div>
-              )}
-
-              {/* VIEWER CHAT TAB PANEL */}
-              {sidebarTab === 'viewer-chat' && canAccessViewerChat && (
-                <div className="p-3 h-100 d-flex flex-column">
-                  <ViewerChat roomId={roomId} />
-                </div>
-              )}
-
-            </div>
-
-          </aside>
+          <DebateRightRail
+            scoreContent={scorePanelContent}
+            matchChatContent={<MainRoomChat roomId={roomId} />}
+            viewerChatContent={canAccessViewerChat ? <ViewerChat roomId={roomId} /> : undefined}
+            canViewViewerChat={canAccessViewerChat}
+          />
 
         </div>
 
-      </div>
-
-      {/* Mobile: Bottom action bar for sidebar controls */}
-      <div
-        className="d-md-none position-fixed bottom-0 start-0 end-0 bg-dark border-top border-neon border-opacity-50 p-2"
-        style={{ zIndex: 1040, backdropFilter: 'blur(10px)' }}
-      >
-        <div className="d-flex justify-content-around">
-          <button
-            className={`btn btn-sm ${sidebarTab === 'scoring' ? 'btn-outline-info' : 'btn-outline-secondary'}`}
-            onClick={() => setSidebarTab('scoring')}
-            style={{ fontSize: '10px' }}
-          >
-            <i className="bi bi-star-fill d-block" style={{ fontSize: '14px' }}></i>
-            {td('debateRoom.admin.score')}
-          </button>
-          {hasHostControl && (
-            <button
-              className={`btn btn-sm ${sidebarTab === 'admin' ? 'btn-outline-info' : 'btn-outline-secondary'}`}
-              onClick={() => setSidebarTab('admin')}
-              style={{ fontSize: '10px' }}
-            >
-              <i className="bi bi-shield-lock-fill d-block" style={{ fontSize: '14px' }}></i>
-              {td('debateRoom.admin.title')}
-            </button>
-          )}
-          {canAccessPrivateRooms && (
-            <button
-              className={`btn btn-sm ${sidebarTab === 'private' ? 'btn-outline-warning' : 'btn-outline-secondary'}`}
-              onClick={() => setSidebarTab('private')}
-              style={{ fontSize: '10px' }}
-            >
-              <i className="bi bi-door-closed-fill d-block" style={{ fontSize: '14px' }}></i>
-              {td('debateRoom.preparation')}
-            </button>
-          )}
-                {sidebarTab === 'viewer-chat' && canAccessViewerChat && (
-                  <button
-                    className={`btn btn-sm ${sidebarTab === 'viewer-chat' ? 'btn-outline-info' : 'btn-outline-secondary'}`}
-                    onClick={() => setSidebarTab('viewer-chat')}
-                    style={{ fontSize: '10px' }}
-                  >
-                    <i className="bi bi-chat-dots-fill d-block" style={{ fontSize: '14px' }}></i>
-                    {td('debateRoom.admin.chat')}
-                  </button>
-                )}
-        </div>
       </div>
 
       {/* === LEAVE CONFIRMATION MODAL === */}

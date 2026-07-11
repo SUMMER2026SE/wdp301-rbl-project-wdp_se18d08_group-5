@@ -25,6 +25,7 @@ interface LiveTranslationCaptionsProps {
   captionMode: CaptionMode;
   onCaptionModeChange: (mode: CaptionMode) => void;
   onOwnSourceTranscript?: (text: string) => void;
+  includeOwnCaptions?: boolean;
 }
 
 function languageLabel(language: string) {
@@ -58,6 +59,7 @@ export function LiveTranslationCaptions({
   captionMode,
   onCaptionModeChange,
   onOwnSourceTranscript,
+  includeOwnCaptions = false,
 }: LiveTranslationCaptionsProps) {
   const userId = useAuthStore((state) => state.user?._id);
   const participants = useDebateStore((state) => state.participants);
@@ -116,13 +118,13 @@ export function LiveTranslationCaptions({
   const displayedCaptions = useMemo(
     () =>
       captions
-        .filter((caption) => caption.senderId !== userId)
+        .filter((caption) => includeOwnCaptions || caption.senderId !== userId)
         .filter((caption) => (captionMode === 'original' ? caption.kind === 'source' : caption.kind === 'translation'))
         .slice(0, 8),
-    [captionMode, captions, userId],
+    [captionMode, captions, includeOwnCaptions, userId],
   );
 
-  const hasOtherSpeech = captions.some((caption) => caption.senderId !== userId);
+  const hasOtherSpeech = captions.some((caption) => includeOwnCaptions || caption.senderId !== userId);
   const modeDescription =
     captionMode === 'original'
       ? 'Original mode: Vietnamese stays Vietnamese, English stays English.'
