@@ -38,6 +38,10 @@ function redirectToLogin() {
   }
 }
 
+function isAuthEndpoint(config: InternalAxiosRequestConfig | undefined, endpoint: string) {
+  return Boolean(config?.url?.includes(endpoint));
+}
+
 function handleBlockedSession(error: AxiosError) {
   if (error.response?.status !== 403) {
     return false;
@@ -73,6 +77,17 @@ api.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (handleBlockedSession(error)) {
+      return Promise.reject(error);
+    }
+
+    if (
+      error.response?.status === 401 &&
+      (isAuthEndpoint(originalRequest, '/auth/refresh-token') || isAuthEndpoint(originalRequest, '/auth/logout'))
+    ) {
+      useAuthStore.getState().clearAuth();
+      if (!isAuthEndpoint(originalRequest, '/auth/logout')) {
+        redirectToLogin();
+      }
       return Promise.reject(error);
     }
 

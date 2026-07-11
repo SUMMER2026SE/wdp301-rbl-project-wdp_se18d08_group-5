@@ -524,19 +524,21 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
         });
       };
 
-      const handleUserJoined = (payload: VoiceUserPayload) => {
+      const handleUserJoined = (payload: VoiceUserPayload & { team?: string }) => {
+        if (payload.team) return;
         ensurePeerConnection(payload.socketId);
         if (streamRef.current) {
           sendOffer(payload.socketId).catch(() => undefined);
         }
       };
 
-      const handleUserLeft = (payload: VoiceUserPayload) => {
+      const handleUserLeft = (payload: VoiceUserPayload & { team?: string }) => {
+        if (payload.team) return;
         closePeerConnection(payload.socketId);
       };
 
-      const handleOffer = async (payload: VoiceOfferPayload) => {
-        if (payload.roomId !== roomId) return;
+      const handleOffer = async (payload: VoiceOfferPayload & { team?: string }) => {
+        if (payload.roomId !== roomId || payload.team) return;
 
         try {
           const pc = ensurePeerConnection(payload.fromSocketId);
@@ -556,8 +558,8 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
         }
       };
 
-      const handleAnswer = async (payload: VoiceAnswerPayload) => {
-        if (payload.roomId !== roomId) return;
+      const handleAnswer = async (payload: VoiceAnswerPayload & { team?: string }) => {
+        if (payload.roomId !== roomId || payload.team) return;
 
         try {
           const pc = ensurePeerConnection(payload.fromSocketId);
@@ -568,8 +570,8 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
         }
       };
 
-      const handleIceCandidate = async (payload: VoiceIcePayload) => {
-        if (payload.roomId !== roomId) return;
+      const handleIceCandidate = async (payload: VoiceIcePayload & { team?: string }) => {
+        if (payload.roomId !== roomId || payload.team) return;
 
         try {
           const pc = ensurePeerConnection(payload.fromSocketId);

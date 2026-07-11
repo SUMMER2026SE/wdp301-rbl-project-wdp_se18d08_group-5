@@ -961,13 +961,13 @@ router.post(
   }),
 );
 
-// POST /api/v1/rooms/:id/position/lock — Lock positions (UC-19, Owner only)
+// POST /api/v1/rooms/:id/position/lock — Lock positions (Owner or room controller)
 // Locks assigned participants: debaters, human host, and judges. A room owner
 // is lockable only after being explicitly assigned one of those roles.
 router.post(
   '/:id/position/lock',
   authenticate,
-  roomOwnerGuard,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = (req as any).room;
 
@@ -983,7 +983,7 @@ router.post(
 router.post(
   '/:id/lock',
   authenticate,
-  roomOwnerGuard,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = (req as any).room;
 
@@ -995,11 +995,11 @@ router.post(
   }),
 );
 
-// POST /api/v1/rooms/:id/position/unlock — Unlock all positions (Owner only)
+// POST /api/v1/rooms/:id/position/unlock — Unlock all positions (Owner or room controller)
 router.post(
   '/:id/position/unlock',
   authenticate,
-  roomOwnerGuard,
+  roomControllerGuardDefault,
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = (req as any).room;
 
@@ -1039,7 +1039,7 @@ router.post(
   }),
 );
 
-// POST /api/v1/rooms/:id/position/lock-user — Toggle a single participant's lock (Owner only)
+// POST /api/v1/rooms/:id/position/lock-user — Toggle a single participant's lock (Owner or room controller)
 const toggleLockSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   locked: z.boolean(),
@@ -1048,7 +1048,7 @@ const toggleLockSchema = z.object({
 router.post(
   '/:id/position/lock-user',
   authenticate,
-  roomOwnerGuard,
+  roomControllerGuardDefault,
   validate(toggleLockSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const room = (req as any).room;

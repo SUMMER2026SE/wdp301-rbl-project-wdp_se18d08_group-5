@@ -14,6 +14,13 @@ import type { RoomParticipant, SpeakerSlot, Team } from '@/types';
 import { hasHostControl } from '../../utils/roomPermissions';
 
 type AssignableRole = 'debater' | 'host' | 'judge' | 'viewer';
+type EntityRef = string | { _id?: string; id?: string } | null | undefined;
+
+function getEntityId(value: EntityRef) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value._id || value.id || '';
+}
 
 function getLockState(participant: RoomParticipant, t: (key: string) => string) {
   if (!isLockable(participant)) {
@@ -207,11 +214,13 @@ export default function LobbyPage() {
   });
 
   const viewerChatEnabled = room?.viewerChatEnabled ?? true;
-  const isOwner = Boolean(user && room?.createdBy === user._id);
+  const createdById = getEntityId(room?.createdBy as EntityRef);
+  const isOwner = Boolean(user && createdById === user._id);
   const isHost = hasHostControl(room, user?._id);
+  const canManageLocks = isOwner || isHost;
   const canManageTopic = isOwner || isHost;
   const topicValue = getTopicValue(topicMode, selectedTopic, customTopic);
-  const currentParticipant = room?.participants.find((item) => item.userId === user?._id);
+  const currentParticipant = room?.participants.find((item) => getEntityId(item.userId as EntityRef) === user?._id);
 
   const myEffectiveRole = currentParticipant
     ? currentParticipant.roomRole === 'owner'
@@ -322,9 +331,9 @@ export default function LobbyPage() {
             variant="outline-danger"
             size="sm"
             onClick={() => {
-              const currentParticipant = room?.participants.find((p) => p.userId === user?._id);
+              const currentParticipant = room?.participants.find((p) => getEntityId(p.userId as EntityRef) === user?._id);
               const isOwner = currentParticipant?.roomRole === 'owner';
-              const otherParticipants = room?.participants.filter((p) => p.userId !== user?._id) || [];
+              const otherParticipants = room?.participants.filter((p) => getEntityId(p.userId as EntityRef) !== user?._id) || [];
               if (isOwner && otherParticipants.length > 0) {
                 setShowLeaveConfirmModal(true);
               } else {
@@ -355,10 +364,11 @@ export default function LobbyPage() {
                 </thead>
                 <tbody>
                   {room.participants.map((participant) => {
-                    const isRoomCreator = participant.userId === room.createdBy;
+                    const participantId = getEntityId(participant.userId as EntityRef);
+                    const isRoomCreator = participantId === createdById;
                     const lockable = isLockable(participant);
                     return (
-                      <tr key={participant.userId}>
+                      <tr key={participantId}>
                         <td>
                           {participant.username}
                           {isRoomCreator && (
@@ -371,13 +381,13 @@ export default function LobbyPage() {
                         <td>{participant.team || '-'}</td>
                         <td>{participant.speakerSlot || '-'}</td>
                         <td>
-                          {isOwner && lockable ? (
+                          {canManageLocks && lockable ? (
                             <Button
                               size="sm"
                               variant={participant.positionLocked ? 'success' : 'outline-secondary'}
                               onClick={() =>
                                 toggleLockMutation.mutate({
-                                  userId: participant.userId,
+                                  userId: participantId,
                                   locked: !participant.positionLocked,
                                 })
                               }
@@ -388,7 +398,7 @@ export default function LobbyPage() {
                                 className={`bi ${
                                   participant.positionLocked ? 'bi-lock-fill' : 'bi-unlock'
                                 } ${
-                                  lockFeedback?.userId === participant.userId
+                                  lockFeedback?.userId === participantId
                                     ? lockFeedback.locked
                                       ? 'lock-icon-flash-lock'
                                       : 'lock-icon-flash-unlock'
@@ -454,11 +464,14 @@ export default function LobbyPage() {
                   <Form.Label>User</Form.Label>
                   <Form.Select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>
                     <option value="">{t('selectUser')}</option>
-                    {room.participants.map((participant) => (
-                      <option key={participant.userId} value={participant.userId}>
-                        {participant.username} ({getDisplayRole(participant)})
-                      </option>
-                    ))}
+                    {room.participants.map((participant) => {
+                      const participantId = getEntityId(participant.userId as EntityRef);
+                      return (
+                        <option key={participantId} value={participantId}>
+                          {participant.username} ({getDisplayRole(participant)})
+                        </option>
+                      );
+                    })}
                   </Form.Select>
                 </Form.Group>
                 <Form.Group className="mb-3">
@@ -563,7 +576,7 @@ export default function LobbyPage() {
             </Card.Body>
           </Card>
 
-          {isOwner && (
+          {canManageLocks && (
             <Card>
               <Card.Body>
                 <Card.Title>{t('roomSetup')}</Card.Title>
@@ -675,21 +688,21 @@ export default function LobbyPage() {
             {t('ownerLeaveWarning')}
           </p>
           
-          {room?.participants && room.participants.filter(p => p.userId !== user?._id).length > 0 ? (
+          {room?.participants && room.participants.filter((p) => getEntityId(p.userId as EntityRef) !== user?._id).length > 0 ? (
             <>
               <p className="text-secondary small mb-3">
                 {t('ownerLeaveWarning2')}
               </p>
               <div className="list-group list-group-flush mb-4" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {room.participants
-                  .filter((p) => p.userId !== user?._id)
+                  .filter((p) => getEntityId(p.userId as EntityRef) !== user?._id)
                   .map((p) => (
                     <button
-                      key={p.userId}
+                      key={getEntityId(p.userId as EntityRef)}
                       className="list-group-item list-group-item-action bg-dark text-white border-secondary border-opacity-20 d-flex align-items-center justify-content-between py-2 px-3"
                       onClick={() => {
                         setShowLeaveConfirmModal(false);
-                        leaveMutation.mutate(p.userId);
+                        leaveMutation.mutate(getEntityId(p.userId as EntityRef));
                       }}
                     >
                       <div className="d-flex align-items-center">

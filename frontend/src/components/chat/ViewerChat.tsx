@@ -75,40 +75,40 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
   };
 
   return (
-    <div className="d-flex flex-column h-100" style={{ minHeight: 0 }}>
-      <div className="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
+    <div className="debate-chat debate-viewer-chat d-flex flex-column h-100" style={{ minHeight: 0 }}>
+      <div className="debate-chat-header d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
         <h6 className="mb-0">
           <i className="bi bi-people me-2" />
           Viewer Chat
         </h6>
         <Badge bg="info">
-          {isViewer ? 'You are a viewer' : isHost ? 'Host' : isJudge ? 'Judge (read-only)' : 'Observer'}
+          {isViewer ? 'You are a viewer' : isHost ? 'Host' : isJudge ? 'Judge (read-only)' : 'Read-only'}
         </Badge>
       </div>
 
       <div
         ref={listRef}
-        className="flex-grow-1 overflow-auto px-2 py-2 rounded-3"
-        style={{ minHeight: 0, background: '#ffffff', color: '#1c1c1c' }}
+        className="debate-chat-messages flex-grow-1 overflow-auto px-2 py-2"
+        style={{ minHeight: 0 }}
       >
         {viewerChatMessages.length === 0 ? (
-          <div className="small text-center py-3" style={{ color: '#888888' }}>
+          <div className="debate-chat-empty small text-center py-3">
             No viewer messages yet.
           </div>
         ) : (
           viewerChatMessages.map((message) => {
             if (isSystemMessage(message)) {
               return (
-                <div key={message._id} className="small fst-italic my-1 px-2" style={{ color: '#666666' }}>
+                <div key={message._id} className="debate-chat-system small fst-italic my-1 px-2">
                   {message.content}
                 </div>
               );
             }
             const isOwn = message.senderId === user?._id;
             return (
-              <div key={message._id} className={`my-1 px-2 py-1 rounded-2`} style={{ background: isOwn ? 'rgba(13, 202, 240, 0.08)' : 'rgba(0, 0, 0, 0.03)' }}>
+              <div key={message._id} className={`debate-chat-message ${isOwn ? 'is-own' : ''} my-1 px-2 py-1`}>
                 <div className="d-flex align-items-baseline gap-2">
-                  <strong className="small text-capitalize" style={{ color: isOwn ? '#0dcaf0' : '#333333' }}>
+                  <strong className="debate-chat-sender small text-capitalize">
                     {message.senderName}
                   </strong>
                   <Badge bg="dark" pill style={{ fontSize: '0.6rem' }}>
@@ -118,7 +118,7 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
                     {formatTime(message.timestamp)}
                   </span>
                 </div>
-                <div className="small" style={{ color: '#1c1c1c' }}>{message.content}</div>
+                <div className="debate-chat-content small">{message.content}</div>
               </div>
             );
           })
@@ -126,13 +126,12 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
       </div>
 
       {isViewer && !isChatMuted ? (
-        <InputGroup className="mt-2">
+        <InputGroup className="debate-chat-composer mt-2">
           <Form.Control
             placeholder="Chat as a viewer..."
             value={content}
             disabled={sending}
             onChange={(event) => setContent(event.target.value)}
-            style={{ background: '#ffffff', color: '#1c1c1c', border: '1px solid #ced4da' }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
@@ -156,7 +155,11 @@ export function ViewerChat({ roomId }: ViewerChatProps) {
         <div className="text-muted small text-center py-2 border rounded-3 mt-2">
           Judge view only — you can read the viewer chat
         </div>
-      ) : null}
+      ) : (
+        <div className="text-muted small text-center py-2 border rounded-3 mt-2">
+          Viewer chat is read-only for your role
+        </div>
+      )}
     </div>
   );
 }

@@ -224,7 +224,8 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       });
     };
 
-    const handleUserJoined = (payload: { socketId: string; userId: string }) => {
+    const handleUserJoined = (payload: { socketId: string; userId: string; team?: string }) => {
+      if (payload.team !== team) return;
       ensurePeerConnection(payload.socketId);
       setPeers((prev) => {
         if (prev.find((p) => p.socketId === payload.socketId)) return prev;
@@ -235,7 +236,8 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       }
     };
 
-    const handleUserLeft = (payload: { socketId: string }) => {
+    const handleUserLeft = (payload: { socketId: string; team?: string }) => {
+      if (payload.team !== team) return;
       closePeer(payload.socketId);
     };
 

@@ -8,12 +8,12 @@ type VoicePeer = {
 
 type VoiceRoomPayload = {
   roomId?: string;
-  team?: 'proposition' | 'opposition' | 'judge';
+  team?: 'proposition' | 'opposition' | 'judge' | 'video';
 };
 
 type VoiceSignalPayload = {
   roomId?: string;
-  team?: 'proposition' | 'opposition' | 'judge';
+  team?: 'proposition' | 'opposition' | 'judge' | 'video';
   targetSocketId?: string;
   offer?: unknown;
   answer?: unknown;
@@ -22,7 +22,7 @@ type VoiceSignalPayload = {
 
 type VideoTogglePayload = {
   roomId?: string;
-  team?: 'proposition' | 'opposition' | 'judge';
+  team?: 'proposition' | 'opposition' | 'judge' | 'video';
   targetUserId?: string;
   active?: boolean;
 };
@@ -37,12 +37,8 @@ const socketVoiceRooms = new Map<string, Set<string>>();
 // Per-userId camera state for the main room. Private rooms keep their own map.
 const cameraState = new Map<string, Set<string>>(); // roomId -> Set<userId with cam on>
 
-function buildVoiceKey(roomId: string, team?: 'proposition' | 'opposition' | 'judge'): string {
+function buildVoiceKey(roomId: string, team?: 'proposition' | 'opposition' | 'judge' | 'video'): string {
   return team ? `voice:${roomId}:${team}` : roomId;
-}
-
-function buildMainVoiceKey(roomId: string): string {
-  return roomId;
 }
 
 function getSocketUserId(socket: Socket) {
@@ -70,11 +66,13 @@ function leaveVoiceRoom(socket: Socket, roomId: string) {
   if (!roomPeers?.has(socket.id)) return;
 
   const userId = roomPeers.get(socket.id);
+  const team = roomId.startsWith('voice:') ? roomId.split(':')[2] : undefined;
   roomPeers.delete(socket.id);
   if (roomPeers.size === 0) voiceRooms.delete(roomId);
   trackVoiceLeave(socket.id, roomId);
 
   socket.to(roomId).emit('voice:user-left', {
+    team,
     socketId: socket.id,
     userId,
   });
@@ -84,7 +82,6 @@ function leaveVoiceRoom(socket: Socket, roomId: string) {
     if (set?.has(userId)) {
       set.delete(userId);
       cameraState.set(roomId, set);
-      const team = roomId.startsWith('voice:') ? roomId.split(':')[2] : undefined;
       socket.to(roomId).emit('video:state', { userId, active: false, team });
     }
   }
@@ -129,6 +126,8 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
 
     ack?.({ peers, cameraState: initialState });
     socket.to(key).emit('voice:user-joined', {
+      roomId,
+      team,
       socketId: socket.id,
       userId,
     });
@@ -218,7 +217,7 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      const key = buildMainVoiceKey(roomId);
+      const key = buildVoiceKey(roomId, 'video');
       const set = cameraState.get(key) || new Set<string>();
       if (active) set.add(targetUserId);
       else set.delete(targetUserId);
@@ -228,6 +227,7 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
         userId: targetUserId,
         active,
         byUserId: userId,
+        team: 'video',
       });
 
       ack?.({ success: true });

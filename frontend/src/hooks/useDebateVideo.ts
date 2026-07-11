@@ -19,6 +19,17 @@ const peerConnectionConfig: RTCConfiguration = {
   iceServers: [],
 };
 
+const MAIN_VIDEO_CHANNEL = 'video';
+
+function resolveEntityId(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  const entity = value as { _id?: unknown; id?: unknown };
+  if (typeof entity._id === 'string') return entity._id;
+  if (typeof entity.id === 'string') return entity.id;
+  return '';
+}
+
 function getCameraErrorMessage(error: unknown) {
   if (!window.isSecureContext) {
     return 'Camera needs HTTPS or a trusted local origin';
@@ -45,7 +56,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
   const setCameraActive = useDebateStore((s) => s.setCameraActive);
   const setCameraLockedByHost = useDebateStore((s) => s.setCameraLockedByHost);
   const participants = useDebateStore((s) => s.participants);
-  const me = participants.find((p) => p.userId === userId);
+  const me = participants.find((participant) => resolveEntityId(participant.userId) === userId);
   const isCameraMutedByHost = Boolean(me?.cameraMuted);
 
   const [cameraActive, setLocalCameraActive] = useState(false);
@@ -77,6 +88,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
         if (!event.candidate) return;
         getSocket()?.emit('voice:ice-candidate', {
           roomId,
+          team: MAIN_VIDEO_CHANNEL,
           targetSocketId: peerSocketId,
           candidate: event.candidate.toJSON(),
         });
@@ -119,6 +131,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       await pc.setLocalDescription(offer);
       socket.emit('voice:offer', {
         roomId,
+        team: MAIN_VIDEO_CHANNEL,
         targetSocketId: peerSocketId,
         offer: pc.localDescription,
       });
@@ -140,7 +153,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     }
     setLocalCameraActive(false);
     if (userId) setCameraActive(userId, false);
-    getSocket()?.emit('video:state', { roomId, active: false });
+    getSocket()?.emit('video:state', { roomId, team: MAIN_VIDEO_CHANNEL, active: false });
   }, [roomId, setCameraActive, userId]);
 
   const startCamera = useCallback(async () => {
@@ -159,11 +172,11 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
       setLocalCameraActive(true);
       setCameraActive(userId, true);
-      getSocket()?.emit('video:state', { roomId, active: true });
+      getSocket()?.emit('video:state', { roomId, team: MAIN_VIDEO_CHANNEL, active: true });
     } catch (error) {
       toast.error(getCameraErrorMessage(error));
     }
-  }, [attachLocalVideoTrack, roomId, sendOffer, setCameraActive, userId]);
+  }, [attachLocalVideoTrack, isCameraMutedByHost, roomId, sendOffer, setCameraActive, userId]);
 
   const hostToggleCamera = useCallback(
     (targetUserId: string, active: boolean) => {
@@ -190,7 +203,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     const joinVideo = () => {
       socket.emit(
         'voice:join',
-        { roomId },
+        { roomId, team: MAIN_VIDEO_CHANNEL },
         (response?: {
           peers: Array<{ socketId: string; userId: string }>;
           cameraState?: { activeUsers: string[] };
@@ -217,7 +230,8 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       );
     };
 
-    const handleUserJoined = (payload: { socketId: string; userId: string }) => {
+    const handleUserJoined = (payload: { socketId: string; userId: string; team?: string }) => {
+      if (payload.team !== MAIN_VIDEO_CHANNEL) return;
       ensurePeerConnection(payload.socketId);
       setPeers((prev) => {
         if (prev.find((p) => p.socketId === payload.socketId)) return prev;
@@ -228,27 +242,27 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       }
     };
 
-    const handleUserLeft = (payload: { socketId: string }) => {
+    const handleUserLeft = (payload: { socketId: string; team?: string }) => {
+      if (payload.team !== MAIN_VIDEO_CHANNEL) return;
       closePeer(payload.socketId);
     };
 
-    const handleVideoState = (payload: { userId: string; active: boolean }) => {
+    const handleVideoState = (payload: { userId: string; active: boolean; team?: string }) => {
+      if (payload.team !== MAIN_VIDEO_CHANNEL) return;
       setCameraActive(payload.userId, payload.active);
     };
 
     const handleHostToggle = (payload: { userId: string; active: boolean; byUserId: string }) => {
-      setCameraActive(payload.userId, payload.active);
+      if (!payload.active) {
+        setCameraActive(payload.userId, false);
+      }
       if (userId && payload.userId === userId) {
         if (payload.active) {
           setCameraLockedByHost(false);
           toast.success('The host enabled your camera');
-          startCamera().catch(() => undefined);
         } else {
           setCameraLockedByHost(true);
-          if (streamRef.current) {
-            streamRef.current.getVideoTracks().forEach((t) => t.stop());
-          }
-          setLocalCameraActive(false);
+          stopCamera();
           toast.error('The host turned off your camera');
         }
       }
@@ -265,9 +279,10 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     const handleOffer = async (payload: {
       roomId: string;
       fromSocketId: string;
+      team?: string;
       offer: RTCSessionDescriptionInit;
     }) => {
-      if (payload.roomId !== roomId) return;
+      if (payload.roomId !== roomId || payload.team !== MAIN_VIDEO_CHANNEL) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
@@ -276,6 +291,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
         await pc.setLocalDescription(answer);
         socket.emit('voice:answer', {
           roomId,
+          team: MAIN_VIDEO_CHANNEL,
           targetSocketId: payload.fromSocketId,
           answer: pc.localDescription,
         });
@@ -287,9 +303,10 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     const handleAnswer = async (payload: {
       roomId: string;
       fromSocketId: string;
+      team?: string;
       answer: RTCSessionDescriptionInit;
     }) => {
-      if (payload.roomId !== roomId) return;
+      if (payload.roomId !== roomId || payload.team !== MAIN_VIDEO_CHANNEL) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
@@ -302,9 +319,10 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     const handleIce = async (payload: {
       roomId: string;
       fromSocketId: string;
+      team?: string;
       candidate: RTCIceCandidateInit;
     }) => {
-      if (payload.roomId !== roomId) return;
+      if (payload.roomId !== roomId || payload.team !== MAIN_VIDEO_CHANNEL) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         if (!pc.remoteDescription) {
@@ -343,7 +361,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       socket.off('video:host-toggle', handleHostToggle);
 
       if (joinedRef.current) {
-        socket.emit('voice:leave', { roomId });
+        socket.emit('voice:leave', { roomId, team: MAIN_VIDEO_CHANNEL });
         joinedRef.current = false;
       }
       peerConnectionsRef.current.forEach((pc) => pc.close());
@@ -358,6 +376,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     sendOffer,
     setCameraActive,
     setCameraLockedByHost,
+    stopCamera,
     userId,
   ]);
 
@@ -370,7 +389,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       if (userId) {
         setCameraActive(userId, false);
       }
-      getSocket()?.emit('video:state', { roomId, active: false });
+      getSocket()?.emit('video:state', { roomId, team: MAIN_VIDEO_CHANNEL, active: false });
     };
   }, [roomId, setCameraActive, userId]);
 

@@ -186,12 +186,13 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      // Judges can READ viewer chat but not send. Owners/Hosts/Viewers can both.
+      // Every room participant can read the viewer channel. Send permission is
+      // enforced separately by viewer-chat:send.
       const effectiveRole =
         participant.roomRole === 'owner'
           ? (participant.primaryRole ?? participant.roomRole)
           : participant.roomRole;
-      const canRead = ['viewer', 'host', 'owner', 'judge'].includes(String(effectiveRole));
+      const canRead = ['viewer', 'host', 'owner', 'judge', 'debater'].includes(String(effectiveRole));
       if (!canRead) {
         ack?.({ messages: [] });
         return;

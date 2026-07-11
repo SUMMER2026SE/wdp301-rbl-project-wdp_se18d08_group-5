@@ -9,6 +9,7 @@ import type { Team } from '@/types';
 import { hasHostControl } from '../../utils/roomPermissions';
 
 type PrivateRoomTeam = Team | 'judge';
+type EntityRef = string | { _id?: string; id?: string } | null | undefined;
 
 interface PrivateRoomPanelProps {
   roomId: string;
@@ -18,6 +19,19 @@ function formatTime(timestamp: string | Date) {
   const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function getEntityId(value: EntityRef) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value._id || value.id || '';
+}
+
+function getEffectiveRole(participant: { roomRole?: string | null; primaryRole?: string | null } | undefined) {
+  if (!participant) return null;
+  return participant.roomRole === 'owner'
+    ? participant.primaryRole || participant.roomRole
+    : participant.roomRole || null;
 }
 
 export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
@@ -35,8 +49,8 @@ export function PrivateRoomPanel({ roomId }: PrivateRoomPanelProps) {
   const myKey = currentPrivateRoom ? `${roomId}::${currentPrivateRoom}` : null;
   const messages = myKey ? (privateRoomMessages[myKey] || []) : [];
 
-  const participant = room?.participants.find((p) => p.userId === user?._id);
-  const myRole = participant?.roomRole;
+  const participant = room?.participants.find((p) => getEntityId(p.userId as EntityRef) === user?._id);
+  const myRole = getEffectiveRole(participant);
   const myTeam = participant?.team;
   const isHost = hasHostControl(room, user?._id);
 
