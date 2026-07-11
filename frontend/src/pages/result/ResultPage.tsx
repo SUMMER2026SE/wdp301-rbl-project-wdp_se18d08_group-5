@@ -7,6 +7,9 @@ import { debateService } from '@services/debateService';
 import { useSocket } from '@hooks/useSocket';
 import { clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
 
+// Import CSS
+import '../../styles/result.css';
+
 const ROUNDS = [
   { num: 1, label: 'Round 1 — Opening Speeches', propSpeaker: 'PRO_S1', oppSpeaker: 'OPP_S1', hasCE: true },
   { num: 2, label: 'Round 2 — Rebuttal & Extensions', propSpeaker: 'PRO_S2', oppSpeaker: 'OPP_S2', hasCE: true },
@@ -114,9 +117,9 @@ export default function ResultPage() {
 
   return (
     <div style={{ background: '#0a0a0f', color: '#fff', minHeight: '100vh', fontFamily: 'Rajdhani, sans-serif' }} className="py-4">
-      <Container>
+      <Container className="result-page-container">
         {/* Header */}
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 p-4 rounded-4 border border-secondary border-opacity-15 bg-secondary bg-opacity-5">
+        <div className="result-header-panel d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div className="min-width-0">
             <span className="text-neon-cyan text-uppercase fw-bold" style={{ fontSize: '11px', letterSpacing: '0.15em', fontFamily: 'Orbitron' }}>
               DEBATE ARENA CONCLUDED
@@ -151,7 +154,7 @@ export default function ResultPage() {
           <Col lg={4} className="d-flex flex-column gap-4">
 
             {/* Scorecard — per-round breakdown */}
-            <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
+            <Card className="result-premium-card">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
                   <i className="bi bi-bar-chart-fill text-neon-cyan me-2"></i> {t('finalScoreboard')}
@@ -159,36 +162,36 @@ export default function ResultPage() {
 
                 {isRoundBased || verdicts.length > 0 ? (
                   <>
-                    <div className="mb-4">
-                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                    <div className="result-progress-wrapper">
+                      <div className="result-progress-label">
                         <span className="text-neon-cyan">{t('proposition')}</span>
                         <span className="text-white">{grandPropTotal.toFixed(1)} {t('points')}</span>
                       </div>
-                      <ProgressBar now={(grandPropTotal / grandTotal) * 100} className="bg-dark" style={{ height: '12px' }} variant="info" />
+                      <ProgressBar now={(grandPropTotal / grandTotal) * 100} className="bg-dark result-progress-bar-cyan" style={{ height: '12px' }} />
                     </div>
-                    <div className="mb-4">
-                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                    <div className="result-progress-wrapper">
+                      <div className="result-progress-label">
                         <span className="text-neon-pink">{t('opposition')}</span>
                         <span className="text-white">{grandOppTotal.toFixed(1)} {t('points')}</span>
                       </div>
-                      <ProgressBar now={(grandOppTotal / grandTotal) * 100} className="bg-dark" style={{ height: '12px' }} variant="danger" />
+                      <ProgressBar now={(grandOppTotal / grandTotal) * 100} className="bg-dark result-progress-bar-pink" style={{ height: '12px' }} />
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="mb-4">
-                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                    <div className="result-progress-wrapper">
+                      <div className="result-progress-label">
                         <span className="text-neon-cyan">{t('proposition')}</span>
                         <span className="text-white">— {t('points')}</span>
                       </div>
-                      <ProgressBar now={50} className="bg-dark" style={{ height: '12px' }} variant="info" />
+                      <ProgressBar now={50} className="bg-dark result-progress-bar-cyan" style={{ height: '12px' }} />
                     </div>
-                    <div className="mb-4">
-                      <div className="d-flex justify-content-between mb-1 small fw-bold">
+                    <div className="result-progress-wrapper">
+                      <div className="result-progress-label">
                         <span className="text-neon-pink">{t('opposition')}</span>
                         <span className="text-white">— {t('points')}</span>
                       </div>
-                      <ProgressBar now={50} className="bg-dark" style={{ height: '12px' }} variant="danger" />
+                      <ProgressBar now={50} className="bg-dark result-progress-bar-pink" style={{ height: '12px' }} />
                     </div>
                   </>
                 )}
@@ -203,7 +206,7 @@ export default function ResultPage() {
             </Card>
 
             {/* Participants */}
-            <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
+            <Card className="result-premium-card">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
                   <i className="bi bi-people-fill text-neon-cyan me-2"></i> {t('matchParticipants')}
@@ -249,7 +252,7 @@ export default function ResultPage() {
 
           {/* Right Column — Judges Feedback per Round */}
           <Col lg={8}>
-            <Card className="border-secondary border-opacity-15 rounded-4 bg-secondary bg-opacity-5">
+            <Card className="result-premium-card">
               <Card.Body className="p-4">
                 <Card.Title className="text-uppercase font-monospace mb-4 text-muted" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
                   <i className="bi bi-chat-left-quote-fill text-neon-cyan me-2"></i> {t('judgesFeedback')}
@@ -261,7 +264,7 @@ export default function ResultPage() {
                     const oppVerdicts = verdicts.filter((v: any) => v.speaker === round.oppSpeaker);
 
                     return (
-                      <div key={round.num} className="p-3 rounded-3 bg-dark bg-opacity-20 border border-secondary border-opacity-10">
+                      <div key={round.num} className="round-feedback-card">
                         <h5 className="text-neon-yellow border-bottom border-secondary border-opacity-15 pb-2 mb-3 text-uppercase" style={{ fontFamily: 'Orbitron', fontSize: '13px', fontWeight: 700 }}>
                           {round.label}
                         </h5>
@@ -279,8 +282,12 @@ export default function ResultPage() {
 
                               if (!hasProp && !hasOpp) return null;
 
+                              const propScore = (Number(propV?.score?.logic) || 0) + (Number(propV?.score?.crossExam) || 0);
+                              const oppScore = (Number(oppV?.score?.logic) || 0) + (Number(oppV?.score?.crossExam) || 0);
+                              const accentClass = propScore > oppScore ? 'prop-accent' : propScore < oppScore ? 'opp-accent' : 'draw-accent';
+
                               return (
-                                <div key={jId} className="bg-black bg-opacity-25 rounded p-3 border-start border-warning border-2">
+                                <div key={jId} className={`judge-verdict-node ${accentClass}`}>
                                   {/* Judge name + round badge */}
                                   <div className="d-flex justify-content-between align-items-center mb-3">
                                     <span className="text-white fw-bold small">{judgeName}</span>
