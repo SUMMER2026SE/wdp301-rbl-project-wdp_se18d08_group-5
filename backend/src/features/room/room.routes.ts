@@ -123,20 +123,27 @@ function getEffectiveRoomRole(participant: any) {
 }
 
 // Returns the list of speakers expected to be scored across the full debate.
-// Per docs/ruleScore.md: each round scores the Round-N speaker from each side,
-// and rounds 1-2 also score cross-examination. For 3v3 the full list is:
-//   PRO_S1, OPP_S1, PRO_S2, OPP_S2, PRO_S3, OPP_S3
-// For 1v1 it's the single speaker from each side.
+// Per docs/ruleScore.md: each round scores the Round-N turn from each side,
+// and rounds 1-2 also score cross-examination. In 1v1 the same participant
+// takes all three turns, but scores are still stored as S1/S2/S3 verdicts so
+// each round remains independent.
 //
 // Note: rounds 1 and 2 CE scores are stored on the speaker verdict (crossExam
 // field), not as separate verdicts. So the expected speaker set is just the
 // two speakers per round across all rounds.
-function getExpectedScoringSpeakersForRoom(room: any): string[] {
-  const format = room.format;
-  if (format === '1v1') {
-    return ['PRO_S1', 'OPP_S1'];
-  }
+function getExpectedScoringSpeakersForRoom(_room: any): string[] {
   return ['PRO_S1', 'OPP_S1', 'PRO_S2', 'OPP_S2', 'PRO_S3', 'OPP_S3'];
+}
+
+function getJudgeFeedbackSpeakerForCe(speaker: unknown): { speaker: 'JUDGES_FB_1' | 'JUDGES_FB_2' | 'JUDGES_FB_3'; round: 1 | 2 | 3 } {
+  const match = /^CE_ROUND_(\d)$/i.exec(String(speaker || ''));
+  const round = match && ['1', '2', '3'].includes(match[1])
+    ? Number(match[1])
+    : 1;
+  return {
+    speaker: `JUDGES_FB_${round}` as 'JUDGES_FB_1' | 'JUDGES_FB_2' | 'JUDGES_FB_3',
+    round: round as 1 | 2 | 3,
+  };
 }
 
 async function buildRoomPayload(room: any) {
@@ -1087,6 +1094,20 @@ router.post(
     // is enforced server-side. The route also broadcasts the live state to
     // every connected client so the lobby can react to join/leave realtime.
     const result = await startDebate(req.params.id, (req as any).participant.userId.toString());
+
+    if ((result as any).pendingStart) {
+      const io = getIO();
+      const roomIdStr = req.params.id;
+      io.to(roomIdStr).emit('debate:s1-start-consensus-update', {
+        readyUserIds: (result as any).readyUserIds,
+        requiredUserIds: (result as any).requiredUserIds,
+        readyCount: (result as any).readyUserIds?.length || 0,
+        totalDebaters: (result as any).totalDebaters || 2,
+      });
+      await broadcastRoomState(roomIdStr);
+      sendSuccess(res, result, 'Waiting for both S1 debaters to start');
+      return;
+    }
 
     // Notify every client in the room so participants auto-navigate from
     // the lobby to the live debate screen.
@@ -2048,16 +2069,20 @@ router.post(
       throw new ForbiddenError('Only the asking team or host can finish cross-examination');
     }
 
-    session.currentTurn.status = 'completed';
+    const feedback = getJudgeFeedbackSpeakerForCe(session.currentTurn.speaker);
+    session.currentTurn.status = 'active';
+    session.currentTurn.phaseStatus = 'active';
     session.currentTurn.phase = 'judge_feedback';
-    await session.save();
+    session.currentTurn.speaker = feedback.speaker;
+    room.currentPhase = 'judge_feedback';
+    await Promise.all([session.save(), room.save()]);
 
     // Broadcast phase change so frontend exits cross-exam UI
     getIO().to(room._id.toString()).emit('debate:phase-change', {
       phase: 'judge_feedback',
       phaseStatus: 'active',
-      speaker: 'JUDGES_FB_1',
-      announcement: 'End of Round',
+      speaker: feedback.speaker,
+      announcement: `End of Round ${feedback.round}`,
     });
     getIO().to(room._id.toString()).emit('debate:turn-status-change', { turnStatus: 'active', phaseStatus: 'active' });
 

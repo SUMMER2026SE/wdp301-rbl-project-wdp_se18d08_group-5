@@ -199,7 +199,14 @@ export default function LobbyPage() {
 
   const startMutation = useMutation({
     mutationFn: () => roomService.start(roomId),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const result = response.data?.data as any;
+      if (result?.pendingStart) {
+        const readyCount = result.readyUserIds?.length || 0;
+        const totalDebaters = result.totalDebaters || 2;
+        toast.success(`Waiting for S1 start consensus (${readyCount}/${totalDebaters})`);
+        return;
+      }
       toast.success(t('debateStarting'));
       navigate(`/debate/${roomId}`);
     },
@@ -223,15 +230,14 @@ export default function LobbyPage() {
   const canStartDebate = useMemo(() => {
     if (!room || !user || !currentParticipant) return false;
 
-    // Room Owner always sees the Start button (enabled/disabled by readiness check).
-    if (isOwner) return true;
-
     if (room.hostType !== 'human' && room.judgeType === 'ai') {
       // No-Host + AI: S1 debaters can start
       return myEffectiveRole === 'debater' && mySlot === 'S1';
-    } else {
-      return isHost;
     }
+
+    // Host rooms still allow the owner to start; No-Host + Human uses Judge S1 via isHost.
+    if (isOwner && room.hostType === 'human') return true;
+    return isHost;
   }, [room, user, currentParticipant, myEffectiveRole, mySlot, isOwner, isHost]);
   const isAssignedDebater =
     currentParticipant?.roomRole === 'debater' ||
