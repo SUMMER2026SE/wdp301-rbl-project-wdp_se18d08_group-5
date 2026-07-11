@@ -1,0 +1,288 @@
+/* ============================================================
+   MATCHMAKING RADAR & SCREEN — FUTURISTIC SCI-FI DESIGN
+   ============================================================ */
+
+.matchmaking-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  animation: matchmakingFade 0.5s ease-out;
+}
+
+@keyframes matchmakingFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Radar Visual Scanner ── */
+.radar-scanner-card {
+  background: linear-gradient(135deg, rgba(10, 10, 15, 0.9) 0%, rgba(18, 18, 31, 0.95) 100%);
+  border: 1px solid var(--border-neon);
+  border-radius: 16px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(0, 245, 255, 0.08);
+  height: 100%;
+}
+
+.radar-screen-wrapper {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 245, 255, 0.03) 0%, rgba(10, 10, 15, 0.95) 90%);
+  border: 2px solid rgba(0, 245, 255, 0.25);
+  box-shadow:
+    0 0 20px rgba(0, 245, 255, 0.05),
+    inset 0 0 25px rgba(0, 245, 255, 0.1);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+/* Concentric Radar Grid Rings */
+.radar-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 245, 255, 0.15);
+  pointer-events: none;
+}
+
+.radar-ring.ring-1 {
+  width: 70px;
+  height: 70px;
+}
+.radar-ring.ring-2 {
+  width: 140px;
+  height: 140px;
+}
+.radar-ring.ring-3 {
+  width: 210px;
+  height: 210px;
+}
+
+/* Radar Crosshairs */
+.radar-crosshair-v,
+.radar-crosshair-h {
+  position: absolute;
+  background: rgba(0, 245, 255, 0.15);
+  pointer-events: none;
+}
+
+.radar-crosshair-v {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.radar-crosshair-h {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+/* Radar Rotating Sweep Line */
+.radar-sweep-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(0, 245, 255, 0.22) 0deg, rgba(0, 245, 255, 0) 90deg);
+  transform-origin: 50% 50%;
+  animation: radarSweepAnim 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes radarSweepAnim {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Blinking Player Dot/Pings on Radar */
+.radar-ping-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #39ff14; /* green blinking indicators */
+  border-radius: 50%;
+  box-shadow:
+    0 0 10px #39ff14,
+    0 0 20px #39ff14;
+  animation: radarPingAnim 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.radar-ping-dot.pos-1 {
+  top: 30%;
+  left: 65%;
+  animation-delay: 0.2s;
+}
+.radar-ping-dot.pos-2 {
+  top: 70%;
+  left: 25%;
+  animation-delay: 0.9s;
+}
+.radar-ping-dot.pos-3 {
+  top: 45%;
+  left: 40%;
+  animation-delay: 1.4s;
+}
+
+@keyframes radarPingAnim {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.4;
+    filter: brightness(0.6);
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    filter: brightness(1.2);
+  }
+}
+
+/* ── Queue stats & controller console ── */
+.queue-console-card {
+  background: rgba(18, 18, 31, 0.85);
+  border: 1px solid var(--border-neon);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  height: 100%;
+}
+
+.console-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.console-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  margin-bottom: 0.65rem;
+}
+
+.queue-console-status-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.queue-console-status-badge.searching {
+  background: rgba(0, 245, 255, 0.12);
+  color: var(--bs-primary);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  animation: searchingGlow 2s infinite ease-in-out;
+}
+
+@keyframes searchingGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(0, 245, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.4);
+  }
+}
+
+.queue-console-status-badge.matched {
+  background: rgba(57, 255, 20, 0.12);
+  color: var(--bs-success);
+  border: 1px solid rgba(57, 255, 20, 0.35);
+}
+
+.queue-console-status-badge.idle {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Matchmaking Logs panel ── */
+.queue-logs-panel {
+  background: rgba(10, 10, 15, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.queue-log-line {
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
+
+.queue-log-line.success {
+  color: var(--bs-success);
+}
+
+.queue-log-line.cyan {
+  color: var(--bs-primary);
+}
+
+/* Match Found overlay */
+.match-found-banner {
+  background: linear-gradient(135deg, rgba(57, 255, 20, 0.1) 0%, rgba(10, 10, 15, 0.95) 100%);
+  border: 2px solid var(--bs-success);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  box-shadow: 0 0 25px rgba(57, 255, 20, 0.2);
+  animation: matchFoundPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes matchFoundPop {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.match-found-title {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 800;
+  color: var(--bs-success);
+  font-size: 1.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.25rem;
+}

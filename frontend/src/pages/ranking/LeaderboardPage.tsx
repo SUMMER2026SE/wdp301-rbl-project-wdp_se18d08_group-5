@@ -1,58 +1,28 @@
 import { useState } from 'react';
-import { Alert, Button, Container, Pagination, Table } from 'react-bootstrap';
+import { Alert, Container, Pagination } from 'react-bootstrap';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LoadingScreen } from '@components/common/LoadingScreen';
-import { RankBadge } from '@components/ranking/RankBadge';
 import { rankingService } from '@services/rankingService';
 import { useAuthStore } from '@stores/authStore';
+import type { RankTier } from '@/types';
 
-const PAGE_SIZE = 20;
+// Import custom components
+import { LeaderboardPodium } from '../../components/ranking/LeaderboardPodium';
+import { LeaderboardStatsCard } from '../../components/ranking/LeaderboardStatsCard';
+import { LeaderboardSearchFilter } from '../../components/ranking/LeaderboardSearchFilter';
+import { LeaderboardRow } from '../../components/ranking/LeaderboardRow';
 
-function getPlayerInitial(name: string) {
-  return name.trim().charAt(0).toUpperCase() || 'U';
-}
+// Import CSS
+import '../../styles/leaderboard.css';
 
-function LeaderboardAvatar({ src, name }: { src?: string; name: string }) {
-  const [hasError, setHasError] = useState(false);
-  const shouldUseFallback = !src || hasError;
-
-  if (shouldUseFallback) {
-    return (
-      <span
-        className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
-        style={{
-          width: 40,
-          height: 40,
-          flex: '0 0 40px',
-          color: '#0a0a0f',
-          background: 'var(--gradient-neon)',
-          border: '1px solid rgba(0, 245, 255, 0.45)',
-          boxShadow: '0 0 12px rgba(0, 245, 255, 0.18)',
-        }}
-        aria-label={name}
-      >
-        {getPlayerInitial(name)}
-      </span>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={name}
-      width={40}
-      height={40}
-      className="rounded-circle object-fit-cover"
-      onError={() => setHasError(true)}
-    />
-  );
-}
+const PAGE_SIZE = 50; // Increased page size for a better overview list
 
 export default function LeaderboardPage() {
   const [page, setPage] = useState(1);
-  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTier, setSelectedTier] = useState<'All' | RankTier>('All');
+
   const { t } = useTranslation('common');
   const currentUserId = useAuthStore((state) => state.user?._id);
 
@@ -77,84 +47,112 @@ export default function LeaderboardPage() {
   if (leaderboardQuery.isError) {
     return (
       <Container className="py-4">
-        <Alert variant="danger">{(leaderboardQuery.error as Error).message || 'Failed to load leaderboard.'}</Alert>
+        <Alert variant="danger" className="bg-dark text-danger border-danger">
+          {(leaderboardQuery.error as Error).message || 'Failed to load leaderboard.'}
+        </Alert>
       </Container>
     );
   }
 
   const entries = leaderboardQuery.data ?? [];
 
+  // Filter entries locally based on user input
+  const filteredEntries = entries.filter((entry) => {
+    const name = (entry.displayName || entry.username || '').toLowerCase();
+    const username = entry.username.toLowerCase();
+    const query = searchQuery.toLowerCase();
+
+    const matchesSearch = name.includes(query) || username.includes(query);
+    const matchesTier = selectedTier === 'All' || entry.tier === selectedTier;
+
+    return matchesSearch && matchesTier;
+  });
+
   return (
-    <Container className="py-4">
-      <div className="mb-4">
-        <h2>
-          <i className="bi bi-trophy me-2" />
-          {t('leaderboard.title')}
-        </h2>
-        <p className="landing-subtitle mb-0">{t('leaderboard.subtitle')}</p>
+    <Container className="py-4 leaderboard-fade-in">
+      {/* Title */}
+      <div className="mb-4 d-flex align-items-center gap-3">
+        <div
+          className="rounded d-flex align-items-center justify-content-center bg-dark text-primary border border-secondary"
+          style={{ width: '45px', height: '45px', fontSize: '1.4rem' }}
+        >
+          <i className="bi bi-trophy-fill" />
+        </div>
+        <div>
+          <h2 className="mb-1 text-white" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+            {t('leaderboard.title')}
+          </h2>
+          <p className="text-secondary small mb-0">{t('leaderboard.subtitle')}</p>
+        </div>
       </div>
 
       {entries.length === 0 ? (
-        <Alert variant="info">{t('leaderboard.empty')}</Alert>
+        <Alert variant="info" className="bg-dark text-info border-info">
+          {t('leaderboard.empty')}
+        </Alert>
       ) : (
         <>
-          <div className="table-responsive">
-            <Table hover bordered>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>{t('leaderboard.columns.player')}</th>
-                  <th>{t('leaderboard.columns.elo')}</th>
-                  <th>{t('leaderboard.columns.tier')}</th>
-                  <th>{t('leaderboard.columns.winLoss')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => {
-                  const isCurrentUser = entry._id === currentUserId;
-                  const playerName = entry.displayName || entry.username;
-                  const playerContent = (
-                    <div className="d-flex align-items-center gap-2 text-start">
-                      <LeaderboardAvatar src={entry.avatar} name={playerName} />
-                      <div>
-                        <div className="fw-semibold">{playerName}</div>
-                        <div className="text-muted small">@{entry.username}</div>
-                      </div>
-                    </div>
-                  );
+          {/* Stats Bar */}
+          <LeaderboardStatsCard entries={entries} />
 
-                  return (
-                    <tr key={entry._id} className={isCurrentUser ? 'table-primary' : undefined}>
-                      <td>{entry.rank}</td>
-                      <td>
-                        {isCurrentUser ? (
-                          playerContent
-                        ) : (
-                          <Button
-                            variant="link"
-                            className="p-0 text-decoration-none text-reset w-100"
-                            onClick={() => navigate(`/profile/${entry._id}`)}
-                          >
-                            {playerContent}
-                          </Button>
-                        )}
-                      </td>
-                      <td>{entry.elo}</td>
-                      <td>
-                        <RankBadge tier={entry.tier} />
-                      </td>
-                      <td>{entry.wins}/{entry.losses}/{entry.draws ?? 0}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
+          {/* Podium for Top 3 (Only visible on Page 1) */}
+          {page === 1 && searchQuery === '' && selectedTier === 'All' && (
+            <LeaderboardPodium entries={entries} currentUserId={currentUserId} />
+          )}
 
-          <Pagination className="justify-content-center mb-0">
-            <Pagination.Prev disabled={page === 1} onClick={() => setPage((current) => current - 1)} />
-            <Pagination.Item active>{page}</Pagination.Item>
-            <Pagination.Next disabled={entries.length < PAGE_SIZE} onClick={() => setPage((current) => current + 1)} />
+          {/* Filters Controller */}
+          <LeaderboardSearchFilter
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedTier={selectedTier}
+            onTierChange={setSelectedTier}
+          />
+
+          {/* Custom Rankings Table */}
+          {filteredEntries.length > 0 ? (
+            <div className="leaderboard-table-card-premium table-responsive">
+              <table className="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '75px' }}>Rank</th>
+                    <th>{t('leaderboard.columns.player')}</th>
+                    <th>{t('leaderboard.columns.elo')}</th>
+                    <th>{t('leaderboard.columns.tier')}</th>
+                    <th>{t('leaderboard.columns.winLoss')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEntries.map((entry) => (
+                    <LeaderboardRow key={entry._id} entry={entry} currentUserId={currentUserId} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <Alert
+              variant="warning"
+              className="bg-dark text-warning border-warning text-center py-4"
+            >
+              <i className="bi bi-search me-2" />
+              No competitors found matching the search criteria or selected ELO tier.
+            </Alert>
+          )}
+
+          {/* Pagination */}
+          <Pagination className="justify-content-center mt-4">
+            <Pagination.Prev
+              disabled={page === 1}
+              onClick={() => setPage((current) => current - 1)}
+              className="border-secondary bg-dark"
+            />
+            <Pagination.Item active className="fw-bold">
+              {page}
+            </Pagination.Item>
+            <Pagination.Next
+              disabled={entries.length < PAGE_SIZE}
+              onClick={() => setPage((current) => current + 1)}
+              className="border-secondary bg-dark"
+            />
           </Pagination>
         </>
       )}

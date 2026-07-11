@@ -1,10 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, ButtonGroup, Card, Col, Container, Row, Spinner } from 'react-bootstrap';
+import { Col, Container, Row } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { matchmakingService } from '@services/matchmakingService';
 import type { DebateFormat } from '@/types';
+
+// Import custom components
+import { QueueConsole } from '../../components/matchmaking/QueueConsole';
+import { RadarScanner } from '../../components/matchmaking/RadarScanner';
+import { QueueStatsCard } from '../../components/matchmaking/QueueStatsCard';
+import { MatchFoundBanner } from '../../components/matchmaking/MatchFoundBanner';
+
+// Import CSS
+import '../../styles/matchmaking.css';
 
 export default function RankQueuePage() {
   const queryClient = useQueryClient();
@@ -23,14 +32,14 @@ export default function RankQueuePage() {
     onSuccess: (response) => {
       const result = response.data.data;
       if (result.status === 'matched' && result.roomId) {
-        toast.success('Match found');
+        toast.success('Match found! Entering debate room.');
         navigate(`/debate/${result.roomId}`);
         return;
       }
-      toast.success('Joined ranked queue');
-      queryClient.invalidateQueries({ queryKey: ['matchmaking-status'] });
+      toast.success('Joined competitive queue');
+      void queryClient.invalidateQueries({ queryKey: ['matchmaking-status'] });
     },
-    onError: () => toast.error('Could not join queue'),
+    onError: () => toast.error('Could not connect to matchmaking queue'),
   });
 
   const leaveMutation = useMutation({
@@ -39,11 +48,11 @@ export default function RankQueuePage() {
       return matchmakingService.leaveQueue();
     },
     onSuccess: () => {
-      toast.success('Left queue');
-      queryClient.invalidateQueries({ queryKey: ['matchmaking-status'] });
+      toast.success('Disconnected from matchmaking queue');
+      void queryClient.invalidateQueries({ queryKey: ['matchmaking-status'] });
     },
     onError: () => {
-      toast.error('Could not leave queue');
+      toast.error('Could not disconnect from matchmaking');
       setIsLeaving(false);
     },
     onSettled: () => {
@@ -61,90 +70,61 @@ export default function RankQueuePage() {
     }
   }, [isLeaving, navigate, roomId, status]);
 
+  const handleEnterDebate = () => {
+    if (roomId) {
+      navigate(`/debate/${roomId}`);
+    }
+  };
+
   return (
-    <Container className="py-4">
-      <Row className="g-4">
-        <Col lg={7}>
-          <h2 className="mb-3">
-            <i className="bi bi-lightning-charge me-2" />
-            Ranked Queue
+    <Container className="matchmaking-container">
+      {/* Title */}
+      <div className="mb-4 d-flex align-items-center gap-3">
+        <div
+          className="rounded d-flex align-items-center justify-content-center bg-dark text-primary border border-secondary"
+          style={{ width: '45px', height: '45px', fontSize: '1.4rem' }}
+        >
+          <i className="bi bi-lightning-charge-fill" />
+        </div>
+        <div>
+          <h2 className="mb-1 text-white" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+            Competitive Matches Hub
           </h2>
-          <Card>
-            <Card.Body>
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                <div>
-                  <div className="text-muted small">Format</div>
-                  <ButtonGroup aria-label="Debate format">
-                    {(['1v1', '3v3'] as DebateFormat[]).map((item) => (
-                      <Button
-                        key={item}
-                        variant={format === item ? 'primary' : 'outline-primary'}
-                        onClick={() => setFormat(item)}
-                        disabled={isQueued}
-                      >
-                        {item}
-                      </Button>
-                    ))}
-                  </ButtonGroup>
-                </div>
-                <Badge bg={isQueued ? 'success' : 'secondary'} className="fs-6">
-                  {status}
-                </Badge>
-              </div>
+          <p className="text-secondary small mb-0">
+            Queue up to get paired against players of similar skill levels based on ELO.
+          </p>
+        </div>
+      </div>
 
-              {statusQuery.isLoading ? (
-                <Spinner animation="border" />
-              ) : (
-                <Alert variant={status === 'matched' ? 'success' : 'info'}>
-                  Wait time: {statusQuery.data?.waitTime || 0}s
-                  {statusQuery.data?.eloRange ? ` - ELO +/-${statusQuery.data.eloRange}` : ''}
-                  {statusQuery.data?.format ? ` • ${statusQuery.data.format}` : ''}
-                </Alert>
-              )}
+      {status === 'matched' && roomId && (
+        <MatchFoundBanner roomId={roomId} onEnter={handleEnterDebate} />
+      )}
 
-              <div className="d-flex gap-2">
-                <Button
-                  onClick={() => joinMutation.mutate()}
-                  disabled={isQueued || joinMutation.isPending}
-                >
-                  <i className="bi bi-play-fill me-2" />
-                  Join Queue
-                </Button>
-                <Button
-                  variant="outline-danger"
-                  onClick={() => leaveMutation.mutate()}
-                  disabled={!isQueued || leaveMutation.isPending}
-                >
-                  <i className="bi bi-x-lg me-2" />
-                  Leave
-                </Button>
-                {status === 'matched' && roomId && (
-                  <Button variant="success" onClick={() => navigate(`/debate/${roomId}`)}>
-                    <i className="bi bi-door-open me-2" />
-                    Enter Debate
-                  </Button>
-                )}
-              </div>
-            </Card.Body>
-          </Card>
+      <Row className="g-4">
+        {/* Left Side: Controller Console */}
+        <Col lg={7}>
+          <QueueConsole
+            format={format}
+            onFormatChange={setFormat}
+            isQueued={isQueued}
+            onJoin={() => joinMutation.mutate()}
+            onLeave={() => leaveMutation.mutate()}
+            isPending={joinMutation.isPending || leaveMutation.isPending}
+            status={status}
+          />
         </Col>
+
+        {/* Right Side: Radar Sweeps & Search Metrics */}
         <Col lg={5}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Match Status</Card.Title>
-              <div className="d-flex align-items-center gap-3">
-                {isQueued && <Spinner animation="grow" size="sm" />}
-                <div>
-                  <div className="fw-semibold">{status === 'matched' ? 'Opponent found' : 'Searching'}</div>
-                  <div className="text-muted small">
-                    {status === 'matched' && roomId
-                      ? 'Opening your debate room...'
-                      : 'The room will become available once matchmaking creates it.'}
-                  </div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
+          <RadarScanner isQueued={isQueued} status={status} />
+
+          <QueueStatsCard
+            waitTime={statusQuery.data?.waitTime || 0}
+            eloRange={statusQuery.data?.eloRange}
+            format={statusQuery.data?.format}
+            isQueued={isQueued}
+            status={status}
+          />
         </Col>
       </Row>
     </Container>
