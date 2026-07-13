@@ -17,6 +17,7 @@ class DebateStatTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: DebateColors.canvas,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: DebateColors.line),
         ),
         child: Column(
           children: [

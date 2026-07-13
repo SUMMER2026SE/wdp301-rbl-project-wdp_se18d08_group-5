@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/data/datasources/debate_remote_data_source.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/domain/entities/debate_entities.dart';
@@ -45,6 +47,9 @@ class DebateRepositoryImpl implements DebateRepository {
   @override
   Future<DebateRoomModel> joinRoom(String roomId) =>
       _remoteDataSource.joinRoom(roomId);
+
+  @override
+  Future<void> leaveRoom(String roomId) => _remoteDataSource.leaveRoom(roomId);
 
   @override
   Future<List<LeaderboardEntry>> leaderboard() =>
@@ -125,6 +130,10 @@ class DebateRepositoryImpl implements DebateRepository {
     String userId,
     Map<String, String> data,
   ) => _remoteDataSource.updateProfile(userId, data);
+
+  @override
+  Future<String> uploadAvatar(Uint8List bytes, String filename) =>
+      _remoteDataSource.uploadAvatar(bytes, filename);
 }
 
 final debateRemoteDataSourceProvider = Provider<DebateRemoteDataSource>((ref) {

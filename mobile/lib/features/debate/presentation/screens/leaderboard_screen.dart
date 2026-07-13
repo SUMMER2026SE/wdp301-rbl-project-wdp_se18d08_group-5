@@ -83,7 +83,6 @@ class LeaderboardScreen extends ConsumerWidget {
                 ),
                 if (entry.key != items.length - 1) const SizedBox(height: 10),
               ],
-              const SizedBox(height: 92),
             ],
           );
         },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:flutter_riverpod_clean_architecture/core/constants/app_constants.dart';
 import 'package:flutter_riverpod_clean_architecture/core/utils/app_review_service.dart';
@@ -67,27 +68,13 @@ class SmartReviewPrompt extends ConsumerWidget {
     final reviewService = ref.read(appReviewServiceProvider);
 
     // First, show a dialog to gauge satisfaction
-    final shouldContinue =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Enjoying the app?'),
-            content: const Text(
-              'Would you like to share your feedback with us?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('No thanks'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Sure!'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final shouldContinue = await AdaptiveFeedback.confirm(
+      context,
+      title: 'Enjoying the app?',
+      message: 'Would you like to share your feedback with us?',
+      cancelLabel: 'No thanks',
+      confirmLabel: 'Sure!',
+    );
 
     if (!shouldContinue || !context.mounted) return;
 

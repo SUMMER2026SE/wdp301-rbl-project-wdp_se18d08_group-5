@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod_clean_architecture/features/debate/domain/entities/debate_entities.dart';
 
 abstract class DebateRepository {
@@ -17,6 +19,7 @@ abstract class DebateRepository {
   Future<List<LeaderboardEntry>> leaderboard();
   Future<DebateProfile> profile(String userId);
   Future<DebateProfile> updateProfile(String userId, Map<String, String> data);
+  Future<String> uploadAvatar(Uint8List bytes, String filename);
   Future<List<HistoryItem>> history(String userId);
   Future<QueueStatus> joinQueue(String format);
   Future<QueueStatus> queueStatus();
@@ -29,6 +32,7 @@ abstract class DebateRepository {
     required String format,
   });
   Future<DebateRoomModel> joinRoom(String roomId);
+  Future<void> leaveRoom(String roomId);
   Future<DebateRoomModel> selectPosition(
     String roomId,
     String team,

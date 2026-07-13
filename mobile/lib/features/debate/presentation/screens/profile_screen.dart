@@ -8,6 +8,7 @@ import 'package:flutter_riverpod_clean_architecture/features/debate/presentation
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/ios_debate_widgets.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/screen_state_widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key, required this.userId});
@@ -24,6 +25,12 @@ class ProfileScreen extends ConsumerWidget {
       title: 'Profile',
       subtitle: isMe ? 'Hồ sơ tranh biện của bạn.' : 'Hồ sơ người chơi.',
       actions: [
+        if (isMe)
+          IconButton(
+            tooltip: 'Cài đặt',
+            onPressed: () => context.push(AppConstants.settingsRoute),
+            icon: const Icon(Icons.settings_outlined),
+          ),
         if (isMe)
           IconButton(
             onPressed: () =>
@@ -87,7 +94,6 @@ class ProfileScreen extends ConsumerWidget {
               icon: const Icon(Icons.history),
               label: const Text('Xem lịch sử debate'),
             ),
-            const SizedBox(height: 92),
           ],
         ),
       ),
@@ -109,8 +115,45 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _bio = TextEditingController();
   final _school = TextEditingController();
   final _club = TextEditingController();
+  final _imagePicker = ImagePicker();
   bool _seeded = false;
   bool _saving = false;
+  bool _uploadingAvatar = false;
+
+  Future<void> _pickAndUploadAvatar() async {
+    final image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (image == null || !mounted) return;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await image.readAsBytes();
+      const maxAvatarBytes = 5 * 1024 * 1024;
+      if (bytes.lengthInBytes > maxAvatarBytes) {
+        throw Exception('Ảnh đại diện phải nhỏ hơn 5 MB.');
+      }
+
+      final avatar = await ref
+          .read(debateRepositoryProvider)
+          .uploadAvatar(bytes, image.name);
+      if (avatar.isEmpty) {
+        throw Exception('Server không trả về ảnh đại diện.');
+      }
+
+      ref.invalidate(profileProvider(widget.userId));
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(leaderboardProvider);
+      if (mounted) showDebateSnack(context, 'Đã cập nhật ảnh đại diện.');
+    } catch (error) {
+      if (mounted) showDebateSnack(context, error.toString());
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -140,6 +183,50 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    DebateAvatar(
+                      name: data.name,
+                      imageUrl: data.avatar,
+                      radius: 48,
+                    ),
+                    Material(
+                      color: DebateColors.accent,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: _uploadingAvatar ? null : _pickAndUploadAvatar,
+                        customBorder: const CircleBorder(),
+                        child: SizedBox(
+                          width: 38,
+                          height: 38,
+                          child: _uploadingAvatar
+                              ? const Padding(
+                                  padding: EdgeInsets.all(9),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: DebateColors.canvas,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.photo_camera_rounded,
+                                  size: 19,
+                                  color: DebateColors.canvas,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _uploadingAvatar
+                      ? 'Đang tải ảnh đại diện…'
+                      : 'Chạm vào biểu tượng camera để đổi ảnh đại diện',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _displayName,
                   decoration: const InputDecoration(labelText: 'Tên hiển thị'),

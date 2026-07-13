@@ -67,6 +67,21 @@ flutter run
 flutter build apk --release
 ```
 
+### API configuration
+
+The app uses the shared development API by default. To use a local backend,
+override both endpoints when starting Flutter. For an Android emulator, use
+`10.0.2.2` (not `localhost`):
+
+```bash
+flutter run \
+  --dart-define=API_BASE_URL=http://10.0.2.2:4300/api/v1 \
+  --dart-define=SOCKET_BASE_URL=http://10.0.2.2:4300
+```
+
+For a physical device, replace `10.0.2.2` with the development machine's LAN
+IP address and ensure the device and machine are on the same network.
+
 ---
 
 ## ⚡ Generating New Features

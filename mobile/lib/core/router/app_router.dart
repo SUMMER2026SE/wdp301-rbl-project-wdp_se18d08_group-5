@@ -138,6 +138,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       GoRoute(
+        path: AppConstants.settingsRoute,
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+
+      GoRoute(
         path: '${AppConstants.profileRoute}/:userId/edit',
         name: 'edit_profile',
         builder: (context, state) =>

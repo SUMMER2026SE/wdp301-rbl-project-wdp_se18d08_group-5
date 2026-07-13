@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod_clean_architecture/core/constants/app_constants.dart';
@@ -276,6 +278,20 @@ class DebateRemoteDataSource {
     );
   }
 
+  Future<String> uploadAvatar(Uint8List bytes, String filename) {
+    return _guard(() async {
+      final response = await _dio.post(
+        '/upload/avatar',
+        data: FormData.fromMap({
+          'image': MultipartFile.fromBytes(bytes, filename: filename),
+        }),
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = _asMap(_data(response));
+      return _readString(data, ['avatar', 'url']);
+    });
+  }
+
   Future<List<HistoryItem>> history(String userId) {
     return _guard(() async {
       final data = _data(
@@ -365,6 +381,9 @@ class DebateRemoteDataSource {
       ),
     );
   }
+
+  Future<void> leaveRoom(String roomId) =>
+      _guard(() async => _dio.post('/rooms/$roomId/leave', data: {}));
 
   Future<DebateRoomModel> selectPosition(
     String roomId,

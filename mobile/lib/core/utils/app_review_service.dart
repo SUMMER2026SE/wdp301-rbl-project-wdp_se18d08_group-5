@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 
 /// Interface for the app review service
 abstract class AppReviewService {
@@ -166,44 +168,79 @@ class AppReviewServiceImpl implements AppReviewService {
     bool result = false;
 
     // Show a dialog to collect feedback
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Enter your feedback here',
-                border: OutlineInputBorder(),
+    await (AdaptiveFeedback.isCupertino(context)
+        ? showCupertinoDialog<void>(
+            context: context,
+            builder: (dialogContext) => CupertinoAlertDialog(
+              title: Text(title),
+              content: Column(
+                children: [
+                  Text(message),
+                  const SizedBox(height: 16),
+                  CupertinoTextField(
+                    controller: controller,
+                    maxLines: 4,
+                    placeholder: 'Enter your feedback here',
+                  ),
+                ],
               ),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () {
+                    result = true;
+                    debugPrint('⭐️ User feedback: ${controller.text}');
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Submit'),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              result = true;
-              // In a real app, send this feedback to your server
-              debugPrint('⭐️ User feedback: ${controller.text}');
-              Navigator.of(context).pop();
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    );
+          )
+        : showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(title),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(message),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter your feedback here',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    result = true;
+                    // In a real app, send this feedback to your server
+                    debugPrint('⭐️ User feedback: ${controller.text}');
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Submit'),
+                ),
+              ],
+            ),
+          ));
+
+    controller.dispose();
 
     return result;
   }

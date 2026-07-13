@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod_clean_architecture/core/providers/localization_providers.dart';
+import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 import 'package:flutter_riverpod_clean_architecture/l10n/app_localizations_delegate.dart';
 import 'package:flutter_riverpod_clean_architecture/l10n/l10n.dart';
 
@@ -45,10 +47,9 @@ class LanguageSelectorWidget extends ConsumerWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
-              trailing:
-                  isSelected
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
+              trailing: isSelected
+                  ? const Icon(Icons.check, color: Colors.green)
+                  : null,
               selected: isSelected,
               onTap: () async {
                 await ref
@@ -72,6 +73,12 @@ class LanguageSelectorDialog extends StatelessWidget {
 
   /// Show the language selector dialog
   static Future<Locale?> show(BuildContext context) async {
+    if (AdaptiveFeedback.isCupertino(context)) {
+      return showCupertinoModalPopup<Locale>(
+        context: context,
+        builder: (_) => const _CupertinoLanguageSelectorSheet(),
+      );
+    }
     return showDialog<Locale>(
       context: context,
       builder: (context) => const LanguageSelectorDialog(),
@@ -98,6 +105,36 @@ class LanguageSelectorDialog extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CupertinoLanguageSelectorSheet extends ConsumerWidget {
+  const _CupertinoLanguageSelectorSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentLocale = ref.watch(persistentLocaleProvider);
+    return CupertinoActionSheet(
+      title: Text(context.tr('language')),
+      actions: [
+        for (final locale in AppLocalizations.supportedLocales)
+          CupertinoActionSheetAction(
+            isDefaultAction: currentLocale.languageCode == locale.languageCode,
+            onPressed: () async {
+              await ref
+                  .read(persistentLocaleProvider.notifier)
+                  .setLocale(locale);
+              if (context.mounted) Navigator.of(context).pop(locale);
+            },
+            child: Text(LocalizationUtils.getLocaleName(locale)),
+          ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        isDefaultAction: true,
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text(context.tr('cancel')),
       ),
     );
   }

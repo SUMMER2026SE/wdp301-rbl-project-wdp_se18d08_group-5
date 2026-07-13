@@ -3,17 +3,79 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class DebateColors {
-  static const ink = Color(0xFF111827);
-  static const muted = Color(0xFF6B7280);
-  static const line = Color(0xFFE5E7EB);
-  static const canvas = Color(0xFFF6F7FB);
-  static const surface = Color(0xFFFFFFFF);
-  static const accent = Color(0xFF2563EB);
-  static const accentDark = Color(0xFF1D4ED8);
-  static const mint = Color(0xFF10B981);
-  static const amber = Color(0xFFF59E0B);
-  static const rose = Color(0xFFEF4444);
-  static const indigo = Color(0xFF4F46E5);
+  // Matches frontend/src/styles/global.css.
+  static const ink = Color(0xFFE0E0FF);
+  static const textSecondary = Color(0xFFB8B8D8);
+  static const muted = Color(0xFF9C9CC0);
+  static const line = Color(0x3300F5FF);
+  static const canvas = Color(0xFF0A0A0F);
+  static const surface = Color(0xFF12121F);
+  static const cardHover = Color(0xFF1A1A2E);
+  static const accent = Color(0xFF00F5FF);
+  static const accentDark = Color(0xFF00D4FF);
+  static const mint = Color(0xFF39FF14);
+  static const amber = Color(0xFFFFD60A);
+  static const rose = Color(0xFFFF006E);
+  static const indigo = Color(0xFFBF00FF);
+}
+
+/// The shared background used by every route. It keeps the dark neon visual
+/// system present without competing with the content placed above it.
+class CyberBackdrop extends StatelessWidget {
+  const CyberBackdrop({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(-0.85, -0.9),
+          radius: 1.25,
+          colors: [Color(0xFF10182B), DebateColors.canvas],
+          stops: [0, 0.7],
+        ),
+      ),
+      child: Stack(
+        children: [
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(painter: _CyberGridPainter()),
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _CyberGridPainter extends CustomPainter {
+  const _CyberGridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final horizontal = Paint()
+      ..color = DebateColors.accent.withValues(alpha: 0.025)
+      ..strokeWidth = 1;
+    final vertical = Paint()
+      ..color = DebateColors.indigo.withValues(alpha: 0.02)
+      ..strokeWidth = 1;
+
+    const gap = 44.0;
+    for (double y = 0; y < size.height; y += gap) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), horizontal);
+    }
+    for (double x = 0; x < size.width; x += gap) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), vertical);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CyberGridPainter oldDelegate) => false;
 }
 
 class DebatePage extends StatelessWidget {
@@ -45,7 +107,13 @@ class DebatePage extends StatelessWidget {
           pinned: true,
           centerTitle: false,
           expandedHeight: subtitle == null ? 104 : 132,
-          title: Text(title),
+          title: Text(
+            title.toUpperCase(),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: DebateColors.ink,
+              letterSpacing: 1.1,
+            ),
+          ),
           actions: actions,
           flexibleSpace: FlexibleSpaceBar(
             titlePadding: const EdgeInsetsDirectional.only(
@@ -58,11 +126,25 @@ class DebatePage extends StatelessWidget {
                 : SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 76, 20, 0),
-                      child: Text(
-                        subtitle!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DEBATE NETWORK',
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: DebateColors.accent,
+                                  letterSpacing: 1.2,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle!,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -76,9 +158,11 @@ class DebatePage extends StatelessWidget {
     );
 
     return Scaffold(
-      body: onRefresh == null
-          ? content
-          : RefreshIndicator(onRefresh: onRefresh!, child: content),
+      body: CyberBackdrop(
+        child: onRefresh == null
+            ? content
+            : RefreshIndicator(onRefresh: onRefresh!, child: content),
+      ),
     );
   }
 }
@@ -97,29 +181,58 @@ class DebateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(22);
     final card = DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF17172A), DebateColors.surface],
+        ),
+        borderRadius: radius,
+        border: Border.all(color: DebateColors.line),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: DebateColors.accent.withValues(alpha: 0.045),
+            blurRadius: 28,
+            spreadRadius: -8,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Padding(padding: padding, child: child),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 22,
+            right: 22,
+            top: 0,
+            child: Container(
+              height: 1,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    DebateColors.accent,
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(padding: padding, child: child),
+        ],
+      ),
     );
-    if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: card,
-      ),
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: onTap, child: card),
     );
   }
 }
@@ -129,18 +242,30 @@ class DebateGlassBar extends StatelessWidget {
 
   final Widget child;
 
+  static const _shape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.all(Radius.circular(28)),
+  );
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+    return Material(
+      color: Colors.transparent,
+      shape: _shape,
+      clipBehavior: Clip.antiAlias,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.surface.withValues(alpha: 0.88),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            color: DebateColors.cardHover.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: DebateColors.line),
+            boxShadow: [
+              BoxShadow(
+                color: DebateColors.accent.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: child,
         ),
@@ -166,8 +291,14 @@ class DebatePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.19),
+            color.withValues(alpha: 0.08),
+          ],
+        ),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -206,7 +337,7 @@ class DebateAvatar extends StatelessWidget {
     final initial = name.trim().isEmpty ? 'U' : name.trim()[0].toUpperCase();
     return CircleAvatar(
       radius: radius,
-      backgroundColor: DebateColors.accent.withValues(alpha: 0.11),
+      backgroundColor: DebateColors.cardHover,
       backgroundImage: imageUrl.isEmpty ? null : NetworkImage(imageUrl),
       child: imageUrl.isEmpty
           ? Text(
@@ -231,11 +362,31 @@ class DebateSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+      padding: const EdgeInsets.fromLTRB(2, 10, 2, 10),
       child: Row(
         children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: DebateColors.accent,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: DebateColors.accent.withValues(alpha: 0.5),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+            child: Text(
+              title.toUpperCase(),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(letterSpacing: 0.8),
+            ),
           ),
           ?trailing,
         ],

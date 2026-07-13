@@ -1,10 +1,12 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod_clean_architecture/core/constants/app_constants.dart';
 import 'package:flutter_riverpod_clean_architecture/core/router/app_router.dart';
 import 'package:flutter_riverpod_clean_architecture/core/updates/update_service.dart';
+import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 
 /// Provider for the update service
 final updateServiceProvider = Provider<UpdateService>((ref) {
@@ -141,12 +143,21 @@ class _UpdateCheckerState extends ConsumerState<UpdateChecker> {
     // Use the global navigator key to show dialog
     final navigatorContext = rootNavigatorKey.currentContext;
     if (navigatorContext != null && mounted) {
-      showDialog(
-        context: navigatorContext,
-        barrierDismissible: !isCritical,
-        builder: (dialogContext) =>
-            UpdateDialog(updateInfo: updateInfo, isCritical: isCritical),
-      );
+      Widget builder(BuildContext dialogContext) =>
+          UpdateDialog(updateInfo: updateInfo, isCritical: isCritical);
+      if (AdaptiveFeedback.isCupertino(navigatorContext)) {
+        showCupertinoDialog(
+          context: navigatorContext,
+          barrierDismissible: !isCritical,
+          builder: builder,
+        );
+      } else {
+        showDialog(
+          context: navigatorContext,
+          barrierDismissible: !isCritical,
+          builder: builder,
+        );
+      }
     }
   }
 }
@@ -169,46 +180,68 @@ class UpdateDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final title = Text(isCritical ? 'Required Update' : 'Update Available');
+    final content = SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isCritical
+                ? 'A critical update (version ${updateInfo.latestVersion}) is required to continue using this app.'
+                : 'A new version (${updateInfo.latestVersion}) is available.',
+            style: theme.textTheme.bodyLarge,
+          ),
+          if (updateInfo.releaseNotes != null) ...[
+            const SizedBox(height: 16),
+            Text('What\'s new:', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(updateInfo.releaseNotes!),
+          ],
+        ],
+      ),
+    );
 
     return PopScope(
       canPop: !isCritical,
-      child: AlertDialog(
-        title: Text(isCritical ? 'Required Update' : 'Update Available'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isCritical
-                    ? 'A critical update (version ${updateInfo.latestVersion}) is required to continue using this app.'
-                    : 'A new version (${updateInfo.latestVersion}) is available.',
-                style: theme.textTheme.bodyLarge,
-              ),
-              if (updateInfo.releaseNotes != null) ...[
-                const SizedBox(height: 16),
-                Text('What\'s new:', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 4),
-                Text(updateInfo.releaseNotes!),
+      child: AdaptiveFeedback.isCupertino(context)
+          ? CupertinoAlertDialog(
+              title: title,
+              content: content,
+              actions: [
+                if (!isCritical)
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Later'),
+                  ),
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    ref.read(updateControllerProvider.notifier).openUpdateUrl();
+                  },
+                  child: Text(isCritical ? 'Update Now' : 'Update'),
+                ),
               ],
-            ],
-          ),
-        ),
-        actions: [
-          if (!isCritical)
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Later'),
+            )
+          : AlertDialog(
+              title: title,
+              content: content,
+              actions: [
+                if (!isCritical)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Later'),
+                  ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    ref.read(updateControllerProvider.notifier).openUpdateUrl();
+                  },
+                  child: Text(isCritical ? 'Update Now' : 'Update'),
+                ),
+              ],
             ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ref.read(updateControllerProvider.notifier).openUpdateUrl();
-            },
-            child: Text(isCritical ? 'Update Now' : 'Update'),
-          ),
-        ],
-      ),
     );
   }
 }
