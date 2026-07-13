@@ -50,31 +50,59 @@ flowchart LR
 
 ### 1.1.2 System Architecture Explanation
 
-The AI Debate Platform uses a feature-based MERN architecture with a separate client layer, application layer, data layer, and external-service integrations. REST APIs handle standard request-response operations, while Socket.IO provides server-authoritative real-time debate communication.
+The AI Debate Platform follows a feature-based MERN architecture. The React client presents the user interface; Express and Socket.IO provide standard and real-time application services; MongoDB stores persistent data; and external providers supply AI, identity, email, and media capabilities. This separation lets the platform run real-time debates while retaining server-authoritative control of rooms, timers, and results.
 
-#### React Client Application
+#### React 18 and TypeScript
 
-The frontend is a React 18 and TypeScript single-page application built with Vite. React Router manages public and protected routes, Zustand stores authenticated and debate-related client state, and TanStack Query retrieves and caches API data. The Socket.IO client receives live room, timer, chat, score, and debate-status updates. This separation keeps the interface responsive while the server remains responsible for authoritative debate state.
+React 18 forms the core client framework for the AI Debate Platform. Its component-based architecture is used to build reusable pages and interface elements for registration, profiles, leaderboard, live matches, room lobby, debate room, results, forum, and administration. TypeScript supplies static typing for room state, user roles, API data, and Socket.IO events, reducing errors when the client processes complex debate data.
 
-#### Express REST API
+#### Vite, React Router, Zustand, and TanStack Query
 
-The Node.js and Express backend exposes versioned endpoints under `/api/v1`. These endpoints support authentication, users, rooms, matchmaking, debates, AI functions, rankings, uploads, reports, forum functions, and administration. Request data is validated with Zod before feature logic is executed. The API is protected with JWT authentication, role-based authorization, Helmet security headers, CORS configuration, and rate limiting.
+Vite builds and serves the frontend application with fast development feedback and optimized production bundles. React Router manages public, protected, and administrator-only routes. Zustand maintains lightweight client state, such as the authenticated user and current debate state, while TanStack Query retrieves, caches, and refreshes server data for profiles, rankings, rooms, and administrative lists. Together, these tools keep navigation responsive and reduce unnecessary API requests.
 
-#### Socket.IO Real-Time Service
+#### React Bootstrap and Bootstrap
 
-Socket.IO runs alongside the Express server and requires a valid JWT during the connection handshake. It manages authenticated room channels and broadcasts real-time events for room membership, messages, debate phases, synchronized timers, cross-examination, score updates, voice signaling, and live translation. When a participant reconnects, the service can restore the latest server-side room state.
+React Bootstrap and Bootstrap provide the responsive layout and user-interface components used throughout the platform. Cards, forms, buttons, alerts, modals, navigation elements, and tables support consistent experiences across authentication, room management, debate controls, and the Admin Dashboard. The component library also helps maintain accessible form labels, validation feedback, and responsive layouts without requiring each page to implement these patterns from scratch.
+
+#### Node.js and Express.js
+
+Node.js runs the backend application, while Express.js exposes versioned REST endpoints under `/api/v1`. The API handles authentication, profiles, rooms, matchmaking, debates, AI functions, rankings, uploads, forum activities, reports, and administration. Express middleware applies JSON parsing, request logging, security headers, CORS, rate limiting, validation, and standard error handling before requests reach the feature modules.
+
+#### Socket.IO
+
+Socket.IO provides the real-time communication layer required for live debate sessions. It authenticates clients with JWT during the Socket.IO handshake, organizes participants into room channels, and broadcasts participant changes, messages, debate phases, synchronized timers, cross-examination state, scores, and results. Socket.IO also supports reconnect state restoration so a reconnecting participant can retrieve the latest server-side room state rather than relying on an outdated browser state.
 
 #### Feature Modules and Debate Engine
 
-The backend is organized into feature modules rather than one large application module. Authentication manages local and Google login; Room and Matchmaking manage custom rooms and ranked queues; Debate and socket handlers manage debate phases and timers; Ranking applies ELO results; and Admin, Report, Forum, Upload, and User modules support surrounding platform functions. This modular organization keeps business logic isolated and easier to maintain.
+The backend is organized by feature modules, including Auth, User, Room, Matchmaking, Debate, Ranking, AI, Forum, Report, Admin, and Upload. Room and Matchmaking manage custom rooms and ranked queues; Debate and its Socket.IO handlers enforce phases, timers, speaking turns, and cross-examination; and Ranking applies ELO changes after eligible ranked debates. This modular design keeps each business domain focused, testable, and easier to extend.
 
-#### MongoDB Data Layer
+#### MongoDB and Mongoose
 
-MongoDB is the primary persistent store, accessed through Mongoose. It holds user accounts and profiles, debate rooms, active and completed debate sessions, messages, matchmaking entries, ranking data, and reports. The server reads and writes this data before broadcasting completed state changes to connected clients, preserving consistent room and debate state.
+MongoDB is the primary database, and Mongoose manages database schemas and access. The database stores user accounts and profiles, debate rooms, sessions, messages, matchmaking entries, rankings, reports, and forum data. By persisting room and debate changes before broadcasting the completed state, the backend maintains a consistent history and allows clients to restore state after reconnection.
 
-#### External Service Integrations
+#### OpenAI API
 
-Google Identity Services supplies OAuth credentials for Google login. SMTP sends email-verification and password-reset links. OpenAI and Google Gemini support AI judging, argument analysis, summaries, and translation features. Cloudinary stores uploaded avatars and other image assets. These integrations are called only by the backend, so API keys and service credentials remain in server-side environment configuration.
+The OpenAI API is integrated through the backend AI service to support AI-powered debate functions, including argument analysis, scoring, feedback, fallacy detection, summaries, and final verdict generation. The backend prepares debate context and validates returned AI data before exposing it to the client. If an AI request fails, the debate session remains available and the platform can show an AI-status error instead of interrupting the match.
+
+#### Google Gemini API
+
+Google Gemini is used as an additional AI provider for AI generation and Gemini Live translation. The backend can use the configured AI provider for debate analysis and opens authenticated server-side Gemini Live connections to process live translation audio and return captions. This integration improves accessibility for multilingual debate participants without exposing the Gemini API key to the browser.
+
+#### Google Identity Services
+
+Google Identity Services enables Login by Google. The frontend obtains a Google ID credential, which is sent to the backend for validation against the configured Google Client ID. The backend matches an existing account or creates a new Google-authenticated account, then returns the platform's own JWT access and refresh tokens for subsequent API and Socket.IO access.
+
+#### SMTP Email Service
+
+An SMTP-compatible email service, implemented through Nodemailer, sends verification and password-reset emails. The backend creates time-limited tokens, stores only their hashes, and sends links that direct users to the Verify Email or Reset Password screens. This enables account verification and recovery without storing credentials or security tokens in the browser.
+
+#### Cloudinary
+
+Cloudinary provides cloud media storage for user avatars and general image uploads. The backend receives the upload request, validates the file, sends it to Cloudinary, and stores the resulting image reference for use in the profile or other supported platform content. Cloudinary removes the need for the frontend to manage file-storage infrastructure and supports optimized image delivery.
+
+#### RESTful API and Security Layer
+
+The RESTful API is the standard request-response interface between the React client and backend. It uses JSON payloads over HTTPS in production and separates client concerns from server-side business logic. JWT authentication, platform and room-level authorization, Zod validation, Helmet headers, CORS configuration, and rate limiting protect sensitive operations such as authentication, room management, scoring, uploads, and administrative moderation.
 
 # 2. User Requirements
 
