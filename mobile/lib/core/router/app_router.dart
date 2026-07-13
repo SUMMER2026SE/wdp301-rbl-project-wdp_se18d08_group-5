@@ -5,14 +5,9 @@ import 'package:flutter_riverpod_clean_architecture/core/providers/localization_
 import 'package:flutter_riverpod_clean_architecture/core/router/locale_aware_router.dart';
 import 'package:flutter_riverpod_clean_architecture/features/auth/presentation/screens/login_screen.dart';
 import 'package:flutter_riverpod_clean_architecture/features/auth/presentation/screens/register_screen.dart';
-import 'package:flutter_riverpod_clean_architecture/features/home/presentation/screens/home_screen.dart';
 import 'package:flutter_riverpod_clean_architecture/features/auth/presentation/providers/auth_provider.dart';
-import 'package:flutter_riverpod_clean_architecture/features/settings/presentation/screens/settings_screen.dart';
-import 'package:flutter_riverpod_clean_architecture/features/settings/presentation/screens/language_settings_screen.dart';
+import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/debate_presentation.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_riverpod_clean_architecture/features/chat/presentation/screens/chat_screen.dart';
-import 'package:flutter_riverpod_clean_architecture/features/survey/presentation/screens/survey_screen.dart';
-import 'package:flutter_riverpod_clean_architecture/features/counter/presentation/screens/counter_screen.dart';
 
 /// Global navigator key for accessing navigator from anywhere
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -40,9 +35,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Check if the user is going to the register page
       final isGoingToRegister =
           state.matchedLocation == AppConstants.registerRoute;
+      final isGoingToForgotPassword =
+          state.matchedLocation == AppConstants.forgotPasswordRoute;
 
       // If not logged in and not going to login or register, redirect to login
-      if (!isLoggedIn && !isGoingToLogin && !isGoingToRegister) {
+      if (!authState.isLoading &&
+          !isLoggedIn &&
+          !isGoingToLogin &&
+          !isGoingToRegister &&
+          !isGoingToForgotPassword) {
         return AppConstants.loginRoute;
       }
 
@@ -55,11 +56,59 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Home route
-      GoRoute(
-        path: AppConstants.homeRoute,
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainShellScreen(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppConstants.homeRoute,
+                name: 'home',
+                builder: (context, state) => const DashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppConstants.matchmakingRoute,
+                name: 'matchmaking',
+                builder: (context, state) => const MatchmakingScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppConstants.leaderboardRoute,
+                name: 'leaderboard',
+                builder: (context, state) => const LeaderboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppConstants.profileRoute,
+                name: 'profile_root',
+                redirect: (context, state) {
+                  final userId = authState.user?.id;
+                  if (userId == null || userId.isEmpty) {
+                    return AppConstants.homeRoute;
+                  }
+                  return '${AppConstants.profileRoute}/$userId';
+                },
+              ),
+              GoRoute(
+                path: '${AppConstants.profileRoute}/:userId',
+                name: 'profile',
+                builder: (context, state) =>
+                    ProfileScreen(userId: state.pathParameters['userId'] ?? ''),
+              ),
+            ],
+          ),
+        ],
       ),
 
       // Login route
@@ -76,39 +125,57 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      // Settings route
       GoRoute(
-        path: AppConstants.settingsRoute,
-        name: 'settings',
-        builder: (context, state) => const SettingsScreen(),
+        path: AppConstants.forgotPasswordRoute,
+        name: 'forgot_password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
-      // Language settings route
       GoRoute(
-        path: AppConstants.languageSettingsRoute,
-        name: 'language_settings',
-        builder: (context, state) => const LanguageSettingsScreen(),
+        path: AppConstants.changePasswordRoute,
+        name: 'change_password',
+        builder: (context, state) => const ChangePasswordScreen(),
       ),
 
-      // Chat route
       GoRoute(
-        path: AppConstants.chatRoute,
-        name: 'chat',
-        builder: (context, state) => const ChatScreen(),
+        path: '${AppConstants.profileRoute}/:userId/edit',
+        name: 'edit_profile',
+        builder: (context, state) =>
+            EditProfileScreen(userId: state.pathParameters['userId'] ?? ''),
       ),
 
-      // Survey route
       GoRoute(
-        path: AppConstants.surveyRoute,
-        name: 'survey',
-        builder: (context, state) => const SurveyScreen(),
+        path: '${AppConstants.profileRoute}/:userId/history',
+        name: 'history',
+        builder: (context, state) =>
+            HistoryScreen(userId: state.pathParameters['userId'] ?? ''),
       ),
 
-      // Counter route
       GoRoute(
-        path: AppConstants.counterRoute,
-        name: 'counter',
-        builder: (context, state) => const CounterScreen(),
+        path: '/rooms/create',
+        name: 'create_room',
+        builder: (context, state) => const CreateRoomScreen(),
+      ),
+
+      GoRoute(
+        path: '/rooms/:roomId/lobby',
+        name: 'lobby',
+        builder: (context, state) =>
+            LobbyScreen(roomId: state.pathParameters['roomId'] ?? ''),
+      ),
+
+      GoRoute(
+        path: '/debate/:roomId',
+        name: 'debate',
+        builder: (context, state) =>
+            DebateRoomScreen(roomId: state.pathParameters['roomId'] ?? ''),
+      ),
+
+      GoRoute(
+        path: '${AppConstants.resultRoute}/:roomId',
+        name: 'result',
+        builder: (context, state) =>
+            ResultScreen(roomId: state.pathParameters['roomId'] ?? ''),
       ),
 
       // Initial route - redirects based on auth state
