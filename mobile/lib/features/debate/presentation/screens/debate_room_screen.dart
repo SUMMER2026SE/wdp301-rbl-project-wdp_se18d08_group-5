@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod_clean_architecture/core/constants/app_constants.dart';
+import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/data/repositories/debate_repository_impl.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/providers/debate_providers.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/debate_shared_widgets.dart';
@@ -18,6 +20,37 @@ class DebateRoomScreen extends ConsumerStatefulWidget {
 
 class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
   bool _micOn = true;
+  bool _leaving = false;
+
+  Future<void> _leaveRoom() async {
+    final shouldLeave = await AdaptiveFeedback.confirm(
+      context,
+      title: 'Rời phòng?',
+      message:
+          'Bạn sẽ không còn tham gia phòng tranh biện này. Nếu bạn là chủ phòng, '
+          'quyền sở hữu sẽ được chuyển cho một thành viên khác.',
+      cancelLabel: 'Ở lại',
+      confirmLabel: 'Rời phòng',
+      destructive: true,
+    );
+    if (!shouldLeave || !mounted) return;
+
+    setState(() => _leaving = true);
+    try {
+      await ref.read(debateRepositoryProvider).leaveRoom(widget.roomId);
+      ref
+        ..invalidate(roomProvider(widget.roomId))
+        ..invalidate(sessionProvider(widget.roomId))
+        ..invalidate(roomListProvider);
+      if (!mounted) return;
+      AdaptiveFeedback.showSnackBar(context, message: 'Bạn đã rời phòng');
+      context.go(AppConstants.homeRoute);
+    } catch (error) {
+      if (mounted) showDebateSnack(context, error.toString());
+    } finally {
+      if (mounted) setState(() => _leaving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +62,12 @@ class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
       subtitle: _micOn ? 'Mic đang bật.' : 'Mic đang tắt.',
       actions: [
         IconButton(
+          tooltip: 'Rời phòng',
+          onPressed: _leaving ? null : _leaveRoom,
+          icon: const Icon(Icons.exit_to_app_rounded, color: DebateColors.rose),
+        ),
+        IconButton(
+          tooltip: 'Kết quả',
           onPressed: () => context.push('/results/${widget.roomId}'),
           icon: const Icon(Icons.scoreboard_rounded),
         ),
@@ -148,6 +187,25 @@ class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: DebateColors.rose,
+                side: const BorderSide(color: DebateColors.rose),
+              ),
+              onPressed: _leaving ? null : _leaveRoom,
+              icon: _leaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.exit_to_app_rounded),
+              label: Text(_leaving ? 'Đang rời phòng...' : 'Rời phòng'),
+            ),
           ),
         ],
       ),

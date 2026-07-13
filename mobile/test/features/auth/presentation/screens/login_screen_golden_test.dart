@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
+import 'package:flutter_riverpod_clean_architecture/core/theme/app_theme.dart';
 import 'package:flutter_riverpod_clean_architecture/features/auth/presentation/screens/login_screen.dart';
 
 void main() {
@@ -13,8 +14,7 @@ void main() {
         widget: ProviderScope(
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            // Basic theme
-            theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+            theme: AppTheme.lightTheme,
             home: const LoginScreen(),
           ),
         ),

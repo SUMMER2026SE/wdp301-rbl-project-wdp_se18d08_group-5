@@ -1,5 +1,6 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 import 'package:intl/intl.dart';
 
 class AppUtils {
@@ -55,13 +56,12 @@ class AppUtils {
     Color? backgroundColor,
     SnackBarAction? action,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: duration ?? const Duration(seconds: 2),
-        backgroundColor: backgroundColor,
-        action: action,
-      ),
+    AdaptiveFeedback.showSnackBar(
+      context,
+      message: message,
+      duration: duration ?? const Duration(seconds: 2),
+      backgroundColor: backgroundColor,
+      action: action,
     );
   }
 

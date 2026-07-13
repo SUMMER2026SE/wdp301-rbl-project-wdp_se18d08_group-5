@@ -2,11 +2,15 @@ class AppConstants {
   // API constants
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:4300/api/v1',
+    // `localhost` points to the Android/iOS device itself, not the machine
+    // running the backend. Keep the deployed development API as the usable
+    // default; local environments can override this with --dart-define.
+    defaultValue:
+        'https://http--ai-debate-backend--npf9cfnjj9v7.code.run/api/v1',
   );
   static const String socketBaseUrl = String.fromEnvironment(
     'SOCKET_BASE_URL',
-    defaultValue: 'http://localhost:4300',
+    defaultValue: 'https://http--ai-debate-backend--npf9cfnjj9v7.code.run',
   );
 
   // Storage constants
@@ -38,6 +42,7 @@ class AppConstants {
   static const String leaderboardRoute = '/leaderboard';
   static const String roomsRoute = '/rooms';
   static const String profileRoute = '/profile';
+  static const String settingsRoute = '/settings';
   static const String resultRoute = '/results';
 
   // Hive box names

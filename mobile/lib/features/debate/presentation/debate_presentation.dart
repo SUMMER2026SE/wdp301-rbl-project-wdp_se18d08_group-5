@@ -7,3 +7,4 @@ export 'screens/matchmaking_screen.dart';
 export 'screens/profile_screen.dart';
 export 'screens/result_screen.dart';
 export 'screens/room_screens.dart';
+export 'screens/settings_screen.dart';

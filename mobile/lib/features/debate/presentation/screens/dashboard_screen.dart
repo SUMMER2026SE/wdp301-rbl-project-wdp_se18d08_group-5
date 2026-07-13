@@ -44,7 +44,6 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 18),
             const DebateSectionTitle(title: 'Phòng đang chờ'),
             _WaitingRoomsPreview(),
-            const SizedBox(height: 92),
           ],
         ),
       ),
@@ -69,6 +68,20 @@ class _HeroStatsCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              Icon(Icons.bolt_rounded, size: 14, color: DebateColors.accent),
+              const SizedBox(width: 6),
+              Text(
+                'PLAYER SIGNAL // ACTIVE',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: DebateColors.accent,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
               DebateAvatar(
                 name: profile.name,
                 imageUrl: profile.avatar,
@@ -88,6 +101,8 @@ class _HeroStatsCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${ranking.tier} · Rank #${ranking.rank == 0 ? '-' : ranking.rank}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -131,27 +146,34 @@ class _QuickActions extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.55,
+      mainAxisExtent: 148,
       children: [
         _ActionCard(
           icon: Icons.bolt,
           title: 'Tìm trận',
+          code: 'MATCH // 01',
           onTap: () => context.go(AppConstants.matchmakingRoute),
         ),
         _ActionCard(
           icon: Icons.add_circle,
           title: 'Tạo phòng',
+          code: 'ROOM // 02',
+          color: DebateColors.indigo,
           onTap: () => context.push('/rooms/create'),
         ),
         _ActionCard(
           icon: Icons.history,
           title: 'Lịch sử',
+          code: 'LOG // 03',
+          color: DebateColors.amber,
           onTap: () =>
               context.push('${AppConstants.profileRoute}/$userId/history'),
         ),
         _ActionCard(
           icon: Icons.leaderboard,
           title: 'BXH',
+          code: 'RANK // 04',
+          color: DebateColors.mint,
           onTap: () => context.go(AppConstants.leaderboardRoute),
         ),
       ],
@@ -163,12 +185,16 @@ class _ActionCard extends StatelessWidget {
   const _ActionCard({
     required this.icon,
     required this.title,
+    required this.code,
     required this.onTap,
+    this.color = DebateColors.accent,
   });
 
   final IconData icon;
   final String title;
+  final String code;
   final VoidCallback onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -182,17 +208,34 @@ class _ActionCard extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: DebateColors.accent.withValues(alpha: 0.1),
+              gradient: LinearGradient(
+                colors: [
+                  color.withValues(alpha: 0.22),
+                  color.withValues(alpha: 0.08),
+                ],
+              ),
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withValues(alpha: 0.26)),
             ),
-            child: Icon(icon, color: DebateColors.accent, size: 21),
+            child: Icon(icon, color: color, size: 21),
           ),
-          const Spacer(),
+          const SizedBox(height: 16),
+          Text(
+            code,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: color, letterSpacing: 0.7),
+          ),
+          const SizedBox(height: 4),
           Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(letterSpacing: 0.2),
           ),
         ],
       ),

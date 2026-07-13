@@ -9,6 +9,7 @@ import 'package:flutter_riverpod_clean_architecture/core/router/app_router.dart'
 import 'package:flutter_riverpod_clean_architecture/core/theme/app_theme.dart';
 import 'package:flutter_riverpod_clean_architecture/core/updates/update_providers.dart';
 import 'package:flutter_riverpod_clean_architecture/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/ios_debate_widgets.dart';
 import 'package:flutter_riverpod_clean_architecture/l10n/app_localizations_delegate.dart';
 import 'package:flutter_riverpod_clean_architecture/l10n/l10n.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,7 +41,7 @@ void main() async {
 // Provider to manage theme mode
 class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
-  ThemeMode build() => ThemeMode.system;
+  ThemeMode build() => ThemeMode.dark;
 
   void set(ThemeMode mode) => state = mode;
 }
@@ -87,7 +88,9 @@ class MyApp extends ConsumerWidget {
           return UpdateChecker(
             autoPrompt: true,
             enforceCriticalUpdates: true,
-            child: _AuthInitializer(child: child ?? const SizedBox.shrink()),
+            child: CyberBackdrop(
+              child: _AuthInitializer(child: child ?? const SizedBox.shrink()),
+            ),
           );
         },
       ),

@@ -17,10 +17,13 @@ class MainShellScreen extends ConsumerWidget {
     final userId = auth.user?.id ?? '';
 
     return Scaffold(
-      extendBody: true,
+      // The body must end above the floating navigation bar. With extendBody
+      // enabled, scrollable page content is painted beneath the bar and is
+      // obscured on devices with a bottom safe area.
+      extendBody: false,
       body: navigationShell,
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        minimum: const EdgeInsets.fromLTRB(14, 0, 14, 12),
         child: DebateGlassBar(
           child: NavigationBar(
             selectedIndex: navigationShell.currentIndex,

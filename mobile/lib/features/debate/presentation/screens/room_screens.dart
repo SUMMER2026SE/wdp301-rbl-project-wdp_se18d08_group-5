@@ -122,14 +122,13 @@ class LobbyScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
                 try {
                   await ref.read(debateRepositoryProvider).joinRoom(roomId);
                   ref.invalidate(roomProvider(roomId));
                 } catch (error) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(error.toString())),
-                  );
+                  if (context.mounted) {
+                    showDebateSnack(context, error.toString());
+                  }
                 }
               },
               icon: const Icon(Icons.login_rounded),

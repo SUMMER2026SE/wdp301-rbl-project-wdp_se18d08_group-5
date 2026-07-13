@@ -137,7 +137,6 @@ class MatchmakingScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 92),
         ],
       ),
     );
