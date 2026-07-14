@@ -138,6 +138,14 @@ export async function tryCreateRankMatch(entry: IMatchQueue): Promise<MatchResul
   const io = getIO();
   if (io) {
     io.emit('room:update', { action: 'create', roomId: room._id.toString() });
+
+    // Ranked rooms have no human host to start the motion phase. Reuse the
+    // no-host lifecycle so clients receive the countdown and the prep timer.
+    setTimeout(() => {
+      import('../debate/debate.service.js')
+        .then(({ autoStartDebateCountdown }) => autoStartDebateCountdown(room._id.toString()))
+        .catch(console.error);
+    }, 2000);
   }
 
   return { matched: true, room };

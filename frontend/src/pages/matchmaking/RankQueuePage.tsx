@@ -4,6 +4,7 @@ import { Col, Container, Row } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { matchmakingService } from '@services/matchmakingService';
+import { useMatchSocket } from '@hooks/useMatchSocket';
 import type { DebateFormat } from '@/types';
 
 // Import custom components
@@ -18,6 +19,7 @@ import '../../styles/matchmaking.css';
 export default function RankQueuePage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  useMatchSocket();
   const [format, setFormat] = useState<DebateFormat>('1v1');
   const [isLeaving, setIsLeaving] = useState(false);
 
