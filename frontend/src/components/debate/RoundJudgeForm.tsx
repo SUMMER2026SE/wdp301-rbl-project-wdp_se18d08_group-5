@@ -1,4 +1,5 @@
-import { Button, Form } from 'react-bootstrap';
+import { Button as RBButton, Form } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useTranslation } from 'react-i18next';
 import type { SpeakerTurn } from '@/types';
 

@@ -1,4 +1,5 @@
-import { Button, Form, Modal, Spinner } from 'react-bootstrap';
+import { Button as RBButton, Form, Modal, Spinner } from 'react-bootstrap';
+const Button = RBButton as any;
 import type { DebateRoom } from '@/types';
 
 interface JoinRoomModalProps {

@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
-import { Alert, Button, Card, Col, Container, Form, Row } from 'react-bootstrap';
+import { Alert, Button as RBButton, Card, Col, Container, Form, Row } from 'react-bootstrap';
+const Button = RBButton as any;
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { TopicPicker, getTopicValue, type TopicInputMode } from '@components/room/TopicPicker';

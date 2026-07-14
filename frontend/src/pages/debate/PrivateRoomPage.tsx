@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Alert, Badge, Button, Form, ListGroup, Nav, Spinner } from 'react-bootstrap';
+import { Alert, Badge, Button as RBButton, Form, ListGroup, Nav, Spinner } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@stores/authStore';

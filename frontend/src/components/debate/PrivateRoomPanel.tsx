@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Alert, Button, ListGroup } from 'react-bootstrap';
+import { Alert, Button as RBButton, ListGroup } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useNavigate } from 'react-router-dom';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';

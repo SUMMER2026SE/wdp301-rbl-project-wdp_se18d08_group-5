@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Col, Form, Row } from 'react-bootstrap';
+import { Button as RBButton, Col, Form, Row } from 'react-bootstrap';
+const Button = RBButton as any;
 
 interface ForumPageHeaderProps {
   searchInput: string;

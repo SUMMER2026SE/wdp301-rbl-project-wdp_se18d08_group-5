@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Button, Form, Modal } from 'react-bootstrap';
+import { Button as RBButton, Form, Modal } from 'react-bootstrap';
+const Button = RBButton as any;
 
 interface CreateTopicModalProps {
   show: boolean;

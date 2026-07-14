@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Badge, Button, Form, InputGroup } from 'react-bootstrap';
+import { Badge, Button as RBButton, Form, InputGroup } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useTranslation } from 'react-i18next';
 import { useDebateStore } from '@stores/debateStore';
 import { getSocket } from '@hooks/useSocket';

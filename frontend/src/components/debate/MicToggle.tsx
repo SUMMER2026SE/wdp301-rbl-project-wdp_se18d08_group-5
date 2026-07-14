@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button } from 'react-bootstrap';
+import { Badge, Button as RBButton } from 'react-bootstrap';
+const Button = RBButton as any;
 import toast from 'react-hot-toast';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';

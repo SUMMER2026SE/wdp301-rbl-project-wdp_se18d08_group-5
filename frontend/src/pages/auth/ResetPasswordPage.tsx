@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Alert, Button, Card, Container, Form } from 'react-bootstrap';
+import { Alert, Button as RBButton, Card, Container, Form } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';

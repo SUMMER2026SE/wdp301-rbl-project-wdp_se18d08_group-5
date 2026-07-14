@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, ButtonGroup, Card } from 'react-bootstrap';
+import { Badge, Button as RBButton, ButtonGroup, Card } from 'react-bootstrap';
+const Button = RBButton as any;
 import { getSocket } from '@hooks/useSocket';
 import { useAuthStore } from '@stores/authStore';
 import { useDebateStore } from '@stores/debateStore';
