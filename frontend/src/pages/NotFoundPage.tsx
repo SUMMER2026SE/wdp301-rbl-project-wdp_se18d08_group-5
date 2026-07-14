@@ -1,4 +1,5 @@
-import { Container, Button } from 'react-bootstrap';
+import { Container, Button as RBButton } from 'react-bootstrap';
+const Button = RBButton as any;
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 

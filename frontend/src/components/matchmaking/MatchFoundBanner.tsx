@@ -1,4 +1,5 @@
-import { Button } from 'react-bootstrap';
+import { Button as RBButton } from 'react-bootstrap';
+const Button = RBButton as any;
 
 interface MatchFoundBannerProps {
   roomId: string | undefined;

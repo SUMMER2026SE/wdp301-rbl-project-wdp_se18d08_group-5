@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Form, Button, Alert, Container, Row, Col } from 'react-bootstrap';
+import { Card, Form, Button as RBButton, Alert, Container, Row, Col } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';

@@ -1,0 +1,326 @@
+/* ── 3D Storytelling Stylesheet ── */
+
+:root {
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Rajdhani', sans-serif;
+  --radius-max: 8px;
+}
+
+/* Page wrapper */
+.story-page-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #030305;
+  color: #e0e0ff;
+  overflow-x: hidden;
+}
+
+/* Background Canvas styling */
+.story-canvas-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none; /* Let clicks pass through to content */
+}
+
+/* Make canvas element interactive for mouse reaction if needed */
+.story-canvas-container canvas {
+  pointer-events: auto;
+}
+
+/* WebGL Fallback background */
+.story-fallback-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  background: radial-gradient(circle at 50% 50%, #0d0d1a 0%, #030305 100%);
+  background-size: cover;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+/* Grid pattern for fallback */
+.story-fallback-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(0, 245, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 245, 255, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+
+/* Scrollable content container */
+.story-content-overlay {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  pointer-events: none; /* Let scroll events fall through */
+}
+
+/* Ensure interactive controls inside overlays can be clicked */
+.story-interactive {
+  pointer-events: auto !important;
+}
+
+/* Chapters layout */
+.story-chapter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4rem 2rem;
+}
+
+/* Hero sizing */
+.story-chapter-hero {
+  min-height: 88vh; /* Visible cue of the next chapter */
+  padding-bottom: 2rem;
+}
+
+/* Chapter content boxes */
+.story-chapter-content {
+  width: calc(100% - 2.5rem);
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  
+  /* Premium Glassmorphic Card Overlay */
+  background: rgba(6, 6, 14, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 245, 255, 0.15); /* Techy cyan touch border */
+  border-radius: 20px;
+  padding: 3.5rem 4rem;
+  box-shadow: 
+    0 25px 60px rgba(0, 0, 0, 0.7), 
+    0 0 50px rgba(0, 245, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+/* Layout variation: text on the left */
+.story-layout-left {
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* Layout variation: text on the right */
+.story-layout-right {
+  align-items: flex-end;
+  text-align: right;
+  margin-left: auto;
+}
+
+/* Layout variation: centered */
+.story-layout-center {
+  align-items: center;
+  text-align: center;
+  margin: 0 auto;
+}
+
+/* Typography styles */
+.story-kicker {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  color: var(--bs-primary);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.story-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  line-weight: 1.1;
+  letter-spacing: 0px;
+  color: #ffffff;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  font-weight: 800;
+}
+
+/* Contrast highlighted texts */
+.story-highlight-cyan {
+  color: #00f5ff;
+  text-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
+}
+
+.story-highlight-magenta {
+  color: #ff006e;
+  text-shadow: 0 0 15px rgba(255, 0, 110, 0.3);
+}
+
+.story-highlight-yellow {
+  color: #ffd60a;
+  text-shadow: 0 0 15px rgba(255, 214, 10, 0.3);
+}
+
+.story-desc {
+  font-family: var(--font-body);
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  line-height: 1.6;
+  max-width: 36rem;
+  color: #b8b8d8;
+  margin-bottom: 2rem;
+  font-weight: 500;
+}
+
+/* Compact side-by-side or listing features */
+.story-side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  width: 100%;
+  max-width: 800px;
+  margin-top: 1.5rem;
+}
+
+.story-side-pane {
+  background: rgba(10, 10, 15, 0.7);
+  border: 1px solid rgba(224, 224, 255, 0.1);
+  border-radius: var(--radius-max);
+  padding: 1.5rem;
+  text-align: left;
+  transition: border-color 0.3s;
+}
+
+.story-side-pane-proposition {
+  border-left: 3px solid #00f5ff;
+}
+
+.story-side-pane-opposition {
+  border-left: 3px solid #ff006e;
+}
+
+.story-pane-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.story-pane-desc {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: #a0a0c0;
+  margin: 0;
+}
+
+/* Indicators and labels embedded in chapters */
+.story-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.story-indicator-tag {
+  background: rgba(224, 224, 255, 0.05);
+  border: 1px solid rgba(224, 224, 255, 0.1);
+  border-radius: var(--radius-max);
+  padding: 0.5rem 1rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Buttons and CTA layouts */
+.story-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.story-btn-large {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  padding: 0.8rem 2rem;
+  border-radius: var(--radius-max);
+  min-width: 160px;
+}
+
+/* Footer layout */
+.story-footer-compact {
+  border-top: 1px solid rgba(0, 245, 255, 0.1);
+  padding: 2rem 0;
+  text-align: center;
+  background: #030305;
+}
+
+/* Reduced Motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  .story-fallback-bg {
+    transition: none;
+  }
+  .story-chapter {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Tablet Layout (max-width: 992px) */
+@media (max-width: 992px) {
+  .story-chapter {
+    padding: 3rem 1.5rem;
+  }
+  .story-side-by-side {
+    gap: 1rem;
+  }
+  .story-chapter-content {
+    align-items: center !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+  }
+  .story-desc {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .story-side-by-side {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+  }
+  .story-indicators {
+    justify-content: center;
+  }
+  .story-actions {
+    justify-content: center;
+  }
+}
+
+/* Mobile Layout (max-width: 576px) */
+@media (max-width: 576px) {
+  .story-chapter {
+    padding: 2rem 1rem;
+  }
+  .story-title {
+    margin-bottom: 1rem;
+  }
+  .story-desc {
+    margin-bottom: 1.5rem;
+  }
+  .story-btn-large {
+    width: 100%;
+    text-align: center;
+    padding: 0.7rem 1.5rem;
+  }
+}

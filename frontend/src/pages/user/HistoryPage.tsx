@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Col, Container, Pagination, Row } from 'react-bootstrap';
+import { Alert, Badge, Button as RBButton, Card, Col, Container, Pagination, Row } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LoadingScreen } from '@components/common/LoadingScreen';

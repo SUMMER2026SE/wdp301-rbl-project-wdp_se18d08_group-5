@@ -1,4 +1,5 @@
-import { Button } from 'react-bootstrap';
+import { Button as RBButton } from 'react-bootstrap';
+const Button = RBButton as any;
 import type { RoomParticipant, Team } from '@/types';
 
 type PrivateRoomTeam = Team | 'judge';

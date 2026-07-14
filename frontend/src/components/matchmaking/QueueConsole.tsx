@@ -1,4 +1,5 @@
-import { Button, ButtonGroup } from 'react-bootstrap';
+import { Button as RBButton, ButtonGroup } from 'react-bootstrap';
+const Button = RBButton as any;
 import type { DebateFormat } from '@/types';
 
 interface QueueConsoleProps {

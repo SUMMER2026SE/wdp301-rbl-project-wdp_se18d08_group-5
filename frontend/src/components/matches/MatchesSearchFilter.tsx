@@ -1,4 +1,5 @@
-import { Button, ButtonGroup, Col, Form, Row } from 'react-bootstrap';
+import { Button as RBButton, ButtonGroup, Col, Form, Row } from 'react-bootstrap';
+const Button = RBButton as any;
 import type { DebateFormat, RoomStatus, RoomType } from '@/types';
 
 interface MatchesSearchFilterProps {

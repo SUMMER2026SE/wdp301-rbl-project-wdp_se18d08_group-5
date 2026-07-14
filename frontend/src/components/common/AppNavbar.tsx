@@ -12,6 +12,8 @@ const languageLabels: Record<AppLanguage, string> = {
   ja: 'navbar:language.ja',
 };
 
+const NavButton = Button as any;
+
 export function AppNavbar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -166,12 +168,12 @@ export function AppNavbar() {
               </NavDropdown>
             ) : (
               <div className="d-flex gap-2">
-                <Button as={Link as any} to="/login" variant="outline-primary" size="sm" className="px-3">
+                <NavButton as={Link as any} to="/login" variant="outline-primary" size="sm" className="px-3">
                   {t('links.login')}
-                </Button>
-                <Button as={Link as any} to="/register" variant="primary" size="sm" className="px-3">
+                </NavButton>
+                <NavButton as={Link as any} to="/register" variant="primary" size="sm" className="px-3">
                   {t('links.register')}
-                </Button>
+                </NavButton>
               </div>
             )}
           </Nav>

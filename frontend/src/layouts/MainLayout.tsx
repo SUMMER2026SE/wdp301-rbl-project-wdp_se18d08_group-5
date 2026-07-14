@@ -1,14 +1,23 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Container } from 'react-bootstrap';
 import { AppNavbar } from '@components/common/AppNavbar';
 
 export default function MainLayout() {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <AppNavbar />
-      <Container as="main" className="flex-grow-1 py-4">
-        <Outlet />
-      </Container>
+      {isHome ? (
+        <main className="flex-grow-1">
+          <Outlet />
+        </main>
+      ) : (
+        <Container as="main" className="flex-grow-1 py-4">
+          <Outlet />
+        </Container>
+      )}
       <footer className="text-center py-3">
         <small className="text-muted">
           <span className="text-neon-cyan">AI</span>{' '}

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Badge,
-  Button,
+  Button as RBButton,
   ButtonGroup,
   Card,
   Col,
@@ -19,6 +19,7 @@ import {
   Table,
   Tabs,
 } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useTranslation } from 'react-i18next';
 import type {
   AdminReport,

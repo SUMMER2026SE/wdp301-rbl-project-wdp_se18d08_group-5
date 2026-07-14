@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Card, Form, InputGroup } from 'react-bootstrap';
+import { Button as RBButton, Card, Form, InputGroup } from 'react-bootstrap';
+const Button = RBButton as any;
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@stores/authStore';

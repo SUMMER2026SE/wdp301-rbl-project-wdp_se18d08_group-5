@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button, Container, Spinner } from 'react-bootstrap';
+import { Badge, Button as RBButton, Container, Spinner } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useTranslation } from 'react-i18next';
 import { roomService } from '@services/roomService';
 import type { DebateRoom } from '@/types';

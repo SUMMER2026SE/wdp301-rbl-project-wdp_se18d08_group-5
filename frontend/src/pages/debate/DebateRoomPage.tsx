@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Alert,
-  Button,
+  Button as RBButton,
   Card,
   Col,
   Container,
@@ -12,6 +12,7 @@ import {
   Spinner,
   Modal,
 } from 'react-bootstrap';
+const Button = RBButton as any;
 import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';

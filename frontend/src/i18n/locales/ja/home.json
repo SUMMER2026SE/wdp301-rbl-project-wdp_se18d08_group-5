@@ -1,93 +1,52 @@
-﻿{
-  "hero": {
-    "kicker": "Academic debate, powered by AI",
-    "title": "AI debate platform for academic competition",
-    "subtitle": "Play ranked debates, create private rooms, and receive clear AI feedback after every match."
+{
+  "chapter1": {
+    "kicker": "Academic Debate Platform",
+    "title": "FROM MOTION TO VERDICT",
+    "desc": "Turn a question into a battle of ideas. Engage in structured real-time debates judged by artificial intelligence.",
+    "ctaPrimaryAuth": "Enter Ranked Queue",
+    "ctaPrimaryGuest": "Get Started",
+    "ctaSecondary": "Watch Live Matches"
   },
-  "cta": {
-    "primaryAuth": "Enter ranked queue",
-    "primaryGuest": "Get started",
-    "secondaryAuth": "Create room",
-    "secondaryGuest": "Watch matches"
+  "chapter2": {
+    "kicker": "Choose a stance",
+    "title": "Every motion has more than one truth",
+    "desc": "Align with your perspective. Formulate core arguments and prepare to substantiate your stance under opposition scrutiny.",
+    "propTitle": "PROPOSITION",
+    "propDesc": "Affirmative case files. Defend the motion using logical deductions, structured frameworks, and empirical warrants.",
+    "oppTitle": "OPPOSITION",
+    "oppDesc": "Negative refutations. Challenge assumptions, expose logical inconsistencies, and construct a compelling counter-case."
   },
-  "showcase": {
-    "liveRoom": "Live Debate Room",
-    "liveTitle": "Cross Examination in progress",
-    "liveCopy": "Structured rounds, fast pacing, and better focus on decision-making and rebuttal.",
-    "playerSnapshot": "Player Snapshot",
-    "format": "Format",
-    "judge": "Judge",
-    "queue": "Queue",
-    "elo": "ELO",
-    "winRate": "Win rate",
-    "feedback": "Feedback",
-    "strengths": "4 strengths"
+  "chapter3": {
+    "kicker": "Structure is everything",
+    "title": "Build your reasoning. Challenge assumptions.",
+    "desc": "Connect logic nodes to formulate a compelling, coherent debate framework that withstands interrogation.",
+    "logic": "Logic: Coherent Structure",
+    "evidence": "Evidence: Empirical Warrants",
+    "rebuttal": "Rebuttal: Direct Clashes",
+    "delivery": "Delivery: Rhetorical Clarity"
   },
-  "sections": {
-    "start": {
-      "title": "Join debates your way",
-      "description": "Queue into ranked matches or open private rooms for your friends and debate club.",
-      "bullets": ["Ranked matchmaking", "Flexible private rooms", "1v1 and 3v3"],
-      "eyebrow": "Fast start",
-      "panelTitle": "Ranked or custom room",
-      "panelDetail": "Jump into matchmaking or host your own debate table.",
-      "stats": {
-        "modes": "Modes",
-        "access": "Access",
-        "modesValue": "1v1 / 3v3",
-        "accessValue": "Public / private"
-      },
-      "cta": "Explore formats"
-    },
-    "ai": {
-      "title": "AI helps you debate better",
-      "description": "AI does more than score. It highlights weak reasoning, fallacies, and what to improve after the match.",
-      "bullets": ["Argument analysis", "Fallacy detection", "Post-match feedback"],
-      "eyebrow": "Core advantage",
-      "panelTitle": "Clear, fair feedback",
-      "panelDetail": "Turn every debate into a measurable learning loop.",
-      "stats": {
-        "analysis": "Analysis",
-        "detection": "Detection",
-        "analysisValue": "Arguments",
-        "detectionValue": "Fallacies"
-      },
-      "cta": "See AI experience"
-    },
-    "progress": {
-      "title": "Track real progress after every match",
-      "description": "ELO, win/loss history, and your profile show exactly where you are improving.",
-      "bullets": ["ELO ranking", "Match history", "Progress profile"],
-      "eyebrow": "Measured growth",
-      "panelTitle": "Stats with meaning",
-      "panelDetail": "See where you are strong and what you should train next.",
-      "stats": {
-        "tracking": "Tracking",
-        "improvement": "Improvement",
-        "trackingValue": "Win / Loss",
-        "improvementValue": "Over time"
-      },
-      "cta": "View leaderboard"
-    },
-    "community": {
-      "title": "See the debate community in motion",
-      "description": "Watch live debates, explore the leaderboard, and learn faster by observing other players.",
-      "bullets": ["Live matches", "Leaderboard", "Strategy observation"],
-      "eyebrow": "Explore community",
-      "panelTitle": "Learn by watching",
-      "panelDetail": "You can still observe, analyze, and learn even before joining a match.",
-      "stats": {
-        "watch": "Watch",
-        "explore": "Explore",
-        "watchValue": "Live matches",
-        "exploreValue": "Top players"
-      },
-      "cta": "Watch live now"
-    }
+  "chapter4": {
+    "kicker": "Real-time Clashing",
+    "title": "Speak live. Respond under pressure.",
+    "desc": "Step onto the digital podium. Express reasoning clearly, adapt to cross-examinations, and manage your clock in real time.",
+    "cta": "Watch Live Matches"
   },
-  "finalCta": {
-    "title": "Ready for your next debate?",
-    "copy": "Start a ranked match, open a private room, or explore the community debating right now."
+  "chapter5": {
+    "kicker": "Intelligent Analytics",
+    "title": "Judged by reasoning, not volume",
+    "desc": "Our AI analysis engine processes speech recordings, detects fallacies, dissects arguments, and scores based on substance.",
+    "fallacyTitle": "Fallacy Detection",
+    "fallacyDesc": "Identifies circular reasoning, ad hominem attacks, strawman fallacies, and structural invalidity automatically.",
+    "speechTitle": "Speech Dissection",
+    "speechDesc": "Evaluates key claims, responses, cross-examination value, and communication clarity to provide objective verdicts."
+  },
+  "chapter6": {
+    "kicker": "Elevate your mind",
+    "title": "Your argument changes here.",
+    "desc": "Enter the matchmaking queue, host private debate rounds with customized structures, and receive actionable insights to hone your speech.",
+    "ctaPrimaryAuth": "Enter Ranked Queue",
+    "ctaPrimaryGuest": "Create Free Account",
+    "ctaSecondaryAuth": "Create Custom Room",
+    "ctaSecondaryGuest": "Watch Live Matches"
   }
 }
-

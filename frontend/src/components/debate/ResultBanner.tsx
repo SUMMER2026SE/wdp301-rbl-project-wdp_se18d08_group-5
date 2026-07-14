@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button } from 'react-bootstrap';
+import { Button as RBButton } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useDebateStore } from '@stores/debateStore';
 import { useNavigate } from 'react-router-dom';
 

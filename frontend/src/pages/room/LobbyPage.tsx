@@ -3,7 +3,7 @@ import { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Badge,
-  Button,
+  Button as RBButton,
   ButtonGroup,
   Card,
   Col,
@@ -14,6 +14,7 @@ import {
   Spinner,
   Table,
 } from 'react-bootstrap';
+const Button = RBButton as any;
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -292,7 +293,7 @@ export default function LobbyPage() {
     if (assignRole === 'judge' && room.judgeType !== 'human') {
       setAssignRole('debater');
     }
-  }, [room?.hostType, room?.judgeType, room?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [room?.hostType, room?.judgeType, room?._id]);
 
   useEffect(() => {
     if (!room) return;

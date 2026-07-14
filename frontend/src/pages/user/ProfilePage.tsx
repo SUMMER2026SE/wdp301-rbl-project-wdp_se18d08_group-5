@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Badge,
-  Button,
+  Button as RBButton,
   Card,
   Col,
   Container,
@@ -12,6 +12,9 @@ import {
   Row,
   Spinner,
 } from 'react-bootstrap';
+
+const Button = RBButton as any;
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Badge, Card, Col, Container, ListGroup, ProgressBar, Row, Spinner, Button } from 'react-bootstrap';
+import { Alert, Badge, Card, Col, Container, ListGroup, ProgressBar, Row, Spinner, Button as RBButton } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { debateService } from '@services/debateService';

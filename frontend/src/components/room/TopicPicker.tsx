@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Button, ButtonGroup, Dropdown, Form } from 'react-bootstrap';
+import { Button as RBButton, ButtonGroup, Dropdown, Form } from 'react-bootstrap';
+const Button = RBButton as any;
 import { useTranslation } from 'react-i18next';
 import { DEBATE_TOPICS } from '@utils/debateTopics';
 
