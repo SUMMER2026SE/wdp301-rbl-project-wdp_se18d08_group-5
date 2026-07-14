@@ -5,6 +5,7 @@ import { useAuthStore } from '@stores/authStore';
 import { authService } from '@services/authService';
 import i18n from '@/i18n';
 import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/i18n/config';
+import logoUrl from '../../../assets/images/img_logo.png';
 
 const languageLabels: Record<AppLanguage, string> = {
   en: 'navbar:language.en',
@@ -40,7 +41,7 @@ export function AppNavbar() {
     <Navbar expand="lg" sticky="top" className="navbar-dark">
       <Container>
         <Navbar.Brand as={Link} to="/">
-          <i className="bi bi-chat-square-quote me-2" />
+          <img src={logoUrl} alt="" className="navbar-brand-logo" aria-hidden="true" />
           {t('brand')}
         </Navbar.Brand>
 

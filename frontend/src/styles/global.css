@@ -235,6 +235,9 @@ a:hover { color: var(--bs-secondary); text-shadow: 0 0 8px var(--bs-secondary); 
 }
 
 .navbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-family: 'Orbitron', sans-serif;
   font-size: 1.1rem;
   font-weight: 900;
@@ -244,6 +247,15 @@ a:hover { color: var(--bs-secondary); text-shadow: 0 0 8px var(--bs-secondary); 
 }
 
 .navbar-brand:hover { text-shadow: 0 0 20px rgba(0, 245, 255, 0.9); }
+
+.navbar-brand-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex: 0 0 36px;
+  border-radius: 8px;
+  filter: drop-shadow(0 0 8px rgba(0, 245, 255, 0.45));
+}
 
 .nav-link {
   font-family: 'Rajdhani', sans-serif;
