@@ -9,6 +9,8 @@ type AIMessage = {
 };
 
 export class AIService {
+  private geminiAgentKeyIndex = 0;
+
   /**
    * Analyze a speech: claims, strengths, weaknesses, fallacies, score.
    */
@@ -151,7 +153,7 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
   }
 
   private async generateAIContent(messages: AIMessage[], temperature: number, jsonMode: boolean) {
-    if (ENV.GEMINI_API_KEY) {
+    if (ENV.GEMINI_AGENT_API_KEYS.length || ENV.GEMINI_API_KEY) {
       try {
         return await this.generateGeminiContent(messages, temperature, jsonMode);
       } catch (error) {
@@ -193,9 +195,19 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
       .map((message) => message.content)
       .join('\n\n');
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${ENV.GEMINI_MODEL}:generateContent?key=${ENV.GEMINI_API_KEY}`,
-      {
+    // AI Judge uses its own ordered key pool. When a key has exhausted its
+    // quota, subsequent requests begin with the next key in the list.
+    const apiKeys = ENV.GEMINI_AGENT_API_KEYS.length
+      ? ENV.GEMINI_AGENT_API_KEYS
+      : [ENV.GEMINI_API_KEY];
+    let lastQuotaError: Error | null = null;
+    const startingKeyIndex = this.geminiAgentKeyIndex;
+
+    for (let attempt = 0; attempt < apiKeys.length; attempt += 1) {
+      const keyIndex = (startingKeyIndex + attempt) % apiKeys.length;
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${ENV.GEMINI_AGENT_MODEL}:generateContent?key=${apiKeys[keyIndex]}`,
+        {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,26 +227,38 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
             responseMimeType: jsonMode ? 'application/json' : 'text/plain',
           },
         }),
-      },
-    );
+        },
+      );
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Gemini API error ${response.status}: ${errorBody}`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const isQuotaError = response.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(errorBody);
+
+        if (!isQuotaError) {
+          throw new Error(`Gemini API error ${response.status}: ${errorBody}`);
+        }
+
+        lastQuotaError = new Error(`Gemini API quota exhausted (${response.status})`);
+        this.geminiAgentKeyIndex = (keyIndex + 1) % apiKeys.length;
+        console.warn(`Gemini AI Judge key ${keyIndex + 1}/${apiKeys.length} exhausted; trying the next key.`);
+        continue;
+      }
+
+      const payload = await response.json() as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{ text?: string }>;
+          };
+        }>;
+      };
+
+      return payload.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text || '')
+        .join('')
+        .trim() || null;
     }
 
-    const payload = await response.json() as {
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{ text?: string }>;
-        };
-      }>;
-    };
-
-    return payload.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text || '')
-      .join('')
-      .trim() || null;
+    throw lastQuotaError || new Error('No Gemini AI Judge API key is configured');
   }
 
   // --- Fallbacks ---
