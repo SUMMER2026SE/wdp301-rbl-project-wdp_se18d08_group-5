@@ -64,13 +64,22 @@ export function DebateParticipantCard({
   const chatEnabled = Boolean(participant && !participant.chatMuted);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const shouldShowVideo = Boolean(participant && mediaStream && showCameraStream);
+  const videoKey = shouldShowVideo && mediaStream ? `on-${mediaStream.id}` : 'off';
 
   useEffect(() => {
-    if (videoRef.current && videoRef.current.srcObject !== mediaStream) {
-      videoRef.current.srcObject = mediaStream;
+    const video = videoRef.current;
+    if (!video) return;
+    if (shouldShowVideo && mediaStream) {
+      if (video.srcObject !== mediaStream) {
+        video.srcObject = mediaStream;
+      }
+      video.play().catch(() => undefined);
     }
-    videoRef.current?.play().catch(() => undefined);
-  }, [mediaStream]);
+    return () => {
+      video.pause();
+      video.srcObject = null;
+    };
+  }, [mediaStream, shouldShowVideo, videoKey]);
 
   return (
     <article
@@ -86,6 +95,7 @@ export function DebateParticipantCard({
         <div className="debate-participant-avatar">
           {shouldShowVideo ? (
             <video
+              key={videoKey}
               ref={videoRef}
               className="debate-participant-local-video"
               autoPlay

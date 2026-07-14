@@ -4,12 +4,16 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/AppE
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { aggregateFinalScores } from '../../utils/scoring.js';
 import { hasControlPanel } from '../../utils/roomPermissions.js';
+import { DEBATE_DURATIONS } from './engine/config/duration.config';
+import {
+  getFlowAdapter,
+  checkStartMatchParticipantsAdapter,
+  canPerformAdapter,
+} from './engine/adapter.js';
 
-const SPEECH_SECONDS = 3 * 60;
-const CE_SECONDS = 2 * 60;
-const PREP_SECONDS = 7 * 60;
-const TRANSITION_MUTE_SECONDS = 3;
-const AUTO_TRANSITION_COUNTDOWN = 0;
+// Re-export duration constants cho code cũ đang reference trực tiếp (backward-compat)
+const TRANSITION_MUTE_SECONDS = DEBATE_DURATIONS.TRANSITION_MUTE_SECONDS;
+const AUTO_TRANSITION_COUNTDOWN = DEBATE_DURATIONS.AUTO_TRANSITION_COUNTDOWN_SECONDS;
 const noHostAiStartConsensus = new Map<string, Set<string>>();
 
 type DebateStep = {
@@ -29,170 +33,20 @@ type DebateStep = {
 };
 
 /**
- * Human Host 3v3 Debate Flow — aligned with rule_host_judgeHuman.md §14:
- *
- * Round order: R1 (Prop→Opp→CE), R2 (Opp→Prop→CE), R3 (Opp→Prop, no CE)
- * Round 2: "(Same flow as Round 1)" → Pro→Opp, so S2 = Opp→Prop
- * Round 3: Opposition speaks FIRST (Opp→Prop), then "Finish Debate"
- * JUDGES_FB_3 step added so human judges can submit R3 scores before FINAL_JUDGING
+ * Note lịch sử: trước đây 4 hard-coded arrays (DEBATE_FLOW_HOST_3V3/1V1 + NOHost_*)
+ * định nghĩa flow cho từng mode. Nay đã được thay bằng `getFlowAdapter()` từ
+ * engine — single source of truth. Code cũ vẫn dùng `getFlow()` export bên dưới
+ * nhưng nó chỉ là thin wrapper gọi engine.
  */
-const DEBATE_FLOW_HOST_3V3: DebateStep[] = [
-  // 0: Motion — host announces, then 3s countdown → prep
-  { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 1: Prep — 7m auto / both teams skip / host skip
-  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: true },
-  // 2: PROP1 speech (PRO_S1)
-  { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 3: OPP1 speech (OPP_S1)
-  { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 4: CE Round 1 — both teams can talk
-  {
-    speaker: 'CE_ROUND_1', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: true,
-    ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  // 5: Judge Feedback 1 — free, no timer, wait for scores
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 6: PROP2 speech (PRO_S2) — "(Same flow as Round 1)"
-  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 7: OPP2 speech (OPP_S2)
-  { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 8: CE Round 2 — both teams can talk
-  {
-    speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: true,
-    ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  // 9: Judge Feedback 2 — free, no timer
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 10: PROP3 speech (PRO_S3) - Prop speaks FIRST in Round 3
-  { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 11: OPP3 speech (OPP_S3) - "Finish Debate" after this
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  // 12: Judge Feedback 3 — judges submit R3 scores (no CE in R3)
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 13: Final Judging — "Finish Debate" → host clicks End → match ends
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // 14: Match complete — host must click End
-  { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-];
 
-/**
- * Human Host 1v1 — rule_host_judgeHuman.md §14:
- * R1: PRO→OPP→CE, R2: OPP→PRO→CE, R3: OPP→PRO (no CE), JUDGES_FB_3, FINAL_JUDGING
- */
-const DEBATE_FLOW_HOST_1V1: DebateStep[] = [
-  { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: true },
-  // Round 1: Prop → Opp → CE
-  { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  {
-    speaker: 'CE_ROUND_1', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: true,
-    ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // Round 2: Opp → Prop → CE (per "Same flow as Round 1")
-  { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  {
-    speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: true,
-    ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  // Round 3: Prop -> Opp (no CE), JUDGES_FB_3, Final Judging
-  { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: true },
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: true },
-  { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-];
-
-/**
- * No-Host 3v3 (config: no host + human judge OR no host + AI judge).
- * rule_noHost_JudgeAI.md §13 and rule_noHost_JudgeHuman.md §15:
- *
- * R1: Prop→Opp→CE, R2: Prop→Opp→CE, R3: Opp→Prop (no CE)
- * R2: "(Same flow as Round 1)" → PRO_S2 first, OPP_S2 second
- * R3: Opposition FIRST (Opp→Prop) per rule: "[S3 Opposition] → [S3 Proposition]"
- * JUDGES_FB_3 added so human judges can submit R3 scores before FINAL_JUDGING
- *
- * Key differences from HOST flow:
- * - No waiting-for-host idle state; phases auto-advance (3s mute + 10s)
- * - CE starts automatically 10s after OPP speech ends
- * - Judge Feedback = free period + AI-generated feedback scores
- * - Match ends automatically after Final Judging (no host End needed)
- */
-const DEBATE_FLOW_NOHost_3V3: DebateStep[] = [
-  // 1: Motion announcement
-  { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // 2: Prep — 7m auto, both teams can skip
-  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: false },
-  // Round 1: Prop → Opp → CE → Judge FB
-  { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  {
-    speaker: 'CE_ROUND_1', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
-    ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 2: "(Same flow as Round 1)" → PRO first, OPP second
-  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  {
-    speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
-    ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 3: Prop -> Opp (no CE) - Prop FIRST per rule
-  { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // Judge Feedback 3 (human judges submit R3 scores)
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Final Judging — auto score + redirect (no-host AI) or wait for score (no-host human)
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Match complete — auto-ended
-  { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-];
-
-/**
- * No-Host 1v1 — rule_noHost_JudgeAI.md §13 and rule_noHost_JudgeHuman.md §15:
- * R1: Prop→Opp→CE, R2: Prop→Opp→CE, R3: Opp→Prop (no CE)
- * JUDGES_FB_3 added so human judges can submit R3 scores
- */
-const DEBATE_FLOW_NOHost_1V1: DebateStep[] = [
-  { speaker: 'HOST', phase: 'motion', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  { speaker: 'BOTH_TEAMS_PREP', phase: 'prep_7', timeLimit: PREP_SECONDS, speakerCanEnd: false, hostCanEnd: false },
-  // Round 1: Prop → Opp → CE
-  { speaker: 'PRO_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'OPP_S1', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  {
-    speaker: 'CE_ROUND_1', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
-    ce: { askingTeam: 'proposition', answeringTeam: 'opposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 2: Prop → Opp → CE (per "Same flow as Round 1")
-  { speaker: 'PRO_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'OPP_S2', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  {
-    speaker: 'CE_ROUND_2', phase: 'cross_exam', timeLimit: CE_SECONDS, speakerCanEnd: false, hostCanEnd: false,
-    ce: { askingTeam: 'opposition', answeringTeam: 'proposition', quotaPerTeam: 2, questionsAsked: 0, currentRole: 'asker' },
-  },
-  { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Round 3: Prop -> Opp (no CE) - Prop FIRST per rule
-  { speaker: 'PRO_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  { speaker: 'OPP_S3', phase: 'speech', timeLimit: SPEECH_SECONDS, speakerCanEnd: true, hostCanEnd: false },
-  // Judge Feedback 3 (human judges submit R3 scores)
-  { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Final Judging
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-  // Complete
-  { speaker: 'COMPLETED', phase: 'completed', timeLimit: 0, speakerCanEnd: false, hostCanEnd: false },
-];
-
-export function getFlow(format?: '1v1' | '3v3', hostType?: 'human' | 'ai'): DebateStep[] {
-  if (!format || format === '3v3') {
-    return hostType === 'ai' ? DEBATE_FLOW_NOHost_3V3 : DEBATE_FLOW_HOST_3V3;
-  }
-  return hostType === 'ai' ? DEBATE_FLOW_NOHost_1V1 : DEBATE_FLOW_HOST_1V1;
+export function getFlow(
+  format?: '1v1' | '3v3',
+  hostType?: 'human' | 'ai',
+  judgeType?: 'human' | 'ai',
+): DebateStep[] {
+  // Delegate sang engine mới — single source of truth cho flow definition.
+  // Xem engine/flowGenerator.ts + engine/config/modeConfigs.ts.
+  return getFlowAdapter(format, hostType, judgeType) as DebateStep[];
 }
 
 export function getStepIndex(flow: DebateStep[], speaker: string, phase: string): number {
@@ -205,64 +59,9 @@ export function getStepIndex(flow: DebateStep[], speaker: string, phase: string)
  * total. The expected total depends on format × hostType × judgeType.
  */
 export function checkStartMatchParticipants(room: any): { ready: boolean; reason?: string; counts?: any } {
-  const getEffectiveRole = (p: any) =>
-    p?.roomRole === 'owner' ? p?.primaryRole : p?.roomRole;
-
-  const is1v1 = room.format === '1v1';
-  const debaterCount = is1v1 ? 2 : 6;
-  const hasHost = room.hostType === 'human';
-  const isAIJudge = room.judgeType === 'ai';
-  const requiredJudges = isAIJudge ? 0 : (room.judgeCount || 1);
-
-  const participants = (room.participants || []) as any[];
-  let currentDebaters = 0;
-  let currentHost = 0;
-  let currentJudges = 0;
-  const debatersWithoutPosition: string[] = [];
-
-  participants.forEach((p) => {
-    const role = getEffectiveRole(p);
-    if (role === 'debater') {
-      if (p.team && p.speakerSlot) {
-        currentDebaters += 1;
-      } else {
-        debatersWithoutPosition.push(p.username || p.userId?.toString() || 'unknown');
-      }
-    } else if (role === 'host') {
-      currentHost += 1;
-    } else if (role === 'judge') {
-      currentJudges += 1;
-    }
-  });
-
-  const missingDebaters = Math.max(0, debaterCount - currentDebaters);
-  const missingHost = hasHost ? Math.max(0, 1 - currentHost) : 0;
-  const missingJudges = Math.max(0, requiredJudges - currentJudges);
-
-  if (missingDebaters > 0 || missingHost > 0 || missingJudges > 0) {
-    const reasons: string[] = [];
-    if (missingDebaters > 0) reasons.push(`need ${missingDebaters} more debater(s) (${currentDebaters}/${debaterCount})`);
-    if (missingHost > 0) reasons.push(`need a Host (${currentHost}/1)`);
-    if (missingJudges > 0) reasons.push(`need ${missingJudges} more judge(s) (${currentJudges}/${requiredJudges})`);
-    return {
-      ready: false,
-      reason: `Cannot start: ${reasons.join(', ')}.`,
-      counts: { currentDebaters, currentHost, currentJudges, debaterCount, hasHost, requiredJudges },
-    };
-  }
-
-  if (debatersWithoutPosition.length > 0) {
-    return {
-      ready: false,
-      reason: `Debater(s) without team/slot: ${debatersWithoutPosition.join(', ')}`,
-      counts: { currentDebaters, currentHost, currentJudges, debaterCount, hasHost, requiredJudges },
-    };
-  }
-
-  return {
-    ready: true,
-    counts: { currentDebaters, currentHost, currentJudges, debaterCount, hasHost, requiredJudges },
-  };
+  // Delegate sang engine mới — single source of truth cho requiredParticipants.
+  // Xem engine/adapter.ts → checkStartMatchParticipantsAdapter.
+  return checkStartMatchParticipantsAdapter(room);
 }
 
 function assertHost(room: any, userId: string) {
@@ -352,20 +151,49 @@ export async function startDebate(roomId: string, userId: string) {
     ? participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole
     : null;
 
+  // Engine-driven permission check (single source of truth cho "who can start_match")
+  // canPerformAdapter bao trùm: Host có start_match trong host_*,
+  // Judge S1 có start_match trong noHost_human_*,
+  // Captain (S1 debater) có start_match trong noHost_ai_*.
+  const engineCanStart = participant
+    ? canPerformAdapter(
+        {
+          userId,
+          roomRole: participant.roomRole ?? undefined,
+          primaryRole: participant.primaryRole ?? undefined,
+          team: participant.team ?? undefined,
+          speakerSlot: participant.speakerSlot ?? undefined,
+          hasControlPanel: hasControlPanel(room, userId),
+        },
+        'start_match',
+        {
+          format: room.format,
+          hostType: room.hostType,
+          judgeType: room.judgeType,
+          judgeCount: room.judgeCount,
+        },
+      )
+    : false;
+
   let isAuthorized = false;
 
   if (!isNoHost) {
-    // Host mode: owner or host can start
+    // Host mode: owner hoặc host có start_match (engine check confirm).
+    // Owner override cũ vẫn giữ để backward-compat với rooms hiện có.
     const isOwner = room.createdBy.toString() === userId;
-    isAuthorized = isOwner || effectiveRole === 'host';
+    isAuthorized = engineCanStart || (isOwner && effectiveRole !== null);
   } else {
     // No-Host mode: owner bypass is NOT allowed per rule
     if (isAIJudge) {
       // No-Host + AI: only S1 debaters consensus starts the debate
-      isAuthorized = effectiveRole === 'debater' && (participant as any).speakerSlot === 'S1';
+      isAuthorized =
+        engineCanStart &&
+        effectiveRole === 'debater' &&
+        (participant as any).speakerSlot === 'S1';
     } else {
       // No-Host + Human Judge: only Judge S1 starts the debate
-      isAuthorized = effectiveRole === 'judge' && hasControlPanel(room, userId);
+      isAuthorized =
+        engineCanStart && effectiveRole === 'judge' && hasControlPanel(room, userId);
     }
   }
 
@@ -496,13 +324,38 @@ export async function endPhaseByHost(roomId: string, userId: string, transcript 
   if (turn.phaseStatus !== 'active' && turn.phaseStatus !== 'paused') {
     throw new BadRequestError(`Cannot end phase in '${turn.phaseStatus}' state`);
   }
-  const flow = getFlow((room.format as '1v1' | '3v3') || '3v3', (room.hostType as 'human' | 'ai') || undefined);
+  const flow = getFlow(
+    (room.format as '1v1' | '3v3') || '3v3',
+    (room.hostType as 'human' | 'ai') || undefined,
+    room.judgeType as 'human' | 'ai' | undefined,
+  );
   const currentIndex = getStepIndex(flow, turn.speaker, turn.phase);
   if (currentIndex === -1) throw new BadRequestError('Current step not in flow');
   const currentStep = flow[currentIndex];
-  
+
   const isNoHostHumanJudge = room.hostType !== 'human' && room.judgeType === 'human';
-  if (!isNoHostHumanJudge && !currentStep.hostCanEnd) {
+  // Engine-driven permission: skip_phase cho Host (host_*) hoặc Judge S1 (noHost_human_*).
+  // Engine đã bao trùm logic này — code cũ check `currentStep.hostCanEnd` để override
+  // cho noHost_human (Judge S1 = host thay thế).
+  const participant = room.participants.find((p: any) => p.userId?.toString() === userId);
+  const engineCanSkip = participant
+    ? canPerformAdapter(
+        {
+          userId,
+          roomRole: participant.roomRole ?? undefined,
+          primaryRole: participant.primaryRole ?? undefined,
+          hasControlPanel: hasControlPanel(room, userId),
+        },
+        'skip_phase',
+        {
+          format: room.format,
+          hostType: room.hostType,
+          judgeType: room.judgeType,
+          judgeCount: room.judgeCount,
+        },
+      )
+    : false;
+  if (!isNoHostHumanJudge && !engineCanSkip && !currentStep.hostCanEnd) {
     throw new BadRequestError('Host cannot end this phase');
   }
   

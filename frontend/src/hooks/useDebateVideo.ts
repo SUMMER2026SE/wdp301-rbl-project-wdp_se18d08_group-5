@@ -66,6 +66,22 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const joinedRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const localCameraActiveRef = useRef(false);
+
+  const stopLocalCameraTrack = useCallback(() => {
+    if (!streamRef.current) return;
+    streamRef.current.getVideoTracks().forEach((track) => {
+      track.stop();
+    });
+  }, []);
+
+  const detachLocalVideoTrack = useCallback((pc: RTCPeerConnection) => {
+    const videoSender = pc.getSenders().find((sender) => sender.track?.kind === 'video');
+    if (!videoSender) return;
+    if (videoSender.track) {
+      videoSender.replaceTrack(null).catch(() => undefined);
+    }
+  }, []);
 
   const attachLocalVideoTrack = useCallback((pc: RTCPeerConnection) => {
     if (!streamRef.current) return;
@@ -96,6 +112,24 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (remoteStream) {
+          const videoTrack = remoteStream.getVideoTracks()[0];
+          if (videoTrack) {
+            const handleRemoteTrackEnded = () => {
+              setPeers((prev) => {
+                const idx = prev.findIndex((p) => p.socketId === peerSocketId);
+                if (idx === -1) return prev;
+                const next = [...prev];
+                next[idx] = { ...next[idx], stream: null };
+                return next;
+              });
+            };
+            if (videoTrack.readyState === 'ended') {
+              handleRemoteTrackEnded();
+            } else {
+              videoTrack.addEventListener('ended', handleRemoteTrackEnded, { once: true });
+              videoTrack.addEventListener('mute', handleRemoteTrackEnded, { once: true });
+            }
+          }
           setPeers((prev) => {
             const idx = prev.findIndex((p) => p.socketId === peerSocketId);
             if (idx === -1) {
@@ -148,13 +182,17 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
   }, []);
 
   const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getVideoTracks().forEach((t) => t.stop());
+    if (!streamRef.current && !localCameraActiveRef.current) {
+      return;
     }
+    peerConnectionsRef.current.forEach(detachLocalVideoTrack);
+    stopLocalCameraTrack();
+    streamRef.current = null;
+    localCameraActiveRef.current = false;
     setLocalCameraActive(false);
     if (userId) setCameraActive(userId, false);
     getSocket()?.emit('video:state', { roomId, team: MAIN_VIDEO_CHANNEL, active: false });
-  }, [roomId, setCameraActive, userId]);
+  }, [detachLocalVideoTrack, roomId, setCameraActive, stopLocalCameraTrack, userId]);
 
   const startCamera = useCallback(async () => {
     if (!userId) return;
@@ -170,6 +208,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       streamRef.current = stream;
       peerConnectionsRef.current.forEach(attachLocalVideoTrack);
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
+      localCameraActiveRef.current = true;
       setLocalCameraActive(true);
       setCameraActive(userId, true);
       getSocket()?.emit('video:state', { roomId, team: MAIN_VIDEO_CHANNEL, active: true });
@@ -262,7 +301,11 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
           toast.success('The host enabled your camera');
         } else {
           setCameraLockedByHost(true);
-          stopCamera();
+          peerConnectionsRef.current.forEach(detachLocalVideoTrack);
+          stopLocalCameraTrack();
+          streamRef.current = null;
+          localCameraActiveRef.current = false;
+          setLocalCameraActive(false);
           toast.error('The host turned off your camera');
         }
       }
@@ -370,6 +413,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     };
   }, [
     closePeer,
+    detachLocalVideoTrack,
     enabled,
     ensurePeerConnection,
     roomId,
@@ -377,21 +421,22 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     setCameraActive,
     setCameraLockedByHost,
     stopCamera,
+    stopLocalCameraTrack,
     userId,
   ]);
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getVideoTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
+      peerConnectionsRef.current.forEach(detachLocalVideoTrack);
+      stopLocalCameraTrack();
+      streamRef.current = null;
+      localCameraActiveRef.current = false;
       if (userId) {
         setCameraActive(userId, false);
       }
       getSocket()?.emit('video:state', { roomId, team: MAIN_VIDEO_CHANNEL, active: false });
     };
-  }, [roomId, setCameraActive, userId]);
+  }, [detachLocalVideoTrack, roomId, setCameraActive, stopLocalCameraTrack, userId]);
 
   return { cameraActive, peers, startCamera, stopCamera, hostToggleCamera, localStream: streamRef.current };
 }

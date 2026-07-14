@@ -234,7 +234,7 @@ Vào Room (timer không chạy)
 ↓
 
 [PREPARATION PHASE — 7 phút]
-Kết thúc khi: hết 7p | Host skip | cả 2 đội cùng skip
+Kết thúc khi: hết 7p | Host skip | cả 2 đội cùng skip (S1 2 đội skip)
 
 ↓ Mute + Lock Chat (3s) → Timer reset 00:00
 
