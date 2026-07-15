@@ -23,6 +23,17 @@ type TranslationAudioPayload = {
   data?: string;
 };
 
+// Native clients transcribe locally (iOS/Android speech services) and use this
+// event to publish the same caption shape as Gemini Live. Keeping one caption
+// contract means web and mobile participants can see each other's captions.
+type TranslationTextPayload = {
+  roomId?: string;
+  sourceLanguage?: string;
+  sourceText?: string;
+  translatedLanguage?: string;
+  translatedText?: string;
+};
+
 type TranslationAck = (payload: { success: boolean; message?: string }) => void;
 
 type LiveConnection = {
@@ -239,6 +250,40 @@ function createLiveConnection(
 
 export function registerTranslationHandlers(io: Server, socket: Socket) {
   const userId = getSocketUserId(socket);
+
+  socket.on('translation:text', async (payload: TranslationTextPayload) => {
+    const roomId = payload?.roomId;
+    const sourceText = payload?.sourceText?.trim();
+    if (!roomId || !sourceText || sourceText.length > 1400) return;
+
+    try {
+      const room = await DebateRoom.findById(roomId).select('participants');
+      const participant = room?.participants.find((entry) => entry.userId.toString() === userId);
+      if (!participant) return;
+
+      const session: TranslationSession = {
+        roomId,
+        userId,
+        senderName: participant.username,
+        connections: [],
+        hasReceivedAudio: false,
+      };
+      emitCaption(io, session, 'source', payload.sourceLanguage || 'und', sourceText);
+
+      const translatedText = payload?.translatedText?.trim();
+      if (translatedText && translatedText.length <= 1400) {
+        emitCaption(
+          io,
+          session,
+          'translation',
+          payload.translatedLanguage || 'und',
+          translatedText,
+        );
+      }
+    } catch (error) {
+      console.error('Could not relay native live caption:', error);
+    }
+  });
 
   socket.on('translation:start', async (payload: TranslationStartPayload, ack?: TranslationAck) => {
     const roomId = payload?.roomId;

@@ -4,9 +4,11 @@ import 'package:flutter_riverpod_clean_architecture/core/constants/app_constants
 import 'package:flutter_riverpod_clean_architecture/core/utils/adaptive_feedback.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/data/repositories/debate_repository_impl.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/providers/debate_providers.dart';
+import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/services/debate_media_controller.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/debate_shared_widgets.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/ios_debate_widgets.dart';
 import 'package:flutter_riverpod_clean_architecture/features/debate/presentation/widgets/screen_state_widgets.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:go_router/go_router.dart';
 
 class DebateRoomScreen extends ConsumerStatefulWidget {
@@ -19,8 +21,36 @@ class DebateRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
-  bool _micOn = true;
   bool _leaving = false;
+  DebateMediaController? _media;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeMedia();
+  }
+
+  Future<void> _initializeMedia() async {
+    final token = await ref.read(debateRepositoryProvider).accessToken();
+    if (!mounted) return;
+    final controller = DebateMediaController(
+      roomId: widget.roomId,
+      socketBaseUrl: AppConstants.socketBaseUrl,
+      accessToken: token,
+    );
+    await controller.initialize();
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
+    setState(() => _media = controller);
+  }
+
+  @override
+  void dispose() {
+    _media?.dispose();
+    super.dispose();
+  }
 
   Future<void> _leaveRoom() async {
     final shouldLeave = await AdaptiveFeedback.confirm(
@@ -59,7 +89,7 @@ class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
     final session = ref.watch(sessionProvider(widget.roomId));
     return DebatePage(
       title: 'Debate',
-      subtitle: _micOn ? 'Mic đang bật.' : 'Mic đang tắt.',
+      subtitle: _media?.micOn == true ? 'Mic đang bật.' : 'Mic đang tắt.',
       actions: [
         IconButton(
           tooltip: 'Rời phòng',
@@ -115,32 +145,7 @@ class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
             },
           ),
           const SizedBox(height: 12),
-          DebateCard(
-            child: Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => setState(() => _micOn = !_micOn),
-                    icon: Icon(
-                      _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
-                    ),
-                    label: Text(_micOn ? 'Mic bật' : 'Mic tắt'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => showDebateSnack(
-                      context,
-                      'Voice transport native sẽ cần backend signaling/audio stream riêng.',
-                    ),
-                    icon: const Icon(Icons.info_outline_rounded),
-                    label: const Text('Voice-first shell'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _MediaPanel(media: _media),
           _JudgeScoreCard(roomId: widget.roomId),
           const SizedBox(height: 12),
           Row(
@@ -206,6 +211,257 @@ class _DebateRoomScreenState extends ConsumerState<DebateRoomScreen> {
                   : const Icon(Icons.exit_to_app_rounded),
               label: Text(_leaving ? 'Đang rời phòng...' : 'Rời phòng'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaPanel extends StatelessWidget {
+  const _MediaPanel({required this.media});
+
+  final DebateMediaController? media;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = media;
+    if (controller == null) {
+      return const DebateCard(
+        child: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text('Đang kết nối camera, micro và phụ đề trực tiếp...'),
+            ),
+          ],
+        ),
+      );
+    }
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final remoteVideo = controller.remoteRenderers.entries.toList();
+        final captions = controller.captions
+            .where(
+              (caption) =>
+                  controller.showTranslations || caption.kind == 'source',
+            )
+            .take(4)
+            .toList();
+        return Column(
+          children: [
+            DebateCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.video_call_rounded,
+                        color: DebateColors.indigo,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Video & voice',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      DebatePill(
+                        label: controller.isConnected
+                            ? 'Realtime'
+                            : 'Connecting',
+                        color: controller.isConnected
+                            ? DebateColors.accent
+                            : DebateColors.muted,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 150,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _VideoTile(
+                          label: 'Bạn',
+                          renderer: controller.localRenderer,
+                          active: controller.cameraOn,
+                          local: true,
+                        ),
+                        ...remoteVideo.map(
+                          (entry) => _VideoTile(
+                            label: 'Participant',
+                            renderer: entry.value,
+                            active: entry.value.srcObject != null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: controller.toggleMic,
+                          icon: Icon(
+                            controller.micOn
+                                ? Icons.mic_rounded
+                                : Icons.mic_off_rounded,
+                          ),
+                          label: Text(controller.micOn ? 'Tắt mic' : 'Bật mic'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: controller.toggleCamera,
+                          icon: Icon(
+                            controller.cameraOn
+                                ? Icons.videocam_rounded
+                                : Icons.videocam_off_rounded,
+                          ),
+                          label: Text(
+                            controller.cameraOn ? 'Tắt camera' : 'Bật camera',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (controller.errorMessage != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      controller.errorMessage!,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: DebateColors.rose),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            DebateCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.translate_rounded,
+                        color: DebateColors.indigo,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Live captions & translate',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      Switch(
+                        value: controller.showTranslations,
+                        onChanged: controller.setShowTranslations,
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Bật mic để dùng nhận diện giọng nói và dịch Việt ↔ Anh ngay trên thiết bị.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 10),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'vi',
+                        label: Text('Tôi nói tiếng Việt'),
+                      ),
+                      ButtonSegment(
+                        value: 'en',
+                        label: Text('I speak English'),
+                      ),
+                    ],
+                    selected: {controller.sourceLanguage},
+                    onSelectionChanged: (value) =>
+                        controller.setSourceLanguage(value.first),
+                  ),
+                  const SizedBox(height: 10),
+                  if (captions.isEmpty)
+                    Text(
+                      'Phụ đề của người tham gia sẽ hiện tại đây.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    )
+                  else
+                    ...captions.map(
+                      (caption) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          '${caption.senderName} · ${caption.kind == 'translation' ? 'DỊCH' : caption.language.toUpperCase()}\n${caption.text}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _VideoTile extends StatelessWidget {
+  const _VideoTile({
+    required this.label,
+    required this.renderer,
+    required this.active,
+    this.local = false,
+  });
+
+  final String label;
+  final RTCVideoRenderer renderer;
+  final bool active;
+  final bool local;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 190,
+      margin: const EdgeInsets.only(right: 10),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: DebateColors.canvas,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: DebateColors.line),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (active)
+            RTCVideoView(
+              renderer,
+              mirror: local,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            )
+          else
+            const Center(
+              child: Icon(
+                Icons.person_outline_rounded,
+                size: 42,
+                color: DebateColors.muted,
+              ),
+            ),
+          Positioned(
+            left: 8,
+            bottom: 8,
+            child: DebatePill(label: active ? label : '$label · camera off'),
           ),
         ],
       ),

@@ -116,8 +116,9 @@ class _UpdateCheckerState extends ConsumerState<UpdateChecker> {
       if (_hasShownDialog || !widget.autoPrompt) return;
 
       next.whenData((result) {
-        if (result == UpdateCheckResult.updateAvailable ||
-            result == UpdateCheckResult.criticalUpdateRequired) {
+        // Optional updates are intentionally silent. Keep the blocking prompt
+        // only for versions the server marks as critical.
+        if (result == UpdateCheckResult.criticalUpdateRequired) {
           // Use addPostFrameCallback to ensure we're not in the build phase
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_hasShownDialog) {

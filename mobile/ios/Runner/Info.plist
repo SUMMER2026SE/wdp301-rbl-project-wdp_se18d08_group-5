@@ -28,6 +28,12 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>DebateHub cần quyền truy cập thư viện ảnh để cập nhật avatar của bạn.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>DebateHub cần camera để bạn tham gia video debate.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>DebateHub cần micro để gửi giọng nói trong debate.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>DebateHub dùng nhận diện giọng nói trên thiết bị để tạo phụ đề và bản dịch trực tiếp.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
