@@ -17,7 +17,7 @@
  * - Trong AUTO_TIMED mode, phase sau TRANSITION tự động chuyển sau 10s.
  */
 
-import type { DebateModeConfig, Role, Team } from '../config/types';
+import type { DebateModeConfig, Role, Team } from '../config/types.js';
 
 /**
  * Lifecycle state của 1 phase. Cùng giá trị với phaseStatus trong DebateSession model.

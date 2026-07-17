@@ -3,7 +3,7 @@
  * song song cho khác roomId.
  */
 import { describe, it, expect } from 'vitest';
-import { TransitionMutex } from './idempotencyGuard';
+import { TransitionMutex } from './idempotencyGuard.js';
 
 describe('TransitionMutex', () => {
   it('chạy tuần tự cho cùng roomId (không parallel)', async () => {

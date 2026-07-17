@@ -8,7 +8,7 @@ import {
   checkStartMatchParticipantsAdapter,
   canPerformAdapter,
   getModeConfigForRoom,
-} from './adapter';
+} from './adapter.js';
 
 describe('adapter.ts — backward-compat với debate.service.ts cũ', () => {
   describe('getFlowAdapter()', () => {

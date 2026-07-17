@@ -26,7 +26,7 @@ import type {
   ParticipantDescriptor,
   PermissionAction,
   Role,
-} from './types';
+} from './types.js';
 
 /**
  * Một số action luôn có cho debater/judge/captain (không phụ thuộc mode):
@@ -394,7 +394,7 @@ function getModeConfigCached(modeId: DebateModeId): DebateModeConfig {
 // Lazy-import wrapper để tránh circular dependency.
 // modeConfigs.ts import types từ types.ts (cùng package) — không có cycle,
 // nhưng dùng dynamic import để chắc chắn resolution theo module load order.
-import { DEBATE_MODE_CONFIGS } from './modeConfigs';
+import { DEBATE_MODE_CONFIGS } from './modeConfigs.js';
 
 function loadModeConfig(modeId: DebateModeId): DebateModeConfig {
   const cfg = DEBATE_MODE_CONFIGS[modeId];

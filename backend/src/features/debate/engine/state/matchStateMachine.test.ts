@@ -15,10 +15,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createActor } from 'xstate';
-import { DEBATE_DURATIONS } from '../config/duration.config';
-import { DEBATE_MODE_CONFIGS } from '../config/modeConfigs';
-import { matchMachine } from './matchStateMachine';
-import type { MatchContext } from './matchStateMachine';
+import { DEBATE_DURATIONS } from '../config/duration.config.js';
+import { DEBATE_MODE_CONFIGS } from '../config/modeConfigs.js';
+import { matchMachine } from './matchStateMachine.js';
+import type { MatchContext } from './matchStateMachine.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
