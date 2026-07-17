@@ -13,15 +13,15 @@
  * Khi nào nên refactor sâu hơn: khi unit tests cho adapter đã ổn + integration
  * tests ổn → có thể migrate các method cũ sang dùng XState trực tiếp.
  */
-import { DEBATE_MODE_CONFIGS } from './config/modeConfigs';
-import { generateFlowFromMode, type FlowStep } from './state/flowGenerator';
+import { DEBATE_MODE_CONFIGS } from './config/modeConfigs.js';
+import { generateFlowFromMode, type FlowStep } from './state/flowGenerator.js';
 import type {
   DebateModeConfig,
   DebateModeId,
   PermissionAction,
   TeamSize,
-} from './config/types';
-import { canPerform, deriveRole } from './config/permissionMatrix';
+} from './config/types.js';
+import { canPerform, deriveRole } from './config/permissionMatrix.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
