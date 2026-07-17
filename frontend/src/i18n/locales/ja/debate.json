@@ -16,6 +16,7 @@
     "sessionStarting": "討論セッションを開始しています...",
     "hostClickedStart": "ホストがSTARTをクリックしました",
     "syncBanner": "ライブ討論状態を同期中...",
+    "syncFailed": "ライブ討論状態を同期できません。",
     "phaseTransition": "フェーズ移行",
     "muteMicAndLockChat": "マイクをミュートしチャットをロック",
     "startsIn": "{{label}}がまもなく開始",
