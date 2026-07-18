@@ -751,7 +751,7 @@ describe('host_human_* — JUDGE_FEEDBACK_3 routes to AWAITING_HOST_END', () => 
   // giữ logic auto-advance. Service-level test sẽ cover trong integration tests.
   // Ở đây ta verify rằng flow step của host_human_3v3 KHÔNG có FINAL_JUDGING.
   it('host_human_3v3 flow có 15 steps và step cuối là COMPLETED', async () => {
-    const { generateFlowFromMode } = await import('./flowGenerator');
+    const { generateFlowFromMode } = await import('./flowGenerator.js');
     const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_human_3v3);
     expect(flow).toHaveLength(15);
     expect(flow[flow.length - 1]?.speaker).toBe('COMPLETED');
