@@ -4,6 +4,8 @@ import { getSocket } from './useSocket';
 import type { PrivateRoomTeam } from './usePrivateRoomSocket';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
+import { loadWebRtcConfiguration, WEBRTC_CONFIGURATION } from '@/config/webrtc';
+import { attachLocalTrack, findSenderForKind } from '@/utils/webrtcNegotiation';
 
 interface RemotePeer {
   socketId: string;
@@ -16,10 +18,6 @@ interface UsePrivateRoomVideoOptions {
   team: PrivateRoomTeam;
   enabled: boolean;
 }
-
-const peerConnectionConfig: RTCConfiguration = {
-  iceServers: [],
-};
 
 function getCameraErrorMessage(error: unknown) {
   if (!window.isSecureContext) {
@@ -46,8 +44,10 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
   const setGlobalCameraActive = useDebateStore((s) => s.setCameraActive);
   const [cameraActive, setLocalCameraActive] = useState(false);
   const [peers, setPeers] = useState<RemotePeer[]>([]);
+  const videoChannel = `private-${team}-video`;
 
   const streamRef = useRef<MediaStream | null>(null);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(WEBRTC_CONFIGURATION);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const joinedRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
@@ -60,23 +60,14 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
   }, []);
 
   const detachLocalVideoTrack = useCallback((pc: RTCPeerConnection) => {
-    const videoSender = pc.getSenders().find((sender) => sender.track?.kind === 'video');
-    if (!videoSender) return;
-    if (videoSender.track) {
-      videoSender.replaceTrack(null).catch(() => undefined);
-    }
+    findSenderForKind(pc, 'video')?.replaceTrack(null).catch(() => undefined);
   }, []);
 
-  const attachLocalVideoTrack = useCallback((pc: RTCPeerConnection) => {
+  const attachLocalVideoTrack = useCallback(async (pc: RTCPeerConnection) => {
     if (!streamRef.current) return;
-    streamRef.current.getVideoTracks().forEach((track) => {
-      const existing = pc.getSenders().find((s) => s.track?.kind === 'video');
-      if (existing) {
-        existing.replaceTrack(track).catch(() => undefined);
-      } else {
-        pc.addTrack(track, streamRef.current!);
-      }
-    });
+    const [track] = streamRef.current.getVideoTracks();
+    if (!track) return;
+    await attachLocalTrack(pc, track, streamRef.current);
   }, []);
 
   const ensurePeerConnection = useCallback(
@@ -84,12 +75,12 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       const existing = peerConnectionsRef.current.get(peerSocketId);
       if (existing) return existing;
 
-      const pc = new RTCPeerConnection(peerConnectionConfig);
+      const pc = new RTCPeerConnection(rtcConfigurationRef.current);
       pc.onicecandidate = (event) => {
         if (!event.candidate) return;
         getSocket()?.emit('voice:ice-candidate', {
           roomId,
-          team,
+          team: videoChannel,
           targetSocketId: peerSocketId,
           candidate: event.candidate.toJSON(),
         });
@@ -112,7 +103,6 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
               handleRemoteTrackEnded();
             } else {
               videoTrack.addEventListener('ended', handleRemoteTrackEnded, { once: true });
-              videoTrack.addEventListener('mute', handleRemoteTrackEnded, { once: true });
             }
           }
           setPeers((prev) => {
@@ -133,11 +123,10 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
           setPeers((prev) => prev.filter((p) => p.socketId !== peerSocketId));
         }
       };
-      attachLocalVideoTrack(pc);
       peerConnectionsRef.current.set(peerSocketId, pc);
       return pc;
     },
-    [attachLocalVideoTrack, roomId, team],
+    [roomId, videoChannel],
   );
 
   const sendOffer = useCallback(
@@ -146,16 +135,17 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       if (!socket) return;
       const pc = ensurePeerConnection(peerSocketId);
       if (pc.signalingState !== 'stable') return;
+      await attachLocalVideoTrack(pc);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit('voice:offer', {
         roomId,
-        team,
+        team: videoChannel,
         targetSocketId: peerSocketId,
         offer: pc.localDescription,
       });
     },
-    [ensurePeerConnection, roomId, team],
+    [attachLocalVideoTrack, ensurePeerConnection, roomId, videoChannel],
   );
 
   const closePeer = useCallback((peerSocketId: string) => {
@@ -172,8 +162,8 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
     streamRef.current = null;
     setLocalCameraActive(false);
     if (userId) setGlobalCameraActive(userId, false);
-    getSocket()?.emit('video:state', { roomId, team, active: false });
-  }, [detachLocalVideoTrack, roomId, stopLocalCameraTrack, team, setGlobalCameraActive, userId]);
+    getSocket()?.emit('video:state', { roomId, team: videoChannel, active: false });
+  }, [detachLocalVideoTrack, roomId, stopLocalCameraTrack, videoChannel, setGlobalCameraActive, userId]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -182,25 +172,25 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
         audio: false,
       });
       streamRef.current = stream;
-      peerConnectionsRef.current.forEach(attachLocalVideoTrack);
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
       setLocalCameraActive(true);
       if (userId) setGlobalCameraActive(userId, true);
-      getSocket()?.emit('video:state', { roomId, team, active: true });
+      getSocket()?.emit('video:state', { roomId, team: videoChannel, active: true });
     } catch (error) {
       toast.error(getCameraErrorMessage(error));
     }
-  }, [attachLocalVideoTrack, roomId, sendOffer, team, setGlobalCameraActive, userId]);
+  }, [roomId, sendOffer, videoChannel, setGlobalCameraActive, userId]);
 
   useEffect(() => {
     if (!enabled || !roomId || !team) return undefined;
     const socket = getSocket();
     if (!socket) return undefined;
+    let cancelled = false;
 
     const joinVideo = () => {
       socket.emit(
         'voice:join',
-        { roomId, team },
+        { roomId, team: videoChannel },
         (response?: {
           peers: Array<{ socketId: string; userId: string }>;
           cameraState?: { activeUsers: string[] };
@@ -228,7 +218,7 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
     };
 
     const handleUserJoined = (payload: { socketId: string; userId: string; team?: string }) => {
-      if (payload.team !== team) return;
+      if (payload.team !== videoChannel) return;
       ensurePeerConnection(payload.socketId);
       setPeers((prev) => {
         if (prev.find((p) => p.socketId === payload.socketId)) return prev;
@@ -240,16 +230,17 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
     };
 
     const handleUserLeft = (payload: { socketId: string; team?: string }) => {
-      if (payload.team !== team) return;
+      if (payload.team !== videoChannel) return;
       closePeer(payload.socketId);
     };
 
     const handleVideoState = (payload: { userId: string; active: boolean; team?: string }) => {
-      if (payload.team !== team) return;
+      if (payload.team !== videoChannel) return;
       setGlobalCameraActive(payload.userId, payload.active);
     };
 
-    const handleHostToggle = (payload: { userId: string; active: boolean; byUserId: string }) => {
+    const handleHostToggle = (payload: { userId: string; active: boolean; byUserId: string; team?: string }) => {
+      if (payload.team !== videoChannel) return;
       setGlobalCameraActive(payload.userId, payload.active);
       if (userId && payload.userId === userId) {
         if (payload.active) {
@@ -275,20 +266,21 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
 
     const handleOffer = async (payload: {
       roomId: string;
-      team: PrivateRoomTeam;
+      team?: string;
       fromSocketId: string;
       offer: RTCSessionDescriptionInit;
     }) => {
-      if (payload.roomId !== roomId || payload.team !== team) return;
+      if (payload.roomId !== roomId || payload.team !== videoChannel) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+        await attachLocalVideoTrack(pc);
         await flushPending(payload.fromSocketId, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socket.emit('voice:answer', {
           roomId,
-          team,
+          team: videoChannel,
           targetSocketId: payload.fromSocketId,
           answer: pc.localDescription,
         });
@@ -299,11 +291,11 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
 
     const handleAnswer = async (payload: {
       roomId: string;
-      team: PrivateRoomTeam;
+      team?: string;
       fromSocketId: string;
       answer: RTCSessionDescriptionInit;
     }) => {
-      if (payload.roomId !== roomId || payload.team !== team) return;
+      if (payload.roomId !== roomId || payload.team !== videoChannel) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
@@ -315,11 +307,11 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
 
     const handleIce = async (payload: {
       roomId: string;
-      team: PrivateRoomTeam;
+      team?: string;
       fromSocketId: string;
       candidate: RTCIceCandidateInit;
     }) => {
-      if (payload.roomId !== roomId || payload.team !== team) return;
+      if (payload.roomId !== roomId || payload.team !== videoChannel) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         if (!pc.remoteDescription) {
@@ -334,20 +326,25 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       }
     };
 
-    socket.on('connect', joinVideo);
-    socket.on('voice:user-joined', handleUserJoined);
-    socket.on('voice:user-left', handleUserLeft);
-    socket.on('video:state', handleVideoState);
-    socket.on('video:host-toggle', handleHostToggle);
-    socket.on('voice:offer', handleOffer);
-    socket.on('voice:answer', handleAnswer);
-    socket.on('voice:ice-candidate', handleIce);
+    void loadWebRtcConfiguration().then((configuration) => {
+      if (cancelled) return;
+      rtcConfigurationRef.current = configuration;
+      socket.on('connect', joinVideo);
+      socket.on('voice:user-joined', handleUserJoined);
+      socket.on('voice:user-left', handleUserLeft);
+      socket.on('video:state', handleVideoState);
+      socket.on('video:host-toggle', handleHostToggle);
+      socket.on('voice:offer', handleOffer);
+      socket.on('voice:answer', handleAnswer);
+      socket.on('voice:ice-candidate', handleIce);
 
-    if (socket.connected) {
-      joinVideo();
-    }
+      if (socket.connected) {
+        joinVideo();
+      }
+    });
 
     return () => {
+      cancelled = true;
       socket.off('connect', joinVideo);
       socket.off('voice:user-joined', handleUserJoined);
       socket.off('voice:user-left', handleUserLeft);
@@ -357,7 +354,7 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       socket.off('voice:answer', handleAnswer);
       socket.off('voice:ice-candidate', handleIce);
       if (joinedRef.current) {
-        socket.emit('voice:leave', { roomId, team });
+        socket.emit('voice:leave', { roomId, team: videoChannel });
         joinedRef.current = false;
       }
       peerConnectionsRef.current.forEach((pc) => pc.close());
@@ -365,6 +362,7 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       setPeers([]);
     };
   }, [
+    attachLocalVideoTrack,
     closePeer,
     detachLocalVideoTrack,
     enabled,
@@ -372,7 +370,7 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
     roomId,
     sendOffer,
     stopLocalCameraTrack,
-    team,
+    videoChannel,
     setGlobalCameraActive,
     userId,
     startCamera,
@@ -384,9 +382,9 @@ export function usePrivateRoomVideo({ roomId, team, enabled }: UsePrivateRoomVid
       stopLocalCameraTrack();
       streamRef.current = null;
       if (userId) setGlobalCameraActive(userId, false);
-      getSocket()?.emit('video:state', { roomId, team, active: false });
+      getSocket()?.emit('video:state', { roomId, team: videoChannel, active: false });
     };
-  }, [detachLocalVideoTrack, roomId, stopLocalCameraTrack, team, setGlobalCameraActive, userId]);
+  }, [detachLocalVideoTrack, roomId, stopLocalCameraTrack, videoChannel, setGlobalCameraActive, userId]);
 
   return { cameraActive, peers, startCamera, stopCamera, localStream: streamRef.current };
 }

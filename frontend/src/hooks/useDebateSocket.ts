@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { getSocket, useSocket } from './useSocket';
@@ -37,18 +37,29 @@ interface RoomStateRestore {
   prepConsensusTotalDebaters?: number;
 }
 
+interface RoomJoinAck {
+  success: boolean;
+  message?: string;
+  data?: RoomStateRestore;
+}
+
+export type DebateSyncStatus = 'idle' | 'connecting' | 'ready' | 'error';
+
 /**
  * Listen to debate-specific socket events and update store.
  * Does NOT manage loading state — each consumer manages that independently.
  */
 export function useDebateSocket(roomId: string | undefined) {
   const { t } = useTranslation('errors');
-  const user = useAuthStore((s) => s.user);
+  const userId = useAuthStore((s) => s.user?._id);
   // Use the hook so we re-run listeners when the singleton socket becomes
   // available. Previously we called `getSocket()` once and returned early if
   // it was null — that permanently skipped listener registration when the
   // socket was still mid-connect at mount time.
   const { socket: socketFromHook } = useSocket();
+  const [syncStatus, setSyncStatus] = useState<DebateSyncStatus>(roomId ? 'connecting' : 'idle');
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncAttempt, setSyncAttempt] = useState(0);
   // Guard the transition interval so duplicate `debate:transition-start`
   // events can't leak running intervals. Must be a top-level hook call —
   // calling useRef inside useEffect violates the Rules of Hooks and causes
@@ -93,15 +104,39 @@ export function useDebateSocket(roomId: string | undefined) {
   } = useDebateStore();
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId) {
+      setSyncStatus('idle');
+      setSyncError(null);
+      return;
+    }
 
     // Prefer the socket from the hook so this effect re-runs whenever the
     // singleton becomes available or reconnects. Falls back to getSocket()
     // for environments where the hook hasn't been wired up yet.
     const socket = socketFromHook ?? getSocket();
-    if (!socket) return;
+    if (!socket) {
+      setSyncStatus('connecting');
+      return;
+    }
+
+    let disposed = false;
+    let retryCount = 0;
+    let retryTimer: number | null = null;
+    const registeredListeners: Array<{
+      event: string;
+      listener: (...args: any[]) => void;
+    }> = [];
+    const onSocketEvent = (event: string, listener: (...args: any[]) => void) => {
+      socket.on(event, listener);
+      registeredListeners.push({ event, listener });
+    };
+
+    setSyncStatus('connecting');
+    setSyncError(null);
 
     const restoreState = (data: RoomStateRestore) => {
+      if (!data?.room || data.room._id !== roomId) return;
+
       setRoom(data.room);
       setParticipants(data.participants);
       setPhase(data.currentPhase);
@@ -136,20 +171,36 @@ export function useDebateSocket(roomId: string | undefined) {
       }
 
       // Sync speakingAllowed
-      const me = data.participants.find((p) => p.userId === user?._id);
+      const me = data.participants.find((p) => p.userId === userId);
       setSpeakingAllowed(Boolean(me?.speakingAllowed));
+      setSyncStatus('ready');
+      setSyncError(null);
+    };
+
+    const handleRoomError = (data?: { message?: string }) => {
+      if (useDebateStore.getState().room?._id === roomId) return;
+      setSyncStatus('error');
+      setSyncError(data?.message || 'Unable to sync live debate state');
+    };
+
+    const handleConnectError = (error: Error) => {
+      if (useDebateStore.getState().room?._id === roomId) return;
+      setSyncStatus('error');
+      setSyncError(error.message || 'Unable to connect to the live debate server');
     };
 
     // Core room state events
-    socket.on('room:joined', restoreState);
-    socket.on('room:state-restore', restoreState);
-    socket.on('chat:history', (messages: ChatMessage[]) => {
+    onSocketEvent('room:joined', restoreState);
+    onSocketEvent('room:state-restore', restoreState);
+    onSocketEvent('room:error', handleRoomError);
+    onSocketEvent('connect_error', handleConnectError);
+    onSocketEvent('chat:history', (messages: ChatMessage[]) => {
       setMessages(messages);
     });
 
     // Auto Mute Transition Countdown Overlay
     // Guard: store the interval ID in a ref so duplicate events can't leak intervals
-    socket.on('debate:transition-start', (data: { duration: number; announcement?: string }) => {
+    onSocketEvent('debate:transition-start', (data: { duration: number; announcement?: string }) => {
       // Clear any stale interval from a previous transition event
       if (transitionIntervalRef.current !== null) {
         clearInterval(transitionIntervalRef.current);
@@ -180,7 +231,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Phase Started from Waiting state
-    socket.on('debate:phase-started', (data: { phase: DebatePhase; speaker: SpeakerTurn; timeLimit: number }) => {
+    onSocketEvent('debate:phase-started', (data: { phase: DebatePhase; speaker: SpeakerTurn; timeLimit: number }) => {
       setTurnStatus('active');
       setPhase(data.phase);
       setSpeaker(data.speaker);
@@ -189,7 +240,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Judge Reactions
-    socket.on('judge:reaction', (data: { username: string; type: 'agree' | 'disagree' }) => {
+    onSocketEvent('judge:reaction', (data: { username: string; type: 'agree' | 'disagree' }) => {
       toast(`${data.username} reacted: ${data.type === 'agree' ? 'Agree' : 'Disagree'}`, {
         icon: data.type === 'agree' ? '👍' : '👎',
       });
@@ -198,7 +249,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Prep Phase Consensus
-    socket.on('debate:prep-consensus-update', (data: { 
+    onSocketEvent('debate:prep-consensus-update', (data: {
       readyUserIds?: string[]; 
       totalDebaters?: number;
       readyCount?: number;
@@ -225,7 +276,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Judge Next Phase Vote Update (for no-host mode)
-    socket.on('judge:next-phase-vote-update', (data: { 
+    onSocketEvent('judge:next-phase-vote-update', (data: {
       votedUserIds: string[];
       votedCount: number;
       totalJudges: number;
@@ -239,7 +290,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Phase change with announcement text
-    socket.on('debate:phase-change', (data: { phase: DebatePhase; speaker?: SpeakerTurn; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean; phaseStatus?: string }) => {
+    onSocketEvent('debate:phase-change', (data: { phase: DebatePhase; speaker?: SpeakerTurn; announcement?: string; waitingForHost?: boolean; waitingForJudge?: boolean; phaseStatus?: string }) => {
       setPhase(data.phase);
       if (data.speaker) {
         setSpeaker(data.speaker);
@@ -261,7 +312,7 @@ export function useDebateSocket(roomId: string | undefined) {
       }
     });
 
-    socket.on('debate:match-ready-to-end', (data: { announcement?: string }) => {
+    onSocketEvent('debate:match-ready-to-end', (data: { announcement?: string }) => {
       if (data.announcement) {
         setTransitionAnnouncement(data.announcement);
       }
@@ -269,25 +320,25 @@ export function useDebateSocket(roomId: string | undefined) {
 
 
     // AI feedback received during judge feedback phase
-    socket.on('debate:ai-feedback', (data: { speaker: string; feedback: AIAnalysis }) => {
+    onSocketEvent('debate:ai-feedback', (data: { speaker: string; feedback: AIAnalysis }) => {
       setAIFeedback({ speaker: data.speaker, feedback: data.feedback });
       toast(`AI Feedback for ${data.speaker}`, { icon: '🤖', duration: 5000 });
     });
 
     // AI feedback display ready (after AI processed)
-    socket.on('debate:ai-feedback-received', () => {
+    onSocketEvent('debate:ai-feedback-received', () => {
       toast('AI feedback is ready!', { icon: '🤖', duration: 3000 });
     });
 
     // No-host debate ended (auto or manual)
-    socket.on('debate:ended', (data: { roomId: string; isAuto?: boolean; verdict?: { winner: string; summary: string } }) => {
+    onSocketEvent('debate:ended', (data: { roomId: string; isAuto?: boolean; verdict?: { winner: string; summary: string } }) => {
       if (data.verdict) {
         setAIFinalVerdict(data.verdict as any);
       }
     });
 
     // Turn status change
-    socket.on('debate:turn-status-change', (data: { turnStatus: string }) => {
+    onSocketEvent('debate:turn-status-change', (data: { turnStatus: string }) => {
       if (data.turnStatus === 'idle') {
         setTurnStatus('waiting_to_start');
       } else if (data.turnStatus === 'active') {
@@ -298,12 +349,12 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Turn change
-    socket.on('debate:turn-change', (data: { speaker: SpeakerTurn }) => {
+    onSocketEvent('debate:turn-change', (data: { speaker: SpeakerTurn }) => {
       setSpeaker(data.speaker);
     });
 
     // Timer update (every second)
-    socket.on('debate:timer-update', (data: { timeRemaining: number; totalTime?: number }) => {
+    onSocketEvent('debate:timer-update', (data: { timeRemaining: number; totalTime?: number }) => {
       setTimeRemaining(data.timeRemaining);
       if (data.totalTime !== undefined) {
         setTotalTime(data.totalTime);
@@ -311,7 +362,7 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Pause/Resume
-    socket.on('debate:paused', (payload?: { pauseType?: 'host' | 'proposition' | 'opposition' | null; pausesUsed?: { proposition: number; opposition: number } }) => {
+    onSocketEvent('debate:paused', (payload?: { pauseType?: 'host' | 'proposition' | 'opposition' | null; pausesUsed?: { proposition: number; opposition: number } }) => {
       setPaused(true);
       if (payload?.pauseType !== undefined) {
         setPauseType(payload.pauseType);
@@ -320,13 +371,13 @@ export function useDebateSocket(roomId: string | undefined) {
         setPausesUsed(payload.pausesUsed);
       }
     });
-    socket.on('debate:resumed', () => {
+    onSocketEvent('debate:resumed', () => {
       setPaused(false);
       setPauseType(null);
     });
 
     // Cross Examination — shared timer, both teams tick
-    socket.on(
+    onSocketEvent(
       'cross-exam:update',
       (data: {
         sharedRemaining: number;
@@ -341,25 +392,25 @@ export function useDebateSocket(roomId: string | undefined) {
     );
 
     // Main debate chat
-    socket.on('chat:message', (message: ChatMessage) => {
+    onSocketEvent('chat:message', (message: ChatMessage) => {
       addMessage(message);
     });
 
-    socket.on('chat:viewer-chat-updated', (data: { viewerChatEnabled: boolean }) => {
+    onSocketEvent('chat:viewer-chat-updated', (data: { viewerChatEnabled: boolean }) => {
       setViewerChatEnabled(data.viewerChatEnabled);
     });
 
     // Viewer chat (separate channel)
-    socket.on('viewer-chat:message', (message: ChatMessage) => {
+    onSocketEvent('viewer-chat:message', (message: ChatMessage) => {
       addViewerChatMessage(message);
     });
 
-    socket.on('room:viewer-chat-toggled', (data: { enabled: boolean }) => {
+    onSocketEvent('room:viewer-chat-toggled', (data: { enabled: boolean }) => {
       setViewerChatEnabled(data.enabled);
     });
 
     // Participants
-    socket.on(
+    onSocketEvent(
       'room:participant-update',
       (data: { participants?: RoomParticipant[]; userId?: string; type?: string }) => {
         if (!data?.participants) return;
@@ -367,7 +418,7 @@ export function useDebateSocket(roomId: string | undefined) {
       },
     );
 
-    socket.on(
+    onSocketEvent(
       'room:host-transferred',
       (data: { hostId: string; participants: RoomParticipant[] }) => {
         setHost(data.hostId, data.participants);
@@ -375,27 +426,27 @@ export function useDebateSocket(roomId: string | undefined) {
     );
 
     // Score
-    socket.on(
+    onSocketEvent(
       'score:updated',
       (data: { speaker: string; score: ReturnType<typeof useDebateStore.getState>['scores'][string] }) => {
         setScore(data.speaker, data.score);
       },
     );
 
-    socket.on('ai:turn-judged', (data: { speaker: string; analysis: AIAnalysis }) => {
+    onSocketEvent('ai:turn-judged', (data: { speaker: string; analysis: AIAnalysis }) => {
       setAIAnalysis(data.speaker, data.analysis);
     });
 
-    socket.on('score:aggregate-updated', (data: { finalScores: FinalScores }) => {
+    onSocketEvent('score:aggregate-updated', (data: { finalScores: FinalScores }) => {
       setFinalScores(data.finalScores);
     });
 
-    socket.on('score:winner-determined', (data: WinnerResult) => {
+    onSocketEvent('score:winner-determined', (data: WinnerResult) => {
       setWinnerResult(data);
     });
 
     // Card issued
-    socket.on('debate:card-issued', (data: { type: string; userId: string; reason: string }) => {
+    onSocketEvent('debate:card-issued', (data: { type: string; userId: string; reason: string }) => {
       const cardLabel = data.type === 'yellow' ? t('yellowCard') : t('redCard');
 
       addMessage({
@@ -412,26 +463,26 @@ export function useDebateSocket(roomId: string | undefined) {
     });
 
     // Debate ended
-    socket.on('debate:ended', (data: { roomId: string; result?: WinnerResult }) => {
+    onSocketEvent('debate:ended', (data: { roomId: string; result?: WinnerResult }) => {
       if (data.result) setWinnerResult(data.result);
       clearDebateRoomFromStorage();
     });
 
     // Timer events
-    socket.on('debate:timer-complete', (_data: { phase: string }) => {
+    onSocketEvent('debate:timer-complete', (_data: { phase: string }) => {
       setTimeRemaining(0);
     });
-    socket.on('debate:timer-warning', (data: { timeRemaining: number }) => {
+    onSocketEvent('debate:timer-warning', (data: { timeRemaining: number }) => {
       setTimeRemaining(data.timeRemaining);
     });
 
     // Cross-exam ended
-    socket.on('cross-exam:ended', (data: { scoresAdjustment: Record<string, unknown> }) => {
+    onSocketEvent('cross-exam:ended', (data: { scoresAdjustment: Record<string, unknown> }) => {
       console.log('Cross-exam ended:', data);
     });
 
     // Private room events
-    socket.on(
+    onSocketEvent(
       'private-chat:message',
       (message: ChatMessage & { team?: string }) => {
         if (message.team) {
@@ -442,13 +493,13 @@ export function useDebateSocket(roomId: string | undefined) {
         }
       },
     );
-    socket.on(
+    onSocketEvent(
       'private-room:participant-update',
       (data: { team: string; type: string; userId: string; participantCount?: number }) => {
         console.log(`Private room ${data.team} update: ${data.type} - ${data.userId}`);
       },
     );
-    socket.on(
+    onSocketEvent(
       'private-room:joined',
       (data: { roomId: string; team: string; participantCount: number; messageHistory?: ChatMessage[] }) => {
         console.log('Joined private room:', data);
@@ -463,14 +514,14 @@ export function useDebateSocket(roomId: string | undefined) {
         }
       },
     );
-    socket.on(
+    onSocketEvent(
       'private-room:left',
       (data: { roomId: string; team: string }) => {
         console.log('Left private room:', data);
         setCurrentPrivateRoom(null);
       },
     );
-    socket.on(
+    onSocketEvent(
       'private-room:error',
       (data: { message: string }) => {
         console.error('Private room error:', data.message);
@@ -482,77 +533,68 @@ export function useDebateSocket(roomId: string | undefined) {
     // connected. If we're mid-reconnect, queue the join on the next
     // 'connect' event so the server is actually subscribed before
     // `room:joined` arrives.
-    const emitJoin = () => socket.emit('join-room', { roomId });
-    if (socket.connected) {
-      emitJoin();
-    } else {
-      socket.once('connect', emitJoin);
-    }
+    const emitJoin = () => {
+      if (disposed) return;
 
-    // Re-join whenever the socket reconnects
+      setSyncStatus('connecting');
+      setSyncError(null);
+      socket.timeout(5000).emit(
+        'join-room',
+        { roomId },
+        (timeoutError: Error | null, response?: RoomJoinAck) => {
+          if (disposed || useDebateStore.getState().room?._id === roomId) return;
+
+          if (!timeoutError && response?.success) {
+            if (response.data) restoreState(response.data);
+            return;
+          }
+
+          const message = response?.message
+            || timeoutError?.message
+            || 'Unable to sync live debate state';
+
+          if (retryCount < 2 && socket.connected) {
+            retryCount += 1;
+            retryTimer = window.setTimeout(emitJoin, retryCount * 1000);
+            return;
+          }
+
+          setSyncStatus('error');
+          setSyncError(message);
+        },
+      );
+    };
+
+    // Re-join whenever the socket connects or reconnects.
     const handleConnect = () => {
+      retryCount = 0;
       emitJoin();
     };
-    socket.on('connect', handleConnect);
+    onSocketEvent('connect', handleConnect);
 
-    // Safety net: if `room:joined` doesn't come back within 3s, the server
-    // either rejected our join (room gone / kicked) or the emit was lost.
-    // Re-emit and surface a warning so the user knows to refresh.
-    const safetyTimer = window.setTimeout(() => {
-      const storeRoomId = useDebateStore.getState().room?._id;
-      if (storeRoomId === roomId) return; // already populated, nothing to do
-      console.warn('[useDebateSocket] room:joined not received in 3s — retrying join-room');
+    if (socket.connected) {
       emitJoin();
-    }, 3000);
+    }
 
     return () => {
-      window.clearTimeout(safetyTimer);
-      socket.off('connect', handleConnect);
+      disposed = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      if (transitionIntervalRef.current !== null) {
+        clearInterval(transitionIntervalRef.current);
+        transitionIntervalRef.current = null;
+      }
       if (socket.connected) {
         socket.emit('leave-room', { roomId });
       }
-      socket.off('room:joined');
-      socket.off('room:state-restore');
-      socket.off('chat:history');
-      socket.off('debate:transition-start');
-      socket.off('debate:phase-started');
-      socket.off('judge:reaction');
-      socket.off('debate:prep-consensus-update');
-      socket.off('debate:phase-change');
-      socket.off('debate:turn-status-change');
-      socket.off('debate:turn-change');
-      socket.off('debate:timer-update');
-      socket.off('debate:timer-complete');
-      socket.off('debate:timer-warning');
-      socket.off('debate:paused');
-      socket.off('debate:resumed');
-      socket.off('cross-exam:update');
-      socket.off('cross-exam:ended');
-      socket.off('chat:message');
-      socket.off('chat:viewer-chat-updated');
-      socket.off('viewer-chat:message');
-      socket.off('room:viewer-chat-toggled');
-      socket.off('room:participant-update');
-      socket.off('room:host-transferred');
-      socket.off('score:updated');
-      socket.off('ai:turn-judged');
-      socket.off('score:aggregate-updated');
-      socket.off('score:winner-determined');
-      socket.off('debate:card-issued');
-      socket.off('debate:ended');
-      socket.off('debate:participant-disconnected');
-      socket.off('debate:participant-reconnected');
-      socket.off('debate:disconnect-timer-start');
-      socket.off('debate:disconnect-timer-cancelled');
-      socket.off('debate:team-forfeited');
-      socket.off('private-chat:message');
-      socket.off('private-room:participant-update');
-      socket.off('private-room:joined');
-      socket.off('private-room:left');
-      socket.off('private-room:error');
+      registeredListeners.forEach(({ event, listener }) => {
+        socket.off(event, listener);
+      });
     };
   }, [
     roomId,
+    socketFromHook,
+    syncAttempt,
+    userId,
     addMessage,
     addPrivateRoomMessage,
     addViewerChatMessage,
@@ -564,15 +606,20 @@ export function useDebateSocket(roomId: string | undefined) {
     setMessages,
     setParticipants,
     setPaused,
+    setPauseType,
+    setPausesUsed,
     setPhase,
     setRoom,
     setScore,
     setSpeaker,
+    setSpeakingAllowed,
     setTimeRemaining,
     setTotalTime,
     setViewerChatEnabled,
     setWinnerResult,
     setTransitionAnnouncement,
+    setTransitionState,
+    setTurnStatus,
     setPrepConsensus,
     setPrepConsensusByTeam,
     setJudgeNextPhaseVotes,
@@ -581,5 +628,15 @@ export function useDebateSocket(roomId: string | undefined) {
     removeDisconnectedMember,
     setDisconnectTimerActive,
     setForfeitTeam,
+    setAIFeedback,
+    setAIFinalVerdict,
   ]);
+
+  const retrySync = () => {
+    setSyncStatus(roomId ? 'connecting' : 'idle');
+    setSyncError(null);
+    setSyncAttempt((attempt) => attempt + 1);
+  };
+
+  return { syncStatus, syncError, retrySync };
 }

@@ -9,8 +9,8 @@
  * Phase `final_judging` đã được bỏ khỏi flow.
  */
 
-import { DEBATE_DURATIONS } from '../config/duration.config';
-import type { DebateModeConfig, Phase, Team } from '../config/types';
+import { DEBATE_DURATIONS } from '../config/duration.config.js';
+import type { DebateModeConfig, Phase, Team } from '../config/types.js';
 
 export interface FlowStep {
   index: number;

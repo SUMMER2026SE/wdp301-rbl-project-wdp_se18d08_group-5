@@ -13,14 +13,14 @@
  * phải đọc từ duration.config.ts.
  */
 
-import { DEBATE_DURATIONS } from './duration.config';
+import { DEBATE_DURATIONS } from './duration.config.js';
 import type {
   DebateModeConfig,
   DebateModeId,
   JudgeType,
   RoomLike,
   TeamSize,
-} from './types';
+} from './types.js';
 
 /**
  * Build 1 mode config — helper nội bộ để tránh lặp 8 lần.

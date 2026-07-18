@@ -21,7 +21,7 @@ import { roomService } from '@services/roomService';
 import { useAuthStore } from '@stores/authStore';
 import { useDebateStore } from '@stores/debateStore';
 import { useDebateSocket } from '@hooks/useDebateSocket';
-import { useSocket, getSocket } from '@hooks/useSocket';
+import { getSocket } from '@hooks/useSocket';
 import { useDebateVideo } from '@hooks/useDebateVideo';
 import { useDebateRoomTracker, clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
 import { CrossExamPanel } from '@components/debate/CrossExamPanel';
@@ -145,8 +145,7 @@ export default function DebateRoomPage() {
   const { roomId = '' } = useParams();
   const { t } = useTranslation('common');
   const { t: td } = useTranslation('debate');
-  useSocket();
-  useDebateSocket(roomId);
+  const { syncStatus, syncError, retrySync } = useDebateSocket(roomId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
@@ -269,7 +268,7 @@ export default function DebateRoomPage() {
 
 
 
-  // New round-based scoring state (used in judge_feedback / final_judging UI)
+  // New round-based scoring state used in the judge feedback UI.
   const [roundPropSpeak, setRoundPropSpeak] = useState(14);
   const [roundPropCe, setRoundPropCe] = useState(14);
   const [roundPropNotes, setRoundPropNotes] = useState('');
@@ -726,6 +725,15 @@ export default function DebateRoomPage() {
       ? true
       : currentSpeakerSlot === null || currentParticipant?.speakerSlot === currentSpeakerSlot);
 
+  // Every authenticated room participant can join the main voice channel.
+  // Host mute, debate pause, and phase transitions still take precedence.
+  const canUseMicrophone = Boolean(currentParticipant);
+  const canUseCamera = Boolean(
+    (myRole && ['host', 'owner', 'debater', 'judge'].includes(myRole))
+      || isMyTurnToSpeak
+      || (isViewer && speakingAllowed),
+  );
+
 
   // Gemini's input transcript replaces the browser-only speech recognition
   // as the transcript that is persisted for the active speaker's turn.
@@ -917,6 +925,7 @@ export default function DebateRoomPage() {
 
   // Track socket readiness only for diagnostic UI, not as a render gate.
   const socketPending = isParticipant && !socketReady;
+  const socketSyncFailed = socketPending && syncStatus === 'error';
 
   // Surface clear diagnostics so a stuck page is easy to triage in the field.
   useEffect(() => {
@@ -936,6 +945,11 @@ export default function DebateRoomPage() {
     }, 4000);
     return () => window.clearTimeout(timer);
   }, [socketPending, roomId]);
+
+  useEffect(() => {
+    if (!socketSyncFailed || !syncError) return;
+    console.warn('[DebateRoom] Live state sync failed', { roomId, syncError });
+  }, [socketSyncFailed, syncError, roomId]);
 
   if (isLoading) {
     return (
@@ -1141,16 +1155,31 @@ export default function DebateRoomPage() {
         <div
           className="position-fixed top-0 start-50 translate-middle-x mt-2 px-3 py-2 rounded-pill d-flex align-items-center gap-2"
           style={{
-            background: 'rgba(255, 214, 10, 0.18)',
-            border: '1px solid rgba(255, 214, 10, 0.5)',
+            background: socketSyncFailed ? 'rgba(220, 53, 69, 0.18)' : 'rgba(255, 214, 10, 0.18)',
+            border: socketSyncFailed
+              ? '1px solid rgba(220, 53, 69, 0.55)'
+              : '1px solid rgba(255, 214, 10, 0.5)',
             zIndex: 1100,
             fontSize: '12px',
-            color: '#ffd60a',
+            color: socketSyncFailed ? '#ff8a96' : '#ffd60a',
             backdropFilter: 'blur(6px)',
           }}
         >
-          <Spinner animation="border" size="sm" />
-          <span>{td('debateRoom.syncBanner')}</span>
+          {!socketSyncFailed && <Spinner animation="border" size="sm" />}
+          <span>
+            {socketSyncFailed
+              ? td('debateRoom.syncFailed')
+              : td('debateRoom.syncBanner')}
+          </span>
+          {socketSyncFailed && (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-light py-0 px-2"
+              onClick={retrySync}
+            >
+              {td('retry')}
+            </button>
+          )}
         </div>
       )}
       <TransitionPopup 
@@ -1412,18 +1441,22 @@ export default function DebateRoomPage() {
                   />
                 }
                 mediaControls={
-                  ((myRole && ['host', 'owner', 'debater', 'judge'].includes(myRole)) || isMyTurnToSpeak || (isViewer && speakingAllowed)) ? (
+                  (canUseMicrophone || canUseCamera) ? (
                     <div className="debate-motion-media-controls">
-                      <MicToggle roomId={roomId} disabled={isTransitioning || currentParticipant?.muted || isPaused} />
-                      <Button
-                        size="sm"
-                        variant={cameraActive ? 'outline-danger' : 'outline-info'}
-                        onClick={cameraActive ? stopCamera : startCamera}
-                        disabled={!cameraActive && (cameraLockedByHost || currentParticipant?.cameraMuted)}
-                        aria-label={cameraActive ? 'Turn camera off' : 'Turn camera on'}
-                      >
-                        <i className={`bi ${cameraActive ? 'bi-camera-video-off-fill' : 'bi-camera-video-fill'}`} aria-hidden="true" />
-                      </Button>
+                      {canUseMicrophone && (
+                        <MicToggle roomId={roomId} disabled={isTransitioning || currentParticipant?.muted || isPaused} />
+                      )}
+                      {canUseCamera && (
+                        <Button
+                          size="sm"
+                          variant={cameraActive ? 'outline-danger' : 'outline-info'}
+                          onClick={cameraActive ? stopCamera : startCamera}
+                          disabled={!cameraActive && (cameraLockedByHost || currentParticipant?.cameraMuted)}
+                          aria-label={cameraActive ? 'Turn camera off' : 'Turn camera on'}
+                        >
+                          <i className={`bi ${cameraActive ? 'bi-camera-video-off-fill' : 'bi-camera-video-fill'}`} aria-hidden="true" />
+                        </Button>
+                      )}
                     </div>
                   ) : undefined
                 }
@@ -1434,7 +1467,11 @@ export default function DebateRoomPage() {
                   roomStatus={room.status}
                   roomId={roomId}
                   participants={room.participants}
+<<<<<<< HEAD
                   startDisabled={startPhaseMutation.isPending || turnStatus !== 'waiting_to_start'}
+=======
+                  startDisabled={startPhaseMutation.isPending || isJudge3 || turnStatus !== 'waiting_to_start'}
+>>>>>>> 209fc1a (fix deploy)
                   skipDisabled={turnStatus !== 'active' && currentPhase !== 'judge_feedback'}
                   controlsPending={controlMutation.isPending}
                   cameraPending={toggleCameraMutation.isPending}
@@ -1717,4 +1754,3 @@ export function getRoundForStepIndex(index: number, format?: string, _hostType?:
   if (index <= 9) return 2;   // PRO_S2,OPP_S2,CE2,JUDGES_FB_2
   return 3;                   // PRO_S3,OPP_S3,JUDGES_FB_3 (Round 3: Proposition → Opposition)
 }
-

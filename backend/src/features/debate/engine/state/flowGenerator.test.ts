@@ -4,9 +4,9 @@
  * mode.rounds.crossExamRounds (1 cho 1v1, 2 cho 3v3).
  */
 import { describe, it, expect } from 'vitest';
-import { DEBATE_DURATIONS } from '../config/duration.config';
-import { DEBATE_MODE_CONFIGS } from '../config/modeConfigs';
-import { generateFlowFromMode, findStepIndex } from './flowGenerator';
+import { DEBATE_DURATIONS } from '../config/duration.config.js';
+import { DEBATE_MODE_CONFIGS } from '../config/modeConfigs.js';
+import { generateFlowFromMode, findStepIndex } from './flowGenerator.js';
 
 describe('flowGenerator', () => {
   it('host_ai_3v3 có 14 steps (motion, prep, 4×R1, 4×R2, 3×R3, completed)', () => {

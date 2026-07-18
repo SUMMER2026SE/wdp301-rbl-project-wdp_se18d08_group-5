@@ -3,20 +3,7 @@ import mongoose from 'mongoose';
 import { DebateRoom, IDebateRoom } from '../models/DebateRoom.js';
 import { Message } from '../models/Message.js';
 import { getIO } from './index.js';
-
-type PrivateRoomTeam = 'proposition' | 'opposition' | 'judge' | 'host';
-
-interface PrivateRoomState {
-  roomId: string;
-  team: 'proposition' | 'opposition' | 'judge';
-  participants: Set<string>;
-}
-
-const privateRooms = new Map<string, PrivateRoomState>();
-
-function privateRoomKey(roomId: string, team: PrivateRoomTeam): string {
-  return `${roomId}::${team}`;
-}
+import { privateRoomKey, privateRooms, type PrivateRoomTeam } from './privateRoomState.js';
 
 function canJoinPrivateRoom(
   participant: IDebateRoom['participants'][0] | undefined,

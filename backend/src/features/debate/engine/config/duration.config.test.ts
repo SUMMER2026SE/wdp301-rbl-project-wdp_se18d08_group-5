@@ -3,7 +3,7 @@
  * Trong tương lai, đổi rule "Prep 7' → 10'" chỉ cần sửa 1 dòng + update test.
  */
 import { describe, it, expect } from 'vitest';
-import { DEBATE_DURATIONS } from './duration.config';
+import { DEBATE_DURATIONS } from './duration.config.js';
 
 describe('DEBATE_DURATIONS', () => {
   it('PREPARATION = 7 phút (420s) theo rule §13-15 mọi mode', () => {
