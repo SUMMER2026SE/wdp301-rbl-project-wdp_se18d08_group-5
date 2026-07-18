@@ -60,10 +60,10 @@ type DebateWorkflowStep = {
 };
 
 /**
- * Human Host 3v3 workflow — mirrors backend DEBATE_FLOW_HOST_3V3.
- * Rule order: R1(Prop→Opp→CE), R2(Prop→Opp→CE), R3(Prop→Opp, no CE)
- * R2: "(Same flow as Round 1)" → PRO_S2 first, OPP_S2 second
- * R3: Proposition FIRST per requirement: Prop→Opp → JUDGES_FB_3 → COMPLETED
+ * Human Host 3v3 workflow — mirrors backend flowGenerator.
+ * Rule order: R1(PROP→OPP→CE), R2(OPP→PROP), R3(PROP→OPP)
+ * R2: OPP S2 first, PROP S2 second (per requirement)
+ * R3: PROP → OPP → JUDGES_FB_3 → COMPLETED (no Review step)
  */
 const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -72,20 +72,18 @@ const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Extension (3 min)' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Opposition rebuttal (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Proposition rebuttal (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'COMPLETE_REVIEW', phase: 'completed', label: 'Review', detail: 'Host can end match (5 min countdown)' },
-  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
- * Human Host 1v1 workflow — mirrors backend DEBATE_FLOW_HOST_1V1.
- * R2: OPP→PRO (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → COMPLETED
+ * Human Host 1v1 workflow — mirrors backend flowGenerator.
+ * R2: OPP → PROP (per requirement), R3: PROP → OPP → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -94,20 +92,18 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'COMPLETE_REVIEW', phase: 'completed', label: 'Review', detail: 'Host can end match (5 min countdown)' },
-  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
- * No-Host 3v3 workflow — mirrors backend DEBATE_FLOW_NOHost_3V3.
- * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → COMPLETED
+ * No-Host 3v3 workflow — mirrors backend flowGenerator.
+ * R2: OPP → PROP (per requirement), R3: PROP → OPP → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -116,19 +112,18 @@ const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Extension (3 min)' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Extension (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Opposition rebuttal (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Proposition rebuttal (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
- * No-Host 1v1 workflow — mirrors backend DEBATE_FLOW_NOHost_1V1.
- * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → COMPLETED
+ * No-Host 1v1 workflow — mirrors backend flowGenerator.
+ * R2: OPP → PROP (per requirement), R3: PROP → OPP → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -137,14 +132,13 @@ const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
   { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
-  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 export default function DebateRoomPage() {
@@ -532,23 +526,13 @@ export default function DebateRoomPage() {
   const debateWorkflow = useMemo(() => {
     const format = roomFromStore?.format;
     const isNoHost = roomFromStore?.hostType !== 'human';
-    const isHumanJudge = roomFromStore?.judgeType === 'human';
 
     let workflow = isNoHost
       ? (format === '1v1' ? debateWorkflowNoHost1v1 : debateWorkflowNoHost3v3)
       : (format === '1v1' ? debateWorkflow1v1 : debateWorkflow3v3);
 
-    // Host + Human Judge: Round 2 (OPP_S2 before PRO_S2)
-    if (!isNoHost && isHumanJudge) {
-      workflow = workflow.map((step) => {
-        if (step.speaker === 'PRO_S2') return { ...step, speaker: 'OPP_S2', label: format === '1v1' ? 'Opposition S2' : 'Opposition S2' };
-        if (step.speaker === 'OPP_S2') return { ...step, speaker: 'PRO_S2', label: format === '1v1' ? 'Proposition S2' : 'Proposition S2' };
-        return step;
-      });
-    }
-
     return workflow;
-  }, [roomFromStore?.format, roomFromStore?.hostType, roomFromStore?.judgeType]);
+  }, [roomFromStore?.format, roomFromStore?.hostType]);
 
   const isParticipant = useMemo(() => {
     return Boolean(room?.participants.some((p) => p.userId === user?._id));
@@ -831,12 +815,6 @@ export default function DebateRoomPage() {
   const isScoringAllowed = useMemo(() => {
     return activeScoringRound > 0;
   }, [activeScoringRound]);
-
-  const isJudge3 = useMemo(() => {
-    const phase = currentPhase || session?.currentTurn?.phase;
-    const speaker = (currentSpeaker || session?.currentTurn?.speaker) as string;
-    return phase === 'judge_feedback' && speaker === 'JUDGES_FB_3';
-  }, [currentPhase, currentSpeaker, session?.currentTurn?.phase, session?.currentTurn?.speaker]);
 
   useEffect(() => {
     if (!session?.finalScores?.judgeVerdicts || !user?._id) return;
@@ -1456,8 +1434,8 @@ export default function DebateRoomPage() {
                   roomStatus={room.status}
                   roomId={roomId}
                   participants={room.participants}
-                  startDisabled={startPhaseMutation.isPending || isJudge3 || turnStatus !== 'waiting_to_start'}
-                  skipDisabled={isJudge3 || (turnStatus !== 'active' && currentPhase !== 'judge_feedback')}
+                  startDisabled={startPhaseMutation.isPending || turnStatus !== 'waiting_to_start'}
+                  skipDisabled={turnStatus !== 'active' && currentPhase !== 'judge_feedback'}
                   controlsPending={controlMutation.isPending}
                   cameraPending={toggleCameraMutation.isPending}
                   micPending={toggleMicMutation.isPending}

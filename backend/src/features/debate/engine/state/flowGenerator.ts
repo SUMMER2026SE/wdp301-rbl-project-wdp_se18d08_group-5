@@ -2,18 +2,11 @@
  * flowGenerator.ts — sinh ra flow array (danh sách step) từ DebateModeConfig.
  *
  * Theo Consolidated §5 + rule files §13-15, cấu trúc flow luôn là:
- *   MOTION → PREP → R1 (PRO_S1, OPP_S1, CE_1, JUDGE_FB_1) → R2 (PRO_S2, OPP_S2, CE_2, JUDGE_FB_2) →
+ *   MOTION → PREP → R1 (PRO_S1, OPP_S1, CE_1, JUDGE_FB_1) → R2 (OPP_S2, PRO_S2, CE_2, JUDGE_FB_2) →
  *   R3 (PRO_S3, OPP_S3, JUDGE_FB_3) → COMPLETED
  *
- * Lưu ý: Phase `final_judging` đã được bỏ khỏi flow (tính tổng điểm / verdict
- * diễn ra trong JUDGE_FEEDBACK_3 với pause nhỏ cho Human Judge, hoặc auto-finalize
- * cho AI Judge). Engine không còn step `FINAL_JUDGING` — phase cuối là `COMPLETED`.
- *
- * Khác biệt duy nhất giữa các mode là:
- * - Số CE round (1 hoặc 2) theo config.rounds.crossExamRounds
- * - Trong 1v1, mỗi Speaker đóng cả 3 slot (PRO_S1=PRO_S2=PRO_S3 cùng user).
- *
- * KHÔNG hard-code duration — mọi số giây đọc từ duration.config.ts.
+ * Lưu ý: R2 đặc biệt — OPP_S2 đi trước PRO_S2 (thay vì PRO trước OPP như R1/R3).
+ * Phase `final_judging` đã được bỏ khỏi flow.
  */
 
 import { DEBATE_DURATIONS } from '../config/duration.config';
@@ -83,23 +76,45 @@ export function generateFlowFromMode(mode: DebateModeConfig): FlowStep[] {
 
   // Loop qua 3 rounds
   for (let round = 1 as 1 | 2 | 3; round <= 3; round++) {
-    // S1 của 2 đội phát biểu
-    steps.push({
-      index: idx++,
-      speaker: propSpeaker(round),
-      phase: 'speech',
-      durationSec: DEBATE_DURATIONS.SPEECH_SECONDS,
-      speakerCanEnd: true,
-      controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
-    });
-    steps.push({
-      index: idx++,
-      speaker: oppSpeaker(round),
-      phase: 'speech',
-      durationSec: DEBATE_DURATIONS.SPEECH_SECONDS,
-      speakerCanEnd: true,
-      controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
-    });
+    // Round 2 order: OPP S2 → PROP S2 (per requirement: "Round 2: Opponent Speaker 2 then Proposition Speaker 2")
+    // All other rounds: PROP → OPP
+    const isRound2 = round === 2;
+    if (isRound2) {
+      steps.push({
+        index: idx++,
+        speaker: oppSpeaker(round),
+        phase: 'speech',
+        durationSec: DEBATE_DURATIONS.SPEECH_SECONDS,
+        speakerCanEnd: true,
+        controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
+      });
+      steps.push({
+        index: idx++,
+        speaker: propSpeaker(round),
+        phase: 'speech',
+        durationSec: DEBATE_DURATIONS.SPEECH_SECONDS,
+        speakerCanEnd: true,
+        controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
+      });
+    } else {
+      // R1 and R3: PROP → OPP
+      steps.push({
+        index: idx++,
+        speaker: propSpeaker(round),
+        phase: 'speech',
+        durationSec: DEBATE_DURATIONS.SPEECH_SECONDS,
+        speakerCanEnd: true,
+        controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
+      });
+      steps.push({
+        index: idx++,
+        speaker: oppSpeaker(round),
+        phase: 'speech',
+        durationSec: DEBATE_DURATIONS.SPEECH_SECONDS,
+        speakerCanEnd: true,
+        controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
+      });
+    }
 
     // CE chỉ ở Round 1 & 2 (theo rule §13-15)
     const isCE = round === 1 || round === 2;
@@ -131,16 +146,10 @@ export function generateFlowFromMode(mode: DebateModeConfig): FlowStep[] {
   }
 
   // Completed Phase for Host + Human Judge
-  if (mode.hasHost && mode.judgeType !== 'AI') {
-    steps.push({
-      index: idx++,
-      speaker: 'COMPLETE_REVIEW',
-      phase: 'completed',
-      durationSec: DEBATE_DURATIONS.COMPLETE_REVIEW_SECONDS,
-      speakerCanEnd: false,
-      controllerCanEnd: true,
-    });
-  }
+  // NOTE: COMPLETE_REVIEW step removed per requirement. host_human_* mode
+  // transitions directly from JUDGES_FB_3 → COMPLETED when Host presses End Match.
+  // The Host stays in JUDGE_FEEDBACK phase until they click End — no intermediate
+  // "Review" step exists. Only the COMPLETED step remains (index 0, terminal).
 
   // Completed (sau Judge Feedback round 3 — KHÔNG có bước FINAL_JUDGING riêng)
   steps.push({

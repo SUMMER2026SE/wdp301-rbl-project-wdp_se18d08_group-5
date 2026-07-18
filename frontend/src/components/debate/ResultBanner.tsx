@@ -20,7 +20,27 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(10);
   const aiFinalVerdict = useDebateStore((s) => s.aiFinalVerdict);
-  const verdict = aiFinalVerdict ?? finalScores?.winnerTeam ?? finalScores?.winner;
+  const winnerResult = useDebateStore((s) => s.winnerResult);
+  const room = useDebateStore((s) => s.room);
+
+  // Priority: winnerResult from debate:ended (all modes) > aiFinalVerdict > finalScores prop
+  // Only evaluate finalScores if the room is officially completed.
+  const isCompleted = room?.status === 'completed' || winnerResult != null || aiFinalVerdict != null;
+
+  const verdict = isCompleted
+    ? (winnerResult?.winnerTeam
+      ?? aiFinalVerdict?.winnerTeam
+      ?? finalScores?.winnerTeam
+      ?? finalScores?.winner)
+    : null;
+
+  // Build scores from winnerResult if available, otherwise from prop
+  const propScore = winnerResult?.finalScores?.teamProposition?.total
+    ?? finalScores?.teamProposition?.total
+    ?? 0;
+  const oppScore = winnerResult?.finalScores?.teamOpposition?.total
+    ?? finalScores?.teamOpposition?.total
+    ?? 0;
 
   // Auto redirect after 10 seconds (per the rule docs).
   // useEffect must always be called, even when we render nothing below.
@@ -40,9 +60,6 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
   }, [verdict, roomId, navigate]);
 
   if (!verdict) return null;
-
-  const propScore = finalScores?.teamProposition?.total ?? 0;
-  const oppScore = finalScores?.teamOpposition?.total ?? 0;
 
   const getWinnerLabel = () => {
     if (verdict === 'proposition' || verdict === 'pro') return 'PROPOSITION';

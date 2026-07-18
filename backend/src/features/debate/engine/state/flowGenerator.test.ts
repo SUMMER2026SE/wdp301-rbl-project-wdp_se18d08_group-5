@@ -99,6 +99,26 @@ describe('flowGenerator', () => {
     expect(ce3).toBeUndefined();
   });
 
+  it('Round 2: OPP_S2 xuất hiện TRƯỚC PRO_S2 (theo yêu cầu)', () => {
+    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_ai_3v3);
+    const oppS2Idx = flow.findIndex((s) => s.speaker === 'OPP_S2');
+    const proS2Idx = flow.findIndex((s) => s.speaker === 'PRO_S2');
+    expect(oppS2Idx).toBeGreaterThan(0);
+    expect(proS2Idx).toBeGreaterThan(0);
+    expect(oppS2Idx).toBeLessThan(proS2Idx);
+  });
+
+  it('Round 1 & 3: PROP xuất hiện TRƯỚC OPP (bình thường)', () => {
+    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_ai_3v3);
+    const proS1Idx = flow.findIndex((s) => s.speaker === 'PRO_S1');
+    const oppS1Idx = flow.findIndex((s) => s.speaker === 'OPP_S1');
+    expect(proS1Idx).toBeLessThan(oppS1Idx);
+
+    const proS3Idx = flow.findIndex((s) => s.speaker === 'PRO_S3');
+    const oppS3Idx = flow.findIndex((s) => s.speaker === 'OPP_S3');
+    expect(proS3Idx).toBeLessThan(oppS3Idx);
+  });
+
   it('findStepIndex tìm đúng step', () => {
     const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_ai_3v3);
     const idx = findStepIndex(flow, 'PRO_S2', 'speech');

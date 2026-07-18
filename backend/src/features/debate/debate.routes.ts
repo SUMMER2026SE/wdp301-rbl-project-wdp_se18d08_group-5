@@ -528,9 +528,19 @@ router.post(
     const uniqueJudgesSubmitted = new Set(OPP_S3_verdicts.map((v: any) => v.judgeId.toString()));
     const allJudgesSubmitted = assignedJudges.every((j: any) => uniqueJudgesSubmitted.has(j.userId.toString()));
 
+    /**
+     * Auto-complete only for rooms WITHOUT a human controller (noHost_ai_* mode).
+     * For host_human_* mode: Judge submission is persisted but the debate stays in
+     * JUDGE_FEEDBACK_3 until the Host explicitly presses End Match. This matches
+     * the requirement: "Judge submits scores → Stay in Judge Feedback 3 → Host Skip → Complete → End Match".
+     *
+     * hasHumanController = room.hostType === 'human' || room.judgeType === 'human'
+     * → true for host_human_*, noHost_human_* (human is controlling)
+     * → false for noHost_ai_* (AI controls, no human controller)
+     * Therefore: `!hasHumanController` = only true for noHost_ai_* = correct guard
+     */
     let autoCompleted = false;
     let winnerInfo = null;
-
     const hasHumanController = room.hostType === 'human' || room.judgeType === 'human';
     if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0 && !hasHumanController) {
       // Use the authoritative per-round aggregator with tie-breakers.

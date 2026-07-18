@@ -1689,7 +1689,11 @@ router.post(
     let autoCompleted = false;
     let winnerInfo = null;
 
-    if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0) {
+    // Auto-complete only for rooms WITHOUT a human controller (noHost_ai_* mode).
+    // For host_human_* mode: Judge submission is persisted but the debate stays
+    // in JUDGE_FEEDBACK_3 until the Host explicitly presses End Match.
+    const hasHumanController = room.hostType === 'human' || room.judgeType === 'human';
+    if (isOPPS3 && allJudgesSubmitted && assignedJudges.length > 0 && !hasHumanController) {
       session.currentTurn.status = 'completed';
       session.currentTurn.phase = 'completed';
 
@@ -1918,7 +1922,11 @@ router.post(
     let autoCompleted = false;
     let winnerInfo: any = null;
 
-    if (involvesOPPS3 && allJudgesSubmitted) {
+    // Auto-complete only for rooms WITHOUT a human controller (noHost_ai_* mode).
+    // For host_human_* mode: Judge submission is persisted but the debate stays
+    // in JUDGE_FEEDBACK_3 until the Host explicitly presses End Match.
+    const hasHumanController = room.hostType === 'human' || room.judgeType === 'human';
+    if (involvesOPPS3 && allJudgesSubmitted && !hasHumanController) {
       session.currentTurn.status = 'completed';
       session.currentTurn.phase = 'completed';
       room.status = 'completed';
