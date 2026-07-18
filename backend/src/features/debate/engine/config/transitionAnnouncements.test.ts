@@ -26,12 +26,6 @@ describe('getTransitionAnnouncement — rule §13-15 mọi mode', () => {
     ).toBe('End of Round 3');
   });
 
-  it('OPP_S3 → final_judging: "End of Round 3"', () => {
-    expect(
-      getTransitionAnnouncement('OPP_S3', 'final_judging', 'host_human_3v3'),
-    ).toBe('End of Round 3');
-  });
-
   // per rule_host_judgeAI.md §15 — "Tới lượt Opposition" popup
   it('PROP_S3 → speech: "Opposition turn"', () => {
     expect(
@@ -43,37 +37,6 @@ describe('getTransitionAnnouncement — rule §13-15 mọi mode', () => {
     expect(
       getTransitionAnnouncement('PROP_S3', 'speech', 'noHost_human_3v3'),
     ).toBe('Opposition turn');
-  });
-
-  // per Consolidated §5 — verdict phase
-  it('JUDGES_FB_3 → final_judging với AI Judge: "AI Verdict"', () => {
-    expect(
-      getTransitionAnnouncement('JUDGES_FB_3', 'final_judging', 'host_ai_3v3'),
-    ).toBe('AI Verdict');
-    expect(
-      getTransitionAnnouncement(
-        'JUDGES_FB_3',
-        'final_judging',
-        'noHost_ai_1v1',
-      ),
-    ).toBe('AI Verdict');
-  });
-
-  it('JUDGES_FB_3 → final_judging với Human Judge: "Final Verdict"', () => {
-    expect(
-      getTransitionAnnouncement(
-        'JUDGES_FB_3',
-        'final_judging',
-        'host_human_3v3',
-      ),
-    ).toBe('Final Verdict');
-    expect(
-      getTransitionAnnouncement(
-        'JUDGES_FB_3',
-        'final_judging',
-        'noHost_human_3v3',
-      ),
-    ).toBe('Final Verdict');
   });
 
   // per rule_host_judgeHuman.md §14 — "Chuẩn bị CE" popup
@@ -239,7 +202,6 @@ describe('Mọi phase × speaker combo đều trả string hợp lệ', () => {
     'speech',
     'cross_exam',
     'judge_feedback',
-    'final_judging',
     'completed',
     'transition',
   ];

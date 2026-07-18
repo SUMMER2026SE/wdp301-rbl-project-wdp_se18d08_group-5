@@ -178,16 +178,6 @@ export function aggregateFinalScores(session: any, _room?: any) {
     let sumOpp = 0;
     let validJudgesCount = 0;
 
-    let sumPropS3 = 0;
-    let sumOppS3 = 0;
-    let countS3 = 0;
-
-    let sumPropR2 = 0;
-    let sumOppR2 = 0;
-    let countR2 = 0;
-
-    const judgeVotes = { proposition: 0, opposition: 0, draw: 0 };
-
     judgeIds.forEach((jId) => {
       const judgeVerdicts = verdicts.filter(
         (v) => (v.judgeId?.toString() || 'unknown') === jId,
@@ -208,30 +198,11 @@ export function aggregateFinalScores(session: any, _room?: any) {
         } else {
           judgeOppTotal += scoreVal;
         }
-
-        const roundNum = Number(v.round);
-        if (roundNum === 3) {
-          if (isProp) sumPropS3 += scoreVal;
-          else sumOppS3 += scoreVal;
-          countS3 += 1;
-        } else if (roundNum === 2) {
-          if (isProp) sumPropR2 += scoreVal;
-          else sumOppR2 += scoreVal;
-          countR2 += 1;
-        }
       });
 
       sumProp += judgePropTotal;
       sumOpp += judgeOppTotal;
       validJudgesCount += 1;
-
-      if (judgePropTotal > judgeOppTotal) {
-        judgeVotes.proposition += 1;
-      } else if (judgePropTotal < judgeOppTotal) {
-        judgeVotes.opposition += 1;
-      } else {
-        judgeVotes.draw += 1;
-      }
     });
 
     const propositionTotal = validJudgesCount ? sumProp / validJudgesCount : 0;
@@ -244,43 +215,16 @@ export function aggregateFinalScores(session: any, _room?: any) {
     );
     const allRoundsScored = scoredRounds.has(1) && scoredRounds.has(2) && scoredRounds.has(3);
 
+    // Tiebreaker đã bỏ (theo refactor 2026-07): winner chỉ dựa trên tổng điểm.
+    // Bằng điểm → draw (propTotal === oppTotal). KHÔNG còn logic S3, R2, judge votes.
     let winnerTeam: DebateWinner | null = null;
     if (allRoundsScored) {
-      const delta = propositionTotal - oppositionTotal;
-      if (Math.abs(delta) < 0.01) {
-        const avgPropS3 = countS3 ? sumPropS3 / countS3 : 0;
-        const avgOppS3 = countS3 ? sumOppS3 / countS3 : 0;
-        const s3Delta = avgPropS3 - avgOppS3;
-
-        if (Math.abs(s3Delta) > 0.01) {
-          winnerTeam = s3Delta > 0 ? 'proposition' : 'opposition';
-        } else if (countR2 > 0) {
-          const avgPropR2 = sumPropR2 / countR2;
-          const avgOppR2 = sumOppR2 / countR2;
-          const r2Delta = avgPropR2 - avgOppR2;
-
-          if (Math.abs(r2Delta) > 0.01) {
-            winnerTeam = r2Delta > 0 ? 'proposition' : 'opposition';
-          } else {
-            if (judgeVotes.proposition > judgeVotes.opposition) {
-              winnerTeam = 'proposition';
-            } else if (judgeVotes.proposition < judgeVotes.opposition) {
-              winnerTeam = 'opposition';
-            } else {
-              winnerTeam = 'draw';
-            }
-          }
-        } else {
-          if (judgeVotes.proposition > judgeVotes.opposition) {
-            winnerTeam = 'proposition';
-          } else if (judgeVotes.proposition < judgeVotes.opposition) {
-            winnerTeam = 'opposition';
-          } else {
-            winnerTeam = 'draw';
-          }
-        }
+      if (propositionTotal > oppositionTotal) {
+        winnerTeam = 'proposition';
+      } else if (propositionTotal < oppositionTotal) {
+        winnerTeam = 'opposition';
       } else {
-        winnerTeam = delta > 0 ? 'proposition' : 'opposition';
+        winnerTeam = 'draw';
       }
     }
 
@@ -292,8 +236,8 @@ export function aggregateFinalScores(session: any, _room?: any) {
     finalScores.aggregatePolicy = {
       humanJudgeWeight: HUMAN_JUDGE_WEIGHT,
       aiJudgeWeight: AI_JUDGE_WEIGHT,
-      method: 'round_based_average_with_tie_breakers',
-      winnerMethod: allRoundsScored ? 'tie_breaker_rules_applied' : 'pending_more_rounds',
+      method: 'round_based_average_no_tiebreaker',
+      winnerMethod: allRoundsScored ? 'score_delta_with_draw_on_tie' : 'pending_more_rounds',
       scoredRounds: Array.from(scoredRounds),
       verdictCount: verdicts.length,
       aggregatedAt: new Date(),

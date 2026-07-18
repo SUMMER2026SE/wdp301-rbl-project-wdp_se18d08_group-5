@@ -34,7 +34,7 @@
  *   IDLE_BEFORE_NEXT (only MANUAL)
  *     └─ CONTROLLER_START               → active next phase
  *
- *   ROUND_SPEECH, CROSS_EXAM, JUDGE_FEEDBACK, FINAL_JUDGING — tương tự pattern
+ *   ROUND_SPEECH, CROSS_EXAM, JUDGE_FEEDBACK — tương tự pattern
  *   trên với guards đặc thù.
  *
  *   COMPLETED (terminal)
@@ -522,14 +522,6 @@ export const matchMachine = setup({
           },
           target: 'JUDGE_FEEDBACK',
         },
-        {
-          guard: ({ context }) => {
-            const flow = generateFlowFromMode(context.mode);
-            const next = flow[context.currentStepIndex];
-            return next?.phase === 'final_judging';
-          },
-          target: 'FINAL_JUDGING',
-        },
         { target: 'ROUND_SPEECH' },
       ],
     },
@@ -714,63 +706,6 @@ export const matchMachine = setup({
         JUDGE_S1_RECONNECT: {
           target: 'JUDGE_FEEDBACK',
           actions: ['clearJudgeS1Disconnected', 'setPhaseActive'],
-        },
-        SURRENDER: {
-          guard: ({ event }) =>
-            event.type === 'SURRENDER' &&
-            (event.actorRole === 'captain_prop' || event.actorRole === 'captain_opp'),
-          target: 'COMPLETED',
-          actions: ['recordSurrender', 'setPhaseCompleted'],
-        },
-      },
-    },
-
-    FINAL_JUDGING: {
-      on: {
-        AI_VERDICT_READY: [
-          {
-            guard: 'isAIJudge',
-            target: 'COMPLETED',
-            actions: ['setPhaseCompleted'],
-          },
-        ],
-        CONTROLLER_SKIP: {
-          guard: 'canControllerSkip',
-          target: 'COMPLETED',
-          actions: ['setPhaseCompleted'],
-        },
-        JUDGE_SUBMIT_ALL: [
-          {
-            guard: 'isJudgeSubmitAll',
-            target: 'COMPLETED',
-            actions: ['setPhaseCompleted'],
-          },
-        ],
-        JUDGE_S1_DISCONNECT: {
-          guard: 'canJudgeS1Disconnect',
-          target: 'PAUSED_FINAL',
-          actions: ['setJudgeS1Disconnected', 'setPhasePaused'],
-        },
-        SURRENDER: {
-          guard: ({ event }) =>
-            event.type === 'SURRENDER' &&
-            (event.actorRole === 'captain_prop' || event.actorRole === 'captain_opp'),
-          target: 'COMPLETED',
-          actions: ['recordSurrender', 'setPhaseCompleted'],
-        },
-      },
-    },
-
-    PAUSED_FINAL: {
-      on: {
-        JUDGE_S1_RECONNECT: {
-          target: 'FINAL_JUDGING',
-          actions: ['clearJudgeS1Disconnected', 'setPhaseActive'],
-        },
-        RESUME: {
-          guard: 'canResume',
-          target: 'FINAL_JUDGING',
-          actions: ['setPhaseActive'],
         },
         SURRENDER: {
           guard: ({ event }) =>

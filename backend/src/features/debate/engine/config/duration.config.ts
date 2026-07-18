@@ -42,10 +42,11 @@ export const DEBATE_DURATIONS = {
   MATCH_END_REDIRECT_SECONDS: 10,
 
   /**
-   * No-Host + AI: sau khi vào FINAL_JUDGING, đợi bao lâu rồi tự tính verdict.
-   * Theo rule_noHost_JudgeAI.md §13.
+   * Host + Human Judge: sau JUDGE_FEEDBACK_3 (Human Judge chấm xong),
+   * Host có 5 phút (300s) countdown để bấm End. Hết 5 phút → auto-complete.
+   * Không áp dụng cho host_ai_*, noHost_*.
    */
-  AI_FINAL_VERDICT_DELAY_SECONDS: 10,
+  HOST_END_COUNTDOWN_SECONDS: 5 * 60, // 300s
 
   /** Initial countdown khi Start (motion announcement): 3 giây */
   INITIAL_COUNTDOWN_SECONDS: 3,

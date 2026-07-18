@@ -15,7 +15,7 @@ describe('adapter.ts — backward-compat với debate.service.ts cũ', () => {
     it('host_human_3v3 (default) — 14 steps', () => {
       const flow = getFlowAdapter('3v3', 'human');
       // Step 0 = MOTION, Step 1-13 = 14 steps theo rule_host_judgeHuman.md §14
-      expect(flow).toHaveLength(15);
+      expect(flow).toHaveLength(14);
       expect(flow[0].speaker).toBe('HOST');
       expect(flow[0].phase).toBe('motion');
       expect(flow[1].speaker).toBe('BOTH_TEAMS_PREP');
@@ -26,14 +26,14 @@ describe('adapter.ts — backward-compat với debate.service.ts cũ', () => {
 
     it('host_ai_3v3 — host skip cũng OK (vì host có ở mode này)', () => {
       const flow = getFlowAdapter('3v3', 'human', 'ai');
-      expect(flow).toHaveLength(15);
+      expect(flow).toHaveLength(14);
       // Prep step: hostCanEnd = true vì hasHost=true
       expect(flow[1].hostCanEnd).toBe(true);
     });
 
     it('noHost_ai_3v3 — hostCanEnd = false vì không có host', () => {
       const flow = getFlowAdapter('3v3', 'ai', 'ai');
-      expect(flow).toHaveLength(15);
+      expect(flow).toHaveLength(14);
       // Prep: hostCanEnd = false vì controller là Consensus (không phải single controller)
       expect(flow[1].hostCanEnd).toBe(false);
     });
@@ -43,13 +43,13 @@ describe('adapter.ts — backward-compat với debate.service.ts cũ', () => {
       // và check `isNoHostHumanJudge` riêng ở endPhaseByHost() để cấp quyền cho Judge S1.
       // Adapter giữ behavior này để backward-compat — không sửa caller code cũ.
       const flow = getFlowAdapter('3v3', 'ai', 'human');
-      expect(flow).toHaveLength(15);
+      expect(flow).toHaveLength(14);
       expect(flow[1].hostCanEnd).toBe(false);
     });
 
-    it('1v1 — 14 steps với 1 CE round', () => {
+    it('1v1 — 13 steps với 1 CE round', () => {
       const flow = getFlowAdapter('1v1', 'human');
-      expect(flow).toHaveLength(14);
+      expect(flow).toHaveLength(13);
       // 1v1 chỉ có 1 CE round (crossExamRounds=1 cho 1v1)
       const ce1 = flow.find((s) => s.speaker === 'CE_ROUND_1');
       expect(ce1).toBeDefined();

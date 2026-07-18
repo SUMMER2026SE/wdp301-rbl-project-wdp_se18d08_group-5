@@ -128,9 +128,12 @@ export type PermissionAction =
  * - speech:         lượt trình bày S1/S2/S3
  * - cross_exam:     CE giữa 2 đội (Round 1 & 2)
  * - judge_feedback: Free time sau CE — Judge feedback / AI sinh feedback
- * - final_judging:  Sau Round 3 — tổng kết & submit score cuối
  * - completed:      đã kết thúc (chờ redirect /result)
  * - transition:     mute + lock chat 3s giữa 2 phase
+ *
+ * Lưu ý: phase `final_judging` đã bỏ khỏi union. Tổng kết điểm / verdict xảy ra
+ * ngay trong JUDGE_FEEDBACK (round 3) — engine tự route sang COMPLETED khi Judge
+ * submit (Human Judge) hoặc AI tính xong (AI Judge).
  */
 export type Phase =
   | 'motion'
@@ -138,7 +141,6 @@ export type Phase =
   | 'speech'
   | 'cross_exam'
   | 'judge_feedback'
-  | 'final_judging'
   | 'completed'
   | 'transition';
 
@@ -212,11 +214,16 @@ export interface DebateModeConfig {
     needsJudges: number;
   };
   /**
-   * Tie-break cho AI Judge (Consolidated §7 Open Point #4 — chốt "split total").
+   * Tie-break cho AI Judge — **DEPRECATED**.
    *
-   * - SPLIT_TOTAL: chia đều điểm cho 2 đội (default cho AI Judge modes)
-   * - ELO_HIGHER:  đội có ELO cao hơn thắng
-   * - RANDOM:      chọn ngẫu nhiên
+   * Theo refactor 2026-07, `aggregateFinalScores()` đã bỏ hẳn tiebreaker logic:
+   * winner chỉ dựa trên tổng điểm 2 đội (prop > opp → prop thắng, bằng điểm → draw).
+   * Field này giữ lại trong type để không phá mode config hiện có, nhưng
+   * KHÔNG còn ảnh hưởng runtime. Có thể xoá hẳn ở major version tiếp theo.
+   *
+   * - SPLIT_TOTAL: chia đều điểm cho 2 đội (default cho AI Judge modes — deprecated)
+   * - ELO_HIGHER:  đội có ELO cao hơn thắng (deprecated)
+   * - RANDOM:      chọn ngẫu nhiên (deprecated)
    */
   aiTieBreak: 'SPLIT_TOTAL' | 'ELO_HIGHER' | 'RANDOM';
   /**

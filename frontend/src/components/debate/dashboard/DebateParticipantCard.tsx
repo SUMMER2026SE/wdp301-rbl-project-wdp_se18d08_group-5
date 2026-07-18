@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { RoomParticipant } from '@/types';
 import type { TeamTone } from './types';
 
@@ -46,6 +46,34 @@ function StatusIcon({ enabled, onIcon, offIcon, label }: {
   );
 }
 
+/**
+ * Stops and detaches any MediaStream that was previously attached to the
+ * given `<video>` element. We `pause()` first to halt decoding, set
+ * `srcObject = null` to release the stream reference (so the browser drops
+ * its decoded-frame cache), and call `load()` to flush any pending frames
+ * before unmount.
+ */
+function releaseVideoElement(video: HTMLVideoElement | null) {
+  if (!video) return;
+  try {
+    video.pause();
+  } catch {
+    // ignore — element may already be detaching
+  }
+  try {
+    if (video.srcObject) {
+      video.srcObject = null;
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    video.load();
+  } catch {
+    // ignore
+  }
+}
+
 export function DebateParticipantCard({
   participant,
   tone,
@@ -64,22 +92,38 @@ export function DebateParticipantCard({
   const chatEnabled = Boolean(participant && !participant.chatMuted);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const shouldShowVideo = Boolean(participant && mediaStream && showCameraStream);
-  const videoKey = shouldShowVideo && mediaStream ? `on-${mediaStream.id}` : 'off';
+  // Force the `<video>` to remount on every on/off transition so the browser
+  // cannot keep showing the previously-decoded frame after we stop the track.
+  // `off` keeps a stable key when no video is rendered.
+  const videoKey = shouldShowVideo && mediaStream ? `on-${mediaStream.id}-${showCameraStream ? 1 : 0}` : 'off';
 
-  useEffect(() => {
+  // Synchronous cleanup runs before paint so the browser never commits a frame
+  // with the now-stopped MediaStream still attached.
+  useLayoutEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
-    if (shouldShowVideo && mediaStream) {
-      if (video.srcObject !== mediaStream) {
-        video.srcObject = mediaStream;
-      }
-      video.play().catch(() => undefined);
+    if (!shouldShowVideo) {
+      releaseVideoElement(video);
+      return undefined;
     }
+    if (!video || !mediaStream) return undefined;
+    if (video.srcObject !== mediaStream) {
+      video.srcObject = mediaStream;
+    }
+    video.play().catch(() => undefined);
     return () => {
-      video.pause();
-      video.srcObject = null;
+      releaseVideoElement(video);
     };
   }, [mediaStream, shouldShowVideo, videoKey]);
+
+  // Initial mount and unmount safety net so that even if the layout effect's
+  // cleanup never re-runs (e.g. parent unmounts the card outright) we still
+  // detach the MediaStream from the DOM node.
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => {
+      releaseVideoElement(video);
+    };
+  }, []);
 
   return (
     <article

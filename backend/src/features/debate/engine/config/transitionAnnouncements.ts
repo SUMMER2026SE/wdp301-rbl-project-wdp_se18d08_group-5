@@ -5,15 +5,14 @@
  * phục vụ popup 3 giây giữa 2 phase (rule §11 mọi mode).
  *
  * Quyết định text:
- * - OPP_S3 → judge_feedback/final_judging: 'End of Round 3'
- * - PRO_S3 → OPP_S3:                    'Opposition turn'
- * - JUDGES_FB_3 → final_judging:        'AI Verdict' (AI judge) hoặc 'Final Verdict' (Human)
- * - OPP_SN → CE_N:                      'Get ready for cross-examination'
- * - CE_N → JUDGES_FB_N:                 `End of Round ${N}`
- * - JUDGES_FB_N → PRO_S(N+1)/OPP_S(N+1):'Next round starting'
- * - BOTH_TEAMS_PREP → first speech:     'Get ready to speak'
- * - HOST (motion) → prep:               'Preparation starts'
- * - Default:                            'Phase transition'
+ * - OPP_S3 → judge_feedback:                'End of Round 3'
+ * - PRO_S3 → OPP_S3:                         'Opposition turn'
+ * - OPP_SN → CE_N:                           'Get ready for cross-examination'
+ * - CE_N → JUDGES_FB_N:                      `End of Round ${N}`
+ * - JUDGES_FB_N → PRO_S(N+1)/OPP_S(N+1):     'Next round starting'
+ * - BOTH_TEAMS_PREP → first speech:          'Get ready to speak'
+ * - HOST (motion) → prep:                    'Preparation starts'
+ * - Default:                                 'Phase transition'
  *
  * Tham chiếu:
  * - docs/rule_host_judgeAI.md §13-15
@@ -23,7 +22,6 @@
  * - docs/Debate_Rule_Consolidated.md §5
  */
 
-import { DEBATE_MODE_CONFIGS } from './modeConfigs';
 import type { DebateModeId, Phase } from './types';
 
 /**
@@ -53,21 +51,17 @@ export type CurrentSpeaker =
  *
  * @param currentSpeaker speaker/phase hiện tại đang kết thúc
  * @param nextPhase      phase sắp tới
- * @param modeId         mode hiện tại (dùng để biết Judge AI hay Human)
+ * @param _modeId        mode hiện tại (giữ cho backward-compat — hiện không dùng
+ *                       vì engine không còn phase `final_judging`)
  */
 export function getTransitionAnnouncement(
   currentSpeaker: CurrentSpeaker,
   nextPhase: Phase,
-  modeId: DebateModeId,
+  _modeId: DebateModeId,
 ): string {
-  // 1. End of Round 3 — OPP_S3 sang judge_feedback hoặc final_judging
-  if (currentSpeaker === 'OPP_S3') {
-    if (
-      nextPhase === 'judge_feedback' ||
-      nextPhase === 'final_judging'
-    ) {
-      return 'End of Round 3';
-    }
+  // 1. End of Round 3 — OPP_S3 sang judge_feedback
+  if (currentSpeaker === 'OPP_S3' && nextPhase === 'judge_feedback') {
+    return 'End of Round 3';
   }
 
   // 2. PRO_S3 → OPP_S3: đến lượt Opposition
@@ -75,13 +69,7 @@ export function getTransitionAnnouncement(
     return 'Opposition turn';
   }
 
-  // 3. JUDGES_FB_3 → final_judging: AI Verdict hoặc Final Verdict
-  if (currentSpeaker === 'JUDGES_FB_3' && nextPhase === 'final_judging') {
-    const mode = DEBATE_MODE_CONFIGS[modeId];
-    return mode.judgeType === 'AI' ? 'AI Verdict' : 'Final Verdict';
-  }
-
-  // 4. OPP_SN → CE_N (CE chỉ ở Round 1 & 2)
+  // 3. OPP_SN → CE_N (CE chỉ ở Round 1 & 2)
   if (
     (currentSpeaker === 'OPP_S1' || currentSpeaker === 'OPP_S2') &&
     nextPhase === 'cross_exam'
@@ -89,7 +77,7 @@ export function getTransitionAnnouncement(
     return 'Get ready for cross-examination';
   }
 
-  // 5. CE_N → JUDGES_FB_N: kết thúc Round N
+  // 4. CE_N → JUDGES_FB_N: kết thúc Round N
   if (currentSpeaker === 'OPP_S1' && nextPhase === 'judge_feedback') {
     return 'End of Round 1';
   }
@@ -103,7 +91,7 @@ export function getTransitionAnnouncement(
     if (currentSpeaker === 'OPP_S2') return 'End of Round 2';
   }
 
-  // 6. JUDGES_FB_N → PRO_S(N+1) / OPP_S(N+1)
+  // 5. JUDGES_FB_N → PRO_S(N+1) / OPP_S(N+1)
   if (currentSpeaker === 'JUDGES_FB_1' && nextPhase === 'speech') {
     return 'Next round starting';
   }
@@ -111,17 +99,17 @@ export function getTransitionAnnouncement(
     return 'Next round starting';
   }
 
-  // 7. BOTH_TEAMS_PREP → first speech
+  // 6. BOTH_TEAMS_PREP → first speech
   if (currentSpeaker === 'BOTH_TEAMS_PREP' && nextPhase === 'speech') {
     return 'Get ready to speak';
   }
 
-  // 8. HOST (motion) → prep_7
+  // 7. HOST (motion) → prep_7
   if (currentSpeaker === 'HOST' && nextPhase === 'prep_7') {
     return 'Preparation starts';
   }
 
-  // 9. Default
+  // 8. Default
   return 'Phase transition';
 }
 

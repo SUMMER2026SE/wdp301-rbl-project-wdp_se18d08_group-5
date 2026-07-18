@@ -9,15 +9,15 @@ import { DEBATE_MODE_CONFIGS } from '../config/modeConfigs';
 import { generateFlowFromMode, findStepIndex } from './flowGenerator';
 
 describe('flowGenerator', () => {
-  it('host_ai_3v3 có 14 steps (motion, prep, 4×R1, 4×R2, 3×R3, final, completed)', () => {
+  it('host_ai_3v3 có 14 steps (motion, prep, 4×R1, 4×R2, 3×R3, completed)', () => {
     const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_ai_3v3);
-    // 2 (motion+prep) + 3 rounds × (2 speeches + 1 CE + 1 JD_FB) + final + completed
-    // = 2 + 3×4 + 2 = 16? Let's compute exactly:
+    // 2 (motion+prep) + 3 rounds × (2 speeches + 1 CE + 1 JD_FB) + completed
+    // = 2 + 3×4 + 1 = 15? Let's compute exactly:
     // round 1: 2 speeches + CE_1 + JD_FB_1 = 4
     // round 2: 2 speeches + CE_2 + JD_FB_2 = 4
     // round 3: 2 speeches + JD_FB_3 = 3 (no CE)
-    // total: 2 (motion+prep) + 4 + 4 + 3 + 1 (final) + 1 (completed) = 15
-    expect(flow).toHaveLength(15);
+    // total: 2 (motion+prep) + 4 + 4 + 3 + 1 (completed) = 14
+    expect(flow).toHaveLength(14);
   });
 
   it('noHost_ai_1v1 có 1 CE round (crossExamRounds=1)', () => {
@@ -33,6 +33,26 @@ describe('flowGenerator', () => {
     expect(ceSteps).toHaveLength(2);
     expect(ceSteps[0]?.speaker).toBe('CE_ROUND_1');
     expect(ceSteps[1]?.speaker).toBe('CE_ROUND_2');
+  });
+
+  it('KHÔNG có FINAL_JUDGING step (đã bỏ khỏi engine)', () => {
+    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_ai_3v3);
+    const finalJudgingSteps = flow.filter((s) => s.speaker === 'FINAL_JUDGING');
+    expect(finalJudgingSteps).toHaveLength(0);
+    // Type cast: 'final_judging' đã bỏ khỏi Phase union, nhưng ta vẫn assert rằng
+    // flow KHÔNG chứa phase này (defensive check — nếu lỡ có regression sẽ fail test).
+    const finalJudgingPhases = flow.filter((s) => (s.phase as string) === 'final_judging');
+    expect(finalJudgingPhases).toHaveLength(0);
+  });
+
+  it('1v1: 13 steps (motion + prep + R1×3 + R2×3 + R3×3 + completed)', () => {
+    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.noHost_ai_1v1);
+    // 1v1 chỉ có 1 CE round (R1): PRO_S1 + OPP_S1 + CE_1 + JD_FB_1 = 4
+    // R2 không có CE: PRO_S2 + OPP_S2 + JD_FB_2 = 3
+    // R3 không có CE: PRO_S3 + OPP_S3 + JD_FB_3 = 3
+    // + motion + prep + completed = 2 + 1
+    // = 2 + 4 + 3 + 3 + 1 = 13
+    expect(flow).toHaveLength(13);
   });
 
   it('mỗi step có duration lấy từ DEBATE_DURATIONS, không magic number', () => {

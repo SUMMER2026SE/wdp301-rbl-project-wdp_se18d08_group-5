@@ -251,8 +251,8 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
       const session = await DebateSession.findOne({ roomId: room._id });
       if (!session) return;
 
-      // Only during Judge Feedback or Final Judging phase
-      if (!['judge_feedback', 'final_judging'].includes(session.currentTurn.phase)) {
+      // Only during Judge Feedback phase
+      if (!['judge_feedback'].includes(session.currentTurn.phase)) {
         socket.emit('debate:error', { message: 'Can only vote for next phase during judge feedback' });
         return;
       }
@@ -327,7 +327,7 @@ export function registerDebateHandlers(io: Server, socket: Socket) {
 
         // Also sync judge next-phase votes if in judge feedback
         const votes = judgeNextPhaseVotes.get(roomId);
-        if (votes && ['judge_feedback', 'final_judging'].includes(state.currentPhase)) {
+        if (votes && ['judge_feedback'].includes(state.currentPhase)) {
           const assignedJudges = state.room.participants.filter((p: any) => {
             const role = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
             return role === 'judge';

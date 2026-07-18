@@ -3,7 +3,11 @@
  *
  * Theo Consolidated §5 + rule files §13-15, cấu trúc flow luôn là:
  *   MOTION → PREP → R1 (PRO_S1, OPP_S1, CE_1, JUDGE_FB_1) → R2 (PRO_S2, OPP_S2, CE_2, JUDGE_FB_2) →
- *   R3 (PRO_S3, OPP_S3, JUDGE_FB_3) → FINAL_JUDGING → COMPLETED
+ *   R3 (PRO_S3, OPP_S3, JUDGE_FB_3) → COMPLETED
+ *
+ * Lưu ý: Phase `final_judging` đã được bỏ khỏi flow (tính tổng điểm / verdict
+ * diễn ra trong JUDGE_FEEDBACK_3 với pause nhỏ cho Human Judge, hoặc auto-finalize
+ * cho AI Judge). Engine không còn step `FINAL_JUDGING` — phase cuối là `COMPLETED`.
  *
  * Khác biệt duy nhất giữa các mode là:
  * - Số CE round (1 hoặc 2) theo config.rounds.crossExamRounds
@@ -17,7 +21,7 @@ import type { DebateModeConfig, Phase, Team } from '../config/types';
 
 export interface FlowStep {
   index: number;
-  speaker: string; // 'PRO_S1', 'OPP_S2', 'CE_ROUND_1', 'JUDGES_FB_1', 'BOTH_TEAMS_PREP', 'HOST', 'FINAL_JUDGING', 'COMPLETED'
+  speaker: string; // 'PRO_S1', 'OPP_S2', 'CE_ROUND_1', 'JUDGES_FB_1', 'BOTH_TEAMS_PREP', 'HOST', 'COMPLETED'
   phase: Phase;
   durationSec: number;
   speakerCanEnd: boolean;
@@ -126,17 +130,7 @@ export function generateFlowFromMode(mode: DebateModeConfig): FlowStep[] {
     });
   }
 
-  // Final Judging — sau Round 3
-  steps.push({
-    index: idx++,
-    speaker: 'FINAL_JUDGING',
-    phase: 'final_judging',
-    durationSec: 0,
-    speakerCanEnd: false,
-    controllerCanEnd: mode.hasHost || mode.controllerRole === 'JUDGE_S1',
-  });
-
-  // Completed
+  // Completed (sau Judge Feedback round 3 — KHÔNG có bước FINAL_JUDGING riêng)
   steps.push({
     index: idx++,
     speaker: 'COMPLETED',

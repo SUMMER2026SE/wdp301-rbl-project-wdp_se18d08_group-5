@@ -34,7 +34,7 @@ describe('DEBATE_DURATIONS', () => {
     expect(DEBATE_DURATIONS.INITIAL_COUNTDOWN_SECONDS).toBe(3);
   });
 
-  it('AI_FINAL_VERDICT_DELAY = 10 giây theo rule_noHost_JudgeAI.md §13', () => {
-    expect(DEBATE_DURATIONS.AI_FINAL_VERDICT_DELAY_SECONDS).toBe(10);
+  it('HOST_END_COUNTDOWN = 5 phút (300s) cho host_human_* sau Judge Feedback round 3', () => {
+    expect(DEBATE_DURATIONS.HOST_END_COUNTDOWN_SECONDS).toBe(300);
   });
 });

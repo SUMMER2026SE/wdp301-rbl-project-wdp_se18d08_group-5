@@ -11,7 +11,7 @@
  *
  * Thiết kế:
  * - ROOM_WAITING → STARTING → COUNTDOWN_3S → PREP_7MIN → (loop ROUND_SPEECH × 2,
- *   CROSS_EXAM, JUDGE_FEEDBACK) × 3 → FINAL_JUDGING → COMPLETED.
+ *   CROSS_EXAM, JUDGE_FEEDBACK) × 3 → COMPLETED.
  * - Mỗi phase có thể bị gián đoạn bởi TRANSITION (3s mute + lock chat).
  * - Trong MANUAL mode, phase sau TRANSITION dừng ở IDLE_BEFORE_NEXT chờ controller.
  * - Trong AUTO_TIMED mode, phase sau TRANSITION tự động chuyển sau 10s.
@@ -83,6 +83,7 @@ export type MatchEvent =
       speakerSlot: 'S1' | 'S2' | 'S3';
     }
   | { type: 'CONTROLLER_SKIP'; actorRole: Role; actorUserId: string }
+  | { type: 'CONTROLLER_END'; actorRole: 'host'; actorUserId: string }
   | { type: 'CONSENSUS_SKIP'; actorRole: Role; actorUserId: string }
   // ── Judge ────────────────────────────────────────────────────
   | { type: 'JUDGE_SUBMIT_ALL'; actorRole: 'judge_s1' | 'judge'; actorUserId: string }

@@ -14,6 +14,7 @@ import {
 // Re-export duration constants cho code cũ đang reference trực tiếp (backward-compat)
 const TRANSITION_MUTE_SECONDS = DEBATE_DURATIONS.TRANSITION_MUTE_SECONDS;
 const AUTO_TRANSITION_COUNTDOWN = DEBATE_DURATIONS.AUTO_TRANSITION_COUNTDOWN_SECONDS;
+const HOST_END_COUNTDOWN_SECONDS = DEBATE_DURATIONS.HOST_END_COUNTDOWN_SECONDS;
 const noHostAiStartConsensus = new Map<string, Set<string>>();
 
 type DebateStep = {
@@ -462,7 +463,7 @@ function computeTransitionAnnouncement(
   const { speaker: next, phase: nextPhase } = nextStep;
 
   // OPP_S3 -> JUDGES_FB_3: "End of Round 3" per rule (all 4 docs)
-  if (curr === 'OPP_S3' && (nextPhase === 'judge_feedback' || nextPhase === 'final_judging')) {
+  if (curr === 'OPP_S3' && nextPhase === 'judge_feedback') {
     return 'End of Round 3';
   }
 
@@ -471,10 +472,8 @@ function computeTransitionAnnouncement(
     return 'Opposition turn';
   }
 
-  // After JUDGES_FB_3 (R3 feedback) -> FINAL_JUDGING: "AI Verdict" (all 4 docs)
-  if (curr === 'JUDGES_FB_3' && nextPhase === 'final_judging') {
-    return 'AI Verdict';
-  }
+  // (Engine không còn phase `final_judging` — verdict xảy ra trong JUDGE_FEEDBACK_3,
+  //  chuyển thẳng sang COMPLETED. Không còn 'AI Verdict' / 'Final Verdict' riêng.)
 
   // After speech, before CE (R1 or R2)
   if (curr.startsWith('OPP_S') && next.startsWith('CE_')) {
@@ -685,45 +684,6 @@ export async function triggerTransition(
         return;
       }
 
-      // === Handle FINAL_JUDGING phase ===
-      if (nextStep.phase === 'final_judging') {
-        // Unlock mic for all debaters + judges (free time)
-        await unlockAllParticipantsMic(updatedRoom);
-
-        // Snapshot current turn history, then advance the session step
-        // to final_judging as 'active' (free time, no timer).
-        snapshotCurrentTurn(session, '');
-        applyStep(session, nextStep);
-        session.currentTurn.phaseStatus = 'active';
-        session.currentTurn.status = 'active';
-        updatedRoom.currentPhase = nextStep.phase;
-        await session.save();
-        await updatedRoom.save();
-
-        // Broadcast entering final judging
-        io?.to(roomId).emit('debate:phase-change', {
-          phase: 'final_judging',
-          phaseStatus: 'active',
-          speaker: nextStep.speaker,
-          announcement: 'Finish Debate',
-        });
-        io?.to(roomId).emit('debate:turn-status-change', { turnStatus: 'active', phaseStatus: 'active' });
-
-        if (isNoHost) {
-          // Auto: compute AI verdict + end debate
-          setTimeout(async () => {
-            try {
-              const verdictResult = await computeAIFeedbackAndFinalize(roomId);
-              io?.to(roomId).emit('debate:ended', { roomId, isAuto: true, verdict: verdictResult });
-            } catch (err) {
-              console.error('AI final verdict error:', err);
-              io?.to(roomId).emit('debate:ended', { roomId, isAuto: true });
-            }
-          }, 10000); // 10s after "Finish Debate"
-        }
-        return;
-      }
-
       // === Handle JUDGE_FEEDBACK phase ===
       if (nextStep.phase === 'judge_feedback') {
         // Unlock mic for all debaters + judges (free time)
@@ -766,8 +726,8 @@ export async function triggerTransition(
 
           if (humanJudgeCount === 0 || nextStep.speaker === 'JUDGES_FB_3') {
             // JUDGES_FB_3: AI already generated feedback for R3 speeches in the
-            // previous OPP_S3→PRO_S3 transition. Auto-advance to FINAL_JUDGING
-            // after a short delay (no UI interaction needed).
+            // previous OPP_S3→PRO_S3 transition. Auto-advance to COMPLETED
+            // (không còn FINAL_JUDGING phase riêng) sau 3s.
             console.log(`[triggerTransition] Auto-advancing from ${nextStep.speaker} (AI judge, no human judges or R3 FB)`);
             setTimeout(async () => {
               triggerTransition(roomId).catch(console.error);
@@ -788,9 +748,51 @@ export async function triggerTransition(
             }, 5000);
           })();
         } else {
-          // Human judge: wait for judge scores. The phase only ends when the
-          // Control Panel holder (Host or Judge S1 in no-host mode) clicks
-          // Skip. Submitting scores is not enough on its own.
+          // Human judge: wait for judge scores.
+          // - For host_human_*: nếu là JUDGE_FEEDBACK_3 (sau Round 3), Host phải
+          //   bấm End để kết thúc — KHÔNG tự advance. Đợi Host End tối đa 5 phút,
+          //   hết 5 phút → auto-complete.
+          // - Các case khác (host_ai_*, noHost_*): Host/Judge S1 bấm Skip như cũ.
+          const isHostHuman =
+            updatedRoom.hostType === 'human' && updatedRoom.judgeType !== 'ai';
+          const isJudgesFb3 = nextStep.speaker === 'JUDGES_FB_3';
+
+          if (isHostHuman && isJudgesFb3) {
+            // host_human_*: JUDGE_FEEDBACK_3 → AWAITING_HOST_END (chờ Host End 5p)
+            io?.to(roomId).emit('debate:awaiting-host-end', {
+              phase: 'judge_feedback',
+              speaker: nextStep.speaker,
+              hostEndCountdownSec: HOST_END_COUNTDOWN_SECONDS,
+              announcement: 'Host can now end the debate',
+            });
+
+            // Schedule auto-complete sau 5 phút nếu Host không End
+            setTimeout(async () => {
+              try {
+                const freshRoom = await DebateRoom.findById(roomId);
+                const freshSession = await DebateSession.findOne({ roomId: freshRoom?._id });
+                if (!freshRoom || !freshSession) return;
+                // Chỉ auto-complete nếu vẫn còn ở JUDGE_FEEDBACK_3
+                if (
+                  freshSession.currentTurn.speaker !== 'JUDGES_FB_3' ||
+                  freshSession.currentTurn.phase !== 'judge_feedback'
+                ) {
+                  return;
+                }
+                console.log(
+                  `[triggerTransition] host_human_* auto-completing after ${HOST_END_COUNTDOWN_SECONDS}s (Host did not End)`,
+                );
+                await endDebateByHost(roomId, 'system', 'Host did not End within 5 minutes');
+              } catch (err) {
+                console.error('Auto-complete on Host timeout error:', err);
+              }
+            }, HOST_END_COUNTDOWN_SECONDS * 1000);
+            return;
+          }
+
+          // Human judge (host_ai_*, noHost_*): wait for judge scores. The phase
+          // only ends when the Control Panel holder (Host or Judge S1 in no-host
+          // mode) clicks Skip. Submitting scores is not enough on its own.
           io?.to(roomId).emit('debate:waiting-judge-feedback', {
             phase: 'judge_feedback',
             waitingForVotes: true,
@@ -1002,7 +1004,7 @@ async function generateAIFeedback(roomId: string, speaker: string): Promise<bool
 
 /**
  * Unlock mic for all participants during free-time phases
- * (judge_feedback, final_judging, completed, waiting_s1).
+ * (judge_feedback, completed, waiting_s1).
  * Used so debaters/judges can freely discuss and judges can chat in free time.
  */
 async function unlockAllParticipantsMic(room: any) {
@@ -1018,50 +1020,15 @@ async function unlockAllParticipantsMic(room: any) {
 }
 
 /**
- * Compute AI final verdict and end the debate.
- * Called when entering final_judging phase in AI judge mode.
+ * Compute AI feedback during judge feedback phases.
+ * Called after entering a judge_feedback phase in AI judge mode.
+ * Returns true when feedback was generated successfully, false on error
+ * or timeout. The caller uses the return value to decide whether to wait
+ * for feedback before starting the 10s transition countdown.
+ *
+ * Lưu ý: Phase `final_judging` đã bỏ — AI Judge giờ verdict inline trong
+ * JUDGE_FEEDBACK_3, không cần helper riêng cho AI final verdict.
  */
-async function computeAIFeedbackAndFinalize(roomId: string) {
-  try {
-    const { aiService } = await import('../ai/ai.service.js');
-    const room = await DebateRoom.findById(roomId);
-    const session = await DebateSession.findOne({ roomId });
-    if (!room || !session) return null;
-
-    // Generate AI final verdict
-    const result = await aiService.finalVerdict(roomId, {
-      turnHistory: session.turnHistory || [],
-      motion: room.motion,
-    });
-
-    // Apply the result
-    const verdict = result.winner as 'proposition' | 'opposition' | 'draw' || 'draw';
-    const summary = result.summary || result.verdict || 'AI Judge Final Verdict';
-
-    // Update session with AI verdict
-    session.finalScores = {
-      ...(session.finalScores || {}),
-      teamProposition: { total: verdict === 'proposition' ? 100 : verdict === 'draw' ? 50 : 0, breakdown: {} },
-      teamOpposition: { total: verdict === 'opposition' ? 100 : verdict === 'draw' ? 50 : 0, breakdown: {} },
-      winner: verdict,
-      winnerTeam: verdict,
-      aiVerdict: verdict,
-      judgeVerdicts: [],
-    } as any;
-    session.aiSummary = summary;
-    room.status = 'completed';
-    room.currentPhase = 'completed';
-    room.endedAt = new Date();
-
-    await Promise.all([session.save(), room.save()]);
-    await applyDebateResult(roomId);
-
-    return { winner: verdict, summary };
-  } catch (err) {
-    console.error('AI final verdict error:', err);
-    return null;
-  }
-}
 
 export async function finishPhase(roomId: string, userId: string, transcript = '') {
   const room = await DebateRoom.findById(roomId);
@@ -1169,21 +1136,58 @@ async function completeDebateWithWinner(room: any, session: any, winner: 'propos
 }
 
 export async function endDebate(roomId: string, userId: string, summary = ''): Promise<any> {
+  return endDebateInternal(roomId, userId, summary, { requireHost: true });
+}
+
+/**
+ * Host bấm End để kết thúc trận từ JUDGE_FEEDBACK_3 (host_human_* path).
+ * Hoặc hệ thống tự gọi sau 5 phút countdown (userId='system').
+ *
+ * - Host: assertHost(room, userId) — phải là Host mới được End.
+ * - 'system': bỏ qua permission check (auto-complete sau countdown).
+ */
+export async function endDebateByHost(roomId: string, userId: string, summary = ''): Promise<any> {
+  return endDebateInternal(roomId, userId, summary, { requireHost: false });
+}
+
+async function endDebateInternal(
+  roomId: string,
+  userId: string,
+  summary: string,
+  options: { requireHost: boolean },
+): Promise<any> {
   const room = await DebateRoom.findById(roomId);
   if (!room) throw new NotFoundError('Room not found');
 
-  if (room.hostType === 'human') {
-    assertHost(room, userId);
-  } else {
-    // No-host rooms: only Judge S1 can end the debate (debaters can surrender/request draw)
-    const participant = room.participants.find((p: any) => p.userId?.toString() === userId);
-    const effectiveRole = participant ? (participant.roomRole === 'owner' ? participant.primaryRole : participant.roomRole) : null;
-    const isJudgeS1 =
-      participant &&
-      effectiveRole === 'judge' &&
-      hasControlPanel(room, userId);
-    if (!isJudgeS1) {
-      throw new ForbiddenError('Only Judge S1 can end the debate');
+  if (userId !== 'system') {
+    if (room.hostType === 'human') {
+      if (options.requireHost) {
+        assertHost(room, userId);
+      } else {
+        // endDebateByHost: chỉ cần Host role, không yêu cầu room ownership
+        const participant = room.participants.find((p: any) => p.userId?.toString() === userId);
+        const effectiveRole = participant
+          ? participant.roomRole === 'owner'
+            ? participant.primaryRole
+            : participant.roomRole
+          : null;
+        if (effectiveRole !== 'host') {
+          throw new ForbiddenError('Only the host can end the debate');
+        }
+      }
+    } else {
+      // No-host rooms: only Judge S1 can end the debate
+      const participant = room.participants.find((p: any) => p.userId?.toString() === userId);
+      const effectiveRole = participant
+        ? participant.roomRole === 'owner'
+          ? participant.primaryRole
+          : participant.roomRole
+        : null;
+      const isJudgeS1 =
+        participant && effectiveRole === 'judge' && hasControlPanel(room, userId);
+      if (!isJudgeS1) {
+        throw new ForbiddenError('Only Judge S1 can end the debate');
+      }
     }
   }
 

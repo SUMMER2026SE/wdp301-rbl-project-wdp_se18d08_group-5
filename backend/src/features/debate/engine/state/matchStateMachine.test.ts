@@ -696,7 +696,7 @@ describe('CONSENSUS_SKIP — both captains trong noHost_ai_*', () => {
   });
 });
 
-describe('AI Judge — FINAL_JUDGING transition', () => {
+describe('AI Judge — JUDGE_FEEDBACK_3 auto-completes to COMPLETED', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -704,16 +704,16 @@ describe('AI Judge — FINAL_JUDGING transition', () => {
     vi.useRealTimers();
   });
 
-  it('host_ai_1v1: AI_VERDICT_READY trong FINAL_JUDGING → COMPLETED', async () => {
+  it('host_ai_1v1: AI judge path auto-advances from JUDGE_FEEDBACK_3 → COMPLETED', async () => {
     const actor = makeActor(DEBATE_MODE_CONFIGS.host_ai_1v1);
     actor.send({ type: 'START_MATCH', actorRole: 'host', actorUserId: 'h' });
     await tick(DEBATE_DURATIONS.INITIAL_COUNTDOWN_SECONDS * 1000 + 500);
 
-    // Navigate đến FINAL_JUDGING: skip qua TẤT CẢ active phases
-    // (PREP, SPEECH × 6, CE × 2, JUDGE_FEEDBACK × 3) → final_judging
+    // Skip qua TẤT CẢ active phases. Vì không có FINAL_JUDGING, mọi auto-advance
+    // từ JUDGE_FEEDBACK_3 sẽ tăng currentStepIndex đến step COMPLETED cuối.
     const ACTIVE_PHASES = ['PREP_7MIN', 'ROUND_SPEECH', 'CROSS_EXAM', 'JUDGE_FEEDBACK'];
     let safety = 0;
-    while (getState(actor) !== 'FINAL_JUDGING' && safety < 60) {
+    while (getState(actor) !== 'COMPLETED' && safety < 80) {
       const st = getState(actor);
       if (ACTIVE_PHASES.includes(st)) {
         actor.send({
@@ -733,10 +733,22 @@ describe('AI Judge — FINAL_JUDGING transition', () => {
       safety++;
     }
 
-    expect(getState(actor)).toBe('FINAL_JUDGING');
-
-    // AI_VERDICT_READY → COMPLETED
-    actor.send({ type: 'AI_VERDICT_READY' });
     expect(getState(actor)).toBe('COMPLETED');
+  });
+});
+
+describe('host_human_* — JUDGE_FEEDBACK_3 routes to AWAITING_HOST_END', () => {
+  // Lưu ý: hiện tại logic host_human_* AWAITING_HOST_END được xử lý trong
+  // debate.service.ts (qua triggerTransition setTimeout). State machine chỉ
+  // giữ logic auto-advance. Service-level test sẽ cover trong integration tests.
+  // Ở đây ta verify rằng flow step của host_human_3v3 KHÔNG có FINAL_JUDGING.
+  it('host_human_3v3 flow có 14 steps và step cuối là COMPLETED', async () => {
+    const { generateFlowFromMode } = await import('./flowGenerator');
+    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_human_3v3);
+    expect(flow).toHaveLength(14);
+    expect(flow[flow.length - 1]?.speaker).toBe('COMPLETED');
+    expect(flow[flow.length - 1]?.phase).toBe('completed');
+    // Đảm bảo không có FINAL_JUDGING
+    expect(flow.some((s) => s.speaker === 'FINAL_JUDGING')).toBe(false);
   });
 });

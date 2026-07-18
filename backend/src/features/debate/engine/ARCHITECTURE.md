@@ -69,7 +69,7 @@ Debate Engine được thiết kế theo **3-layer modular architecture**:
 
 | File | Vai trò | Exports |
 |---|---|---|
-| `duration.config.ts` | Tất cả hằng số thời gian (Prep 7m, Speech 3m, CE 2m, Transition 3s, Countdown 3s/10s) | `DEBATE_DURATIONS`, `DurationKey` |
+| `duration.config.ts` | Tất cả hằng số thời gian (Prep 7m, Speech 3m, CE 2m, Transition 3s, Countdown 3s/10s, Host End 5m) | `DEBATE_DURATIONS`, `DurationKey` |
 | `types.ts` | TypeScript contracts chung cho toàn engine | `DebateModeConfig`, `PermissionAction`, `Role`, `Phase`, `Team`, `SpeakerSlot`, `ParticipantDescriptor`, `RoomLike` |
 | `modeConfigs.ts` | 8 `DebateModeConfig` cho 8 case (host/noHost × AI/Human × 1v1/3v3) | `DEBATE_MODE_CONFIGS`, `getModeConfig(room)`, `getAllModeIds()` |
 | `permissionMatrix.ts` | Map (role × modeId) → tập `PermissionAction` cho phép | `canPerform(role, action, modeId)`, `getPermissions(role, modeId)`, `deriveRole(participant)` |
@@ -160,17 +160,20 @@ TRANSITION (3s mute — auto-advance countdown overlay)
               NEXT_ACTIVE_PHASE (route dựa trên flow[currentStepIndex].phase)
                   ├── ROUND_SPEECH
                   ├── CROSS_EXAM
-                  ├── JUDGE_FEEDBACK
-                  └── FINAL_JUDGING
+                  └── JUDGE_FEEDBACK
                             ▼
                         COMPLETED (final)
 ```
 
 ### Side states (pause)
 
-`PAUSED_PREP`, `PAUSED_SPEECH`, `PAUSED_CE`, `PAUSED_JUDGE_FEEDBACK`, `PAUSED_FINAL`
+`PAUSED_PREP`, `PAUSED_SPEECH`, `PAUSED_CE`, `PAUSED_JUDGE_FEEDBACK`
 — được enter khi `PAUSE` event (host có control) hoặc `JUDGE_S1_DISCONNECT` (noHost_human).
 Resume qua `RESUME` (host) hoặc `JUDGE_S1_RECONNECT` (noHost_human).
+
+Lưu ý: Phase `final_judging` đã bỏ khỏi state machine (refactor 2026-07).
+AI Judge auto-verdict inline trong JUDGE_FEEDBACK_3, Human Judge (host_human_*)
+chờ Host End (5 phút countdown) rồi mới COMPLETED.
 
 ### Events chính
 
@@ -181,10 +184,11 @@ Resume qua `RESUME` (host) hoặc `JUDGE_S1_RECONNECT` (noHost_human).
 | `TIMER_EXPIRED` | Internal timer | Phase → TRANSITION |
 | `CONTROLLER_START` | Host / Judge S1 | IDLE_BEFORE_NEXT → NEXT_ACTIVE_PHASE |
 | `CONTROLLER_SKIP` | Host / Judge S1 | Active phase → TRANSITION |
+| `CONTROLLER_END` | Host (host_human_*) | Từ JUDGMENT_FEEDBACK_3 → COMPLETED (sớm) |
 | `SPEAKER_SKIP` | Captain/Debater during own speech | Speech → TRANSITION |
 | `CONSENSUS_SKIP` | Both Captains (noHost_ai_*) | Phase → TRANSITION |
 | `JUDGE_SUBMIT_ALL` | Human Judge | JUDGE_FEEDBACK → TRANSITION |
-| `AI_VERDICT_READY` | AI service | JUDGE_FEEDBACK / FINAL_JUDGING → next |
+| `AI_VERDICT_READY` | AI service | JUDGE_FEEDBACK → COMPLETED |
 | `PAUSE` / `RESUME` | Host (host_*) or Judge S1 (noHost_human_*) | Toggle paused state |
 | `SURRENDER` | Captain | ROOM_WAITING or any active → COMPLETED |
 | `REQUEST_DRAW` / `ACCEPT_DRAW` | Captain pair | COMPLETED if both teams accept |
@@ -280,14 +284,13 @@ Implementation: Promise chain per-roomId. Count waiter để cleanup lock đúng
   // Round 3
   { speaker: 'PRO_S3', ... }, { speaker: 'OPP_S3', ... },
   { speaker: 'JUDGES_FB_3',     phase: 'judge_feedback', dur: 0    },
-  { speaker: 'FINAL_JUDGING',   phase: 'final_judging',  dur: 0    },
   { speaker: 'COMPLETED',       phase: 'completed',      dur: 0    },
 ]
 ```
 
-Số steps:
-- 1v1 (1 CE round): 14 steps
-- 3v3 (2 CE rounds): 15 steps
+Số steps (đã bỏ FINAL_JUDGING):
+- 1v1 (1 CE round): 13 steps
+- 3v3 (2 CE rounds): 14 steps
 
 Số CE rounds dựa vào `mode.rounds.crossExamRounds` (1 cho 1v1, 2 cho 3v3).
 
