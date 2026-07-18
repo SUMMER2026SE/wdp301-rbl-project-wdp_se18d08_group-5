@@ -94,8 +94,8 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'OPP_S1', phase: 'speech', label: 'Opposition S1', detail: 'Opening speech (3 min)' },
   { speaker: 'CE_ROUND_1', phase: 'cross_exam', label: 'Cross-examination 1', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_1', phase: 'judge_feedback', label: 'Judge Feedback 1', detail: 'Free discussion' },
-  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'PRO_S2', phase: 'speech', label: 'Proposition S2', detail: 'Closing speech (3 min)' },
+  { speaker: 'OPP_S2', phase: 'speech', label: 'Opposition S2', detail: 'Closing speech (3 min)' },
   { speaker: 'CE_ROUND_2', phase: 'cross_exam', label: 'Cross-examination 2', detail: 'Cross examination (2 min)' },
   { speaker: 'JUDGES_FB_2', phase: 'judge_feedback', label: 'Judge Feedback 2', detail: 'Free discussion' },
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
@@ -532,11 +532,23 @@ export default function DebateRoomPage() {
   const debateWorkflow = useMemo(() => {
     const format = roomFromStore?.format;
     const isNoHost = roomFromStore?.hostType !== 'human';
-    if (format === '1v1') {
-      return isNoHost ? debateWorkflowNoHost1v1 : debateWorkflow1v1;
+    const isHumanJudge = roomFromStore?.judgeType === 'human';
+
+    let workflow = isNoHost
+      ? (format === '1v1' ? debateWorkflowNoHost1v1 : debateWorkflowNoHost3v3)
+      : (format === '1v1' ? debateWorkflow1v1 : debateWorkflow3v3);
+
+    // Host + Human Judge: Round 2 (OPP_S2 before PRO_S2)
+    if (!isNoHost && isHumanJudge) {
+      workflow = workflow.map((step) => {
+        if (step.speaker === 'PRO_S2') return { ...step, speaker: 'OPP_S2', label: format === '1v1' ? 'Opposition S2' : 'Opposition S2' };
+        if (step.speaker === 'OPP_S2') return { ...step, speaker: 'PRO_S2', label: format === '1v1' ? 'Proposition S2' : 'Proposition S2' };
+        return step;
+      });
     }
-    return isNoHost ? debateWorkflowNoHost3v3 : debateWorkflow3v3;
-  }, [roomFromStore?.format, roomFromStore?.hostType]);
+
+    return workflow;
+  }, [roomFromStore?.format, roomFromStore?.hostType, roomFromStore?.judgeType]);
 
   const isParticipant = useMemo(() => {
     return Boolean(room?.participants.some((p) => p.userId === user?._id));

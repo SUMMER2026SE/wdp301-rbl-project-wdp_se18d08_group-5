@@ -392,7 +392,7 @@ describe('Test 10: Pause/Resume — controller pauses PREP_7MIN, resumes', () =>
   });
 });
 
-describe('Test 11: Host + Human — JUDGE_SUBMIT_ALL triggers transition', () => {
+describe('Test 11: Host + Human — JUDGE_SUBMIT_ALL does NOT trigger transition', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -434,11 +434,19 @@ describe('Test 11: Host + Human — JUDGE_SUBMIT_ALL triggers transition', () =>
     // Đến JUDGE_FEEDBACK_1
     expect(getState(actor)).toBe('JUDGE_FEEDBACK');
 
-    // JUDGE_SUBMIT_ALL → TRANSITION (dùng 'judge' role thay vì 'judge_s1' vì host_human_3v3 không có judge_s1)
+    // JUDGE_SUBMIT_ALL → should NOT transition (vì có Host)
     actor.send({
       type: 'JUDGE_SUBMIT_ALL',
       actorRole: 'judge',
       actorUserId: 'j',
+    });
+    expect(getState(actor)).toBe('JUDGE_FEEDBACK');
+
+    // CONTROLLER_SKIP → TRANSITION
+    actor.send({
+      type: 'CONTROLLER_SKIP',
+      actorRole: 'host',
+      actorUserId: 'h',
     });
     expect(getState(actor)).toBe('TRANSITION');
   });
@@ -742,10 +750,10 @@ describe('host_human_* — JUDGE_FEEDBACK_3 routes to AWAITING_HOST_END', () => 
   // debate.service.ts (qua triggerTransition setTimeout). State machine chỉ
   // giữ logic auto-advance. Service-level test sẽ cover trong integration tests.
   // Ở đây ta verify rằng flow step của host_human_3v3 KHÔNG có FINAL_JUDGING.
-  it('host_human_3v3 flow có 14 steps và step cuối là COMPLETED', async () => {
+  it('host_human_3v3 flow có 15 steps và step cuối là COMPLETED', async () => {
     const { generateFlowFromMode } = await import('./flowGenerator');
     const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_human_3v3);
-    expect(flow).toHaveLength(14);
+    expect(flow).toHaveLength(15);
     expect(flow[flow.length - 1]?.speaker).toBe('COMPLETED');
     expect(flow[flow.length - 1]?.phase).toBe('completed');
     // Đảm bảo không có FINAL_JUDGING

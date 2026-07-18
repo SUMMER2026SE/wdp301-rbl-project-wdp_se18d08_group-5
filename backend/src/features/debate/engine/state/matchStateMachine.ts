@@ -206,10 +206,10 @@ export const matchMachine = setup({
       if (event.type !== 'CONTROLLER_START') return false;
       return isController(event.actorRole, context.mode);
     },
-    /** JUDGE_SUBMIT_ALL — host_human_* + noHost_human_* */
+    /** JUDGE_SUBMIT_ALL — noHost_human_* (Host+Human should not auto-transition) */
     isJudgeSubmitAll: ({ context, event }) => {
       if (event.type !== 'JUDGE_SUBMIT_ALL') return false;
-      return context.mode.judgeType !== 'AI';
+      return !context.mode.hasHost && context.mode.judgeType !== 'AI';
     },
     /** MANUAL mode (Host / Judge S1) — pause đến controller bấm Start */
     isManualMode: ({ context }) => context.mode.phaseTransition === 'MANUAL',
