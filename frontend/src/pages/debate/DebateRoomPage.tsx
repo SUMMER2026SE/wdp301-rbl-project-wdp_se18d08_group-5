@@ -268,7 +268,7 @@ export default function DebateRoomPage() {
 
 
 
-  // New round-based scoring state (used in judge_feedback / final_judging UI)
+  // New round-based scoring state used in the judge feedback UI.
   const [roundPropSpeak, setRoundPropSpeak] = useState(14);
   const [roundPropCe, setRoundPropCe] = useState(14);
   const [roundPropNotes, setRoundPropNotes] = useState('');
@@ -1467,7 +1467,11 @@ export default function DebateRoomPage() {
                   roomStatus={room.status}
                   roomId={roomId}
                   participants={room.participants}
+<<<<<<< HEAD
                   startDisabled={startPhaseMutation.isPending || turnStatus !== 'waiting_to_start'}
+=======
+                  startDisabled={startPhaseMutation.isPending || isJudge3 || turnStatus !== 'waiting_to_start'}
+>>>>>>> 209fc1a (fix deploy)
                   skipDisabled={turnStatus !== 'active' && currentPhase !== 'judge_feedback'}
                   controlsPending={controlMutation.isPending}
                   cameraPending={toggleCameraMutation.isPending}

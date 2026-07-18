@@ -22,7 +22,6 @@
  * - docs/Debate_Rule_Consolidated.md §5
  */
 
-import { DEBATE_MODE_CONFIGS } from './modeConfigs.js';
 import type { DebateModeId, Phase } from './types.js';
 
 /**
