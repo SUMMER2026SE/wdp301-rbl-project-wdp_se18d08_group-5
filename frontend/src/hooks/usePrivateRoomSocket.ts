@@ -43,9 +43,12 @@ export function usePrivateRoomSocket(
   const { socket } = useSocket();
 
   useEffect(() => {
-    if (!roomId || !team || !socket || !socket.connected) return;
+    if (!roomId || !team || !socket) return;
 
     setError(null);
+    setJoined(false);
+    setParticipantCount(0);
+    setParticipantUserIds([]);
     setMessages([]);
 
     let cancelled = false;

@@ -1,5 +1,19 @@
 import { Server, Socket } from 'socket.io';
 import { DebateRoom } from '../models/DebateRoom.js';
+import {
+  isUserInPrivateRoom,
+  type JoinablePrivateRoomTeam,
+} from './privateRoomState.js';
+
+type MainVoiceChannel = 'proposition' | 'opposition' | 'judge' | 'video';
+type PrivateVoiceChannel =
+  | 'private-proposition-voice'
+  | 'private-opposition-voice'
+  | 'private-judge-voice'
+  | 'private-proposition-video'
+  | 'private-opposition-video'
+  | 'private-judge-video';
+type VoiceChannel = MainVoiceChannel | PrivateVoiceChannel;
 
 type VoicePeer = {
   socketId: string;
@@ -8,12 +22,12 @@ type VoicePeer = {
 
 type VoiceRoomPayload = {
   roomId?: string;
-  team?: 'proposition' | 'opposition' | 'judge' | 'video';
+  team?: VoiceChannel;
 };
 
 type VoiceSignalPayload = {
   roomId?: string;
-  team?: 'proposition' | 'opposition' | 'judge' | 'video';
+  team?: VoiceChannel;
   targetSocketId?: string;
   offer?: unknown;
   answer?: unknown;
@@ -22,7 +36,7 @@ type VoiceSignalPayload = {
 
 type VideoTogglePayload = {
   roomId?: string;
-  team?: 'proposition' | 'opposition' | 'judge' | 'video';
+  team?: VoiceChannel;
   targetUserId?: string;
   active?: boolean;
 };
@@ -37,8 +51,20 @@ const socketVoiceRooms = new Map<string, Set<string>>();
 // Per-userId camera state for the main room. Private rooms keep their own map.
 const cameraState = new Map<string, Set<string>>(); // roomId -> Set<userId with cam on>
 
-function buildVoiceKey(roomId: string, team?: 'proposition' | 'opposition' | 'judge' | 'video'): string {
+function buildVoiceKey(roomId: string, team?: VoiceChannel): string {
   return team ? `voice:${roomId}:${team}` : roomId;
+}
+
+function parsePrivateVoiceChannel(team?: VoiceChannel): { team: JoinablePrivateRoomTeam } | null {
+  if (!team) return null;
+  const match = /^private-(proposition|opposition|judge)-(voice|video)$/.exec(team);
+  if (!match) return null;
+  return { team: match[1] as JoinablePrivateRoomTeam };
+}
+
+function canSignalInVoiceRoom(key: string, socketId: string, targetSocketId: string): boolean {
+  const roomPeers = voiceRooms.get(key);
+  return Boolean(roomPeers?.has(socketId) && roomPeers.has(targetSocketId));
 }
 
 function getSocketUserId(socket: Socket) {
@@ -108,6 +134,17 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
       return;
     }
 
+    const privateChannel = parsePrivateVoiceChannel(team);
+    if (privateChannel && !isUserInPrivateRoom(roomId, privateChannel.team, userId)) {
+      socket.emit('voice:error', {
+        roomId,
+        team,
+        message: 'Join the private room before starting voice',
+      });
+      ack?.({ peers: [] });
+      return;
+    }
+
     const key = buildVoiceKey(roomId, team);
     socket.join(key);
 
@@ -140,6 +177,8 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
 
   socket.on('voice:offer', ({ roomId, team, targetSocketId, offer }: VoiceSignalPayload) => {
     if (!roomId || !targetSocketId || !offer) return;
+    const key = buildVoiceKey(roomId, team);
+    if (!canSignalInVoiceRoom(key, socket.id, targetSocketId)) return;
     io.to(targetSocketId).emit('voice:offer', {
       roomId,
       team,
@@ -151,6 +190,8 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
 
   socket.on('voice:answer', ({ roomId, team, targetSocketId, answer }: VoiceSignalPayload) => {
     if (!roomId || !targetSocketId || !answer) return;
+    const key = buildVoiceKey(roomId, team);
+    if (!canSignalInVoiceRoom(key, socket.id, targetSocketId)) return;
     io.to(targetSocketId).emit('voice:answer', {
       roomId,
       team,
@@ -162,6 +203,8 @@ export function registerVoiceHandlers(io: Server, socket: Socket) {
 
   socket.on('voice:ice-candidate', ({ roomId, team, targetSocketId, candidate }: VoiceSignalPayload) => {
     if (!roomId || !targetSocketId || !candidate) return;
+    const key = buildVoiceKey(roomId, team);
+    if (!canSignalInVoiceRoom(key, socket.id, targetSocketId)) return;
     io.to(targetSocketId).emit('voice:ice-candidate', {
       roomId,
       team,

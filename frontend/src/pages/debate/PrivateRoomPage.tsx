@@ -65,6 +65,9 @@ export default function PrivateRoomPage() {
     () => participants.find((p) => p.userId === user?._id) ?? (room as any)?.participants?.find((p: any) => p.userId === user?._id),
     [participants, user?._id, room],
   );
+  const roomParticipants = useMemo<RoomParticipant[]>(() => {
+    return participants.length > 0 ? participants : ((room as any)?.participants || []);
+  }, [participants, room]);
 
   const effectiveRole = useMemo(() => {
     return myParticipant
@@ -102,14 +105,14 @@ export default function PrivateRoomPage() {
   const { micActive, peers: voicePeers, startMic, stopMic } = usePrivateRoomVoice({
     roomId,
     team: team ?? 'proposition',
-    enabled: hasAccess,
+    enabled: hasAccess && joined,
   });
 
   const { cameraActive, peers: videoPeers, startCamera, stopCamera, localStream } =
     usePrivateRoomVideo({
       roomId,
       team: team ?? 'proposition',
-      enabled: hasAccess,
+      enabled: hasAccess && joined,
     });
 
   const [chatInput, setChatInput] = useState('');
@@ -126,8 +129,8 @@ export default function PrivateRoomPage() {
   }, []);
 
   const presentParticipants = useMemo<RoomParticipant[]>(() => {
-    return participants.filter((p) => participantUserIds.includes(p.userId));
-  }, [participants, participantUserIds]);
+    return roomParticipants.filter((p) => participantUserIds.includes(p.userId));
+  }, [roomParticipants, participantUserIds]);
 
   if (!team) {
     return (

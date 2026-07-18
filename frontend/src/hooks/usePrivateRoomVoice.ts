@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { getSocket } from './useSocket';
 import type { PrivateRoomTeam } from './usePrivateRoomSocket';
 import { loadWebRtcConfiguration, WEBRTC_CONFIGURATION } from '@/config/webrtc';
-import { attachLocalTrack } from '@/utils/webrtcNegotiation';
+import { attachLocalTrack, findSenderForKind } from '@/utils/webrtcNegotiation';
 
 interface UsePrivateRoomVoiceOptions {
   roomId: string;
@@ -41,6 +41,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
   const [micActive, setMicActive] = useState(false);
   const [peers, setPeers] = useState<RemotePeer[]>([]);
   const [audioLevel, setAudioLevel] = useState(0);
+  const voiceChannel = `private-${team}-voice`;
 
   const streamRef = useRef<MediaStream | null>(null);
   const rtcConfigurationRef = useRef<RTCConfiguration>(WEBRTC_CONFIGURATION);
@@ -49,7 +50,51 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
   const joinedVoiceRef = useRef(false);
+  const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const playbackWarningShownRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+
+  const attachRemoteStream = useCallback((peerSocketId: string, stream: MediaStream) => {
+    let audio = remoteAudioRefs.current.get(peerSocketId);
+
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.autoplay = true;
+      audio.setAttribute('playsinline', 'true');
+      audio.dataset.privateVoice = '1';
+      audio.dataset.voicePeer = peerSocketId;
+      audio.style.display = 'none';
+      document.body.appendChild(audio);
+      remoteAudioRefs.current.set(peerSocketId, audio);
+    }
+
+    if (audio.srcObject !== stream) {
+      audio.srcObject = stream;
+    }
+
+    audio.play().catch(() => {
+      if (!playbackWarningShownRef.current) {
+        playbackWarningShownRef.current = true;
+        toast.error('Click the page once to enable private room audio');
+      }
+
+      const retryPlayback = () => {
+        audio?.play().catch(() => undefined);
+      };
+
+      document.addEventListener('click', retryPlayback, { once: true });
+    });
+  }, []);
+
+  const removeRemoteAudio = useCallback((peerSocketId: string) => {
+    const audio = remoteAudioRefs.current.get(peerSocketId);
+    if (!audio) return;
+
+    audio.pause();
+    audio.srcObject = null;
+    audio.remove();
+    remoteAudioRefs.current.delete(peerSocketId);
+  }, []);
 
   const attachLocalTracks = useCallback(async (pc: RTCPeerConnection) => {
     if (!streamRef.current) return;
@@ -69,7 +114,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
         if (!event.candidate) return;
         getSocket()?.emit('voice:ice-candidate', {
           roomId,
-          team,
+          team: voiceChannel,
           targetSocketId: peerSocketId,
           candidate: event.candidate.toJSON(),
         });
@@ -78,6 +123,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
         if (remoteStream) {
+          attachRemoteStream(peerSocketId, remoteStream);
           setPeers((prev) => {
             const idx = prev.findIndex((p) => p.socketId === peerSocketId);
             if (idx === -1) {
@@ -97,6 +143,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
         if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
           pc.close();
           peerConnectionsRef.current.delete(peerSocketId);
+          removeRemoteAudio(peerSocketId);
           setPeers((prev) => prev.filter((p) => p.socketId !== peerSocketId));
         }
       };
@@ -104,7 +151,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       peerConnectionsRef.current.set(peerSocketId, pc);
       return pc;
     },
-    [roomId, team],
+    [attachRemoteStream, removeRemoteAudio, roomId, voiceChannel],
   );
 
   const sendOffer = useCallback(
@@ -118,12 +165,12 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       await pc.setLocalDescription(offer);
       socket.emit('voice:offer', {
         roomId,
-        team,
+        team: voiceChannel,
         targetSocketId: peerSocketId,
         offer: pc.localDescription,
       });
     },
-    [attachLocalTracks, ensurePeerConnection, roomId, team],
+    [attachLocalTracks, ensurePeerConnection, roomId, voiceChannel],
   );
 
   const closePeer = useCallback((peerSocketId: string) => {
@@ -131,8 +178,9 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
     pc?.close();
     peerConnectionsRef.current.delete(peerSocketId);
     pendingCandidatesRef.current.delete(peerSocketId);
+    removeRemoteAudio(peerSocketId);
     setPeers((prev) => prev.filter((p) => p.socketId !== peerSocketId));
-  }, []);
+  }, [removeRemoteAudio]);
 
   const stopAudioMeter = useCallback(() => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -151,6 +199,9 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    peerConnectionsRef.current.forEach((pc) => {
+      findSenderForKind(pc, 'audio')?.replaceTrack(null).catch(() => undefined);
+    });
     setMicActive(false);
   }, [stopAudioMeter]);
 
@@ -199,7 +250,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
     let cancelled = false;
 
     const joinVoice = () => {
-      socket.emit('voice:join', { roomId, team }, (response?: { peers: Array<{ socketId: string; userId: string }> }) => {
+      socket.emit('voice:join', { roomId, team: voiceChannel }, (response?: { peers: Array<{ socketId: string; userId: string }> }) => {
         joinedVoiceRef.current = true;
         const list = response?.peers || [];
         setPeers((prev) => {
@@ -219,7 +270,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
     };
 
     const handleUserJoined = (payload: { socketId: string; userId: string; team?: string }) => {
-      if (payload.team !== team) return;
+      if (payload.team !== voiceChannel) return;
       ensurePeerConnection(payload.socketId);
       setPeers((prev) => {
         if (prev.find((p) => p.socketId === payload.socketId)) return prev;
@@ -231,7 +282,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
     };
 
     const handleUserLeft = (payload: { socketId: string; team?: string }) => {
-      if (payload.team !== team) return;
+      if (payload.team !== voiceChannel) return;
       closePeer(payload.socketId);
     };
 
@@ -245,11 +296,11 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
 
     const handleOffer = async (payload: {
       roomId: string;
-      team: PrivateRoomTeam;
+      team?: string;
       fromSocketId: string;
       offer: RTCSessionDescriptionInit;
     }) => {
-      if (payload.roomId !== roomId || payload.team !== team) return;
+      if (payload.roomId !== roomId || payload.team !== voiceChannel) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
@@ -259,7 +310,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
         await pc.setLocalDescription(answer);
         socket.emit('voice:answer', {
           roomId,
-          team,
+          team: voiceChannel,
           targetSocketId: payload.fromSocketId,
           answer: pc.localDescription,
         });
@@ -270,11 +321,11 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
 
     const handleAnswer = async (payload: {
       roomId: string;
-      team: PrivateRoomTeam;
+      team?: string;
       fromSocketId: string;
       answer: RTCSessionDescriptionInit;
     }) => {
-      if (payload.roomId !== roomId || payload.team !== team) return;
+      if (payload.roomId !== roomId || payload.team !== voiceChannel) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
@@ -286,11 +337,11 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
 
     const handleIce = async (payload: {
       roomId: string;
-      team: PrivateRoomTeam;
+      team?: string;
       fromSocketId: string;
       candidate: RTCIceCandidateInit;
     }) => {
-      if (payload.roomId !== roomId || payload.team !== team) return;
+      if (payload.roomId !== roomId || payload.team !== voiceChannel) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         if (!pc.remoteDescription) {
@@ -330,14 +381,20 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       socket.off('voice:ice-candidate', handleIce);
 
       if (joinedVoiceRef.current) {
-        socket.emit('voice:leave', { roomId, team });
+        socket.emit('voice:leave', { roomId, team: voiceChannel });
         joinedVoiceRef.current = false;
       }
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
+      remoteAudioRefs.current.forEach((audio) => {
+        audio.pause();
+        audio.srcObject = null;
+        audio.remove();
+      });
+      remoteAudioRefs.current.clear();
       setPeers([]);
     };
-  }, [attachLocalTracks, closePeer, enabled, ensurePeerConnection, roomId, sendOffer, team]);
+  }, [attachLocalTracks, closePeer, enabled, ensurePeerConnection, roomId, sendOffer, voiceChannel]);
 
   useEffect(() => {
     return () => {
