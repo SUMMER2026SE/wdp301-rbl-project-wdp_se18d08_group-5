@@ -24,7 +24,6 @@ export type DebatePhase =
   | 'judge_feedback'
   | 'prep_1'
   | 'closing'
-  | 'final_judging'
   | 'completed';
 
 export type SpeakerTurn =

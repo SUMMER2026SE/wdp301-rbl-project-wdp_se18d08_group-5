@@ -130,6 +130,18 @@ export function generateFlowFromMode(mode: DebateModeConfig): FlowStep[] {
     });
   }
 
+  // Completed Phase for Host + Human Judge
+  if (mode.hasHost && mode.judgeType !== 'AI') {
+    steps.push({
+      index: idx++,
+      speaker: 'COMPLETE_REVIEW',
+      phase: 'completed',
+      durationSec: DEBATE_DURATIONS.COMPLETE_REVIEW_SECONDS,
+      speakerCanEnd: false,
+      controllerCanEnd: true,
+    });
+  }
+
   // Completed (sau Judge Feedback round 3 — KHÔNG có bước FINAL_JUDGING riêng)
   steps.push({
     index: idx++,

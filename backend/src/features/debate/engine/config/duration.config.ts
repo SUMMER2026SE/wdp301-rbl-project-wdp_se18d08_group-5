@@ -25,6 +25,9 @@ export const DEBATE_DURATIONS = {
   /** Cross Examination giữa 2 đội */
   CROSS_EXAMINATION_SECONDS: 2 * 60, // 120
 
+  /** Complete Review Phase for Host + Human Judge (5 minutes) */
+  COMPLETE_REVIEW_SECONDS: 5 * 60, // 300
+
   /** Thời gian mute + lock chat + popup đếm ngược giữa 2 phase (mọi mode) */
   TRANSITION_MUTE_SECONDS: 3,
 

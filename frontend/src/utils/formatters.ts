@@ -67,7 +67,6 @@ export function getPhaseDisplay(phase: DebatePhase): string {
     judge_feedback: i18n.t('debate.phases.judgeFeedback', { ns: 'common' }),
     prep_1: i18n.t('debate.phases.prep1', { ns: 'common' }),
     closing: i18n.t('debate.phases.closing', { ns: 'common' }),
-    final_judging: i18n.t('debate.phases.finalJudging', { ns: 'common' }),
     completed: i18n.t('debate.phases.completed', { ns: 'common' }),
   };
   return map[phase];

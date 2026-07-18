@@ -247,9 +247,9 @@ export function useDebateSocket(roomId: string | undefined) {
       if (data.announcement) {
         setTransitionAnnouncement(data.announcement);
       }
-      // Always reset the timer when transitioning into a free / waiting /
+      // always reset the timer when transitioning into a free / waiting /
       // completed phase — these have no running countdown.
-      if (['waiting_s1', 'judge_feedback', 'final_judging', 'completed'].includes(data.phase)) {
+      if (['waiting_s1', 'judge_feedback', 'completed'].includes(data.phase)) {
         setTimeRemaining(0);
         setTotalTime(0);
       }

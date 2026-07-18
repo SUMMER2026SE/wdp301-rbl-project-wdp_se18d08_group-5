@@ -76,8 +76,15 @@ function VideoTile({
   const stream = isCameraActive ? baseStream : null;
 
   useEffect(() => {
-    if (videoRef.current && videoRef.current.srcObject !== stream) {
-      videoRef.current.srcObject = stream;
+    const video = videoRef.current;
+    if (!video) return;
+    if (stream) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+    } else {
+      // Explicitly clear to release frozen frame
+      video.srcObject = null;
     }
   }, [stream]);
 

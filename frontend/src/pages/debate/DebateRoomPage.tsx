@@ -63,7 +63,7 @@ type DebateWorkflowStep = {
  * Human Host 3v3 workflow — mirrors backend DEBATE_FLOW_HOST_3V3.
  * Rule order: R1(Prop→Opp→CE), R2(Prop→Opp→CE), R3(Prop→Opp, no CE)
  * R2: "(Same flow as Round 1)" → PRO_S2 first, OPP_S2 second
- * R3: Proposition FIRST per requirement: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
+ * R3: Proposition FIRST per requirement: Prop→Opp → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -79,13 +79,13 @@ const debateWorkflow3v3: DebateWorkflowStep[] = [
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
+  { speaker: 'COMPLETE_REVIEW', phase: 'completed', label: 'Review', detail: 'Host can end match (5 min countdown)' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * Human Host 1v1 workflow — mirrors backend DEBATE_FLOW_HOST_1V1.
- * R2: OPP→PRO (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: OPP→PRO (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -101,13 +101,13 @@ const debateWorkflow1v1: DebateWorkflowStep[] = [
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
+  { speaker: 'COMPLETE_REVIEW', phase: 'completed', label: 'Review', detail: 'Host can end match (5 min countdown)' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * No-Host 3v3 workflow — mirrors backend DEBATE_FLOW_NOHost_3V3.
- * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -123,13 +123,12 @@ const debateWorkflowNoHost3v3: DebateWorkflowStep[] = [
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
 /**
  * No-Host 1v1 workflow — mirrors backend DEBATE_FLOW_NOHost_1V1.
- * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → FINAL_JUDGING
+ * R2: PRO→OPP (per "Same flow as Round 1"), R3: Prop→Opp → JUDGES_FB_3 → COMPLETED
  */
 const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
   { speaker: 'HOST', phase: 'motion', label: 'Motion', detail: 'Announce topic' },
@@ -145,7 +144,6 @@ const debateWorkflowNoHost1v1: DebateWorkflowStep[] = [
   { speaker: 'PRO_S3', phase: 'speech', label: 'Proposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'OPP_S3', phase: 'speech', label: 'Opposition S3', detail: 'Closing speech (3 min)' },
   { speaker: 'JUDGES_FB_3', phase: 'judge_feedback', label: 'Judge Feedback 3', detail: 'Free discussion' },
-  { speaker: 'FINAL_JUDGING', phase: 'final_judging', label: 'Final Judging', detail: 'Match result' },
   { speaker: 'COMPLETED', phase: 'completed', label: 'Completed', detail: 'Match ended' },
 ];
 
@@ -1447,7 +1445,7 @@ export default function DebateRoomPage() {
                   roomId={roomId}
                   participants={room.participants}
                   startDisabled={startPhaseMutation.isPending || isJudge3 || turnStatus !== 'waiting_to_start'}
-                  skipDisabled={isJudge3 || (turnStatus !== 'active' && currentPhase !== 'judge_feedback' && currentPhase !== 'final_judging')}
+                  skipDisabled={isJudge3 || (turnStatus !== 'active' && currentPhase !== 'judge_feedback')}
                   controlsPending={controlMutation.isPending}
                   cameraPending={toggleCameraMutation.isPending}
                   micPending={toggleMicMutation.isPending}
@@ -1710,12 +1708,12 @@ export function getScoringRoundFromPhaseSpeaker(
 }
 
 export function isScoringPhase(phase?: string | null): boolean {
-  return phase === 'judge_feedback' || phase === 'final_judging';
+  return phase === 'judge_feedback';
 }
 
 export function getRoundForStepIndex(index: number, format?: string, _hostType?: string): 1 | 2 | 3 {
   // All 4 flows (Host/NoHost × 3v3/1v1) now have the same step order:
-  // [HOST, PREP, R1 speeches+CE+FB, R2 speeches+CE+FB, R3 speeches+FB, FINAL_JUDGING, COMPLETED]
+  // [HOST, PREP, R1 speeches+CE+FB, R2 speeches+CE+FB, R3 speeches+FB, COMPLETED]
   // R1: indices 2-5, R2: indices 6-9, R3: indices 10-12
   if (index === -1) return 1;
   if (format === '1v1') {

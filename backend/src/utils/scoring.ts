@@ -110,32 +110,6 @@ function aggregateTeamScores(verdicts: any[], team: 'proposition' | 'opposition'
   };
 }
 
-function resolveWinnerFromVerdicts(
-  verdicts: any[],
-  propositionTotal: number,
-  oppositionTotal: number,
-): DebateWinner {
-  const votes: Record<DebateWinner, number> = {
-    proposition: 0,
-    opposition: 0,
-    draw: 0,
-  };
-
-  verdicts.forEach((verdict) => {
-    if (!['proposition', 'opposition', 'draw'].includes(verdict?.winner)) return;
-    votes[verdict.winner as DebateWinner] += getVerdictWeight(verdict);
-  });
-
-  const voteEntries = Object.entries(votes) as Array<[DebateWinner, number]>;
-  const [topVote, secondVote] = voteEntries.sort((a, b) => b[1] - a[1]);
-  if (topVote && topVote[1] > 0 && (!secondVote || topVote[1] > secondVote[1])) {
-    return topVote[0];
-  }
-
-  const scoreDelta = propositionTotal - oppositionTotal;
-  if (Math.abs(scoreDelta) < 0.5) return 'draw';
-  return scoreDelta > 0 ? 'proposition' : 'opposition';
-}
 
 function resolveWinnerFromTeamScores(
   propositionTotal: number,
@@ -247,11 +221,6 @@ export function aggregateFinalScores(session: any, _room?: any) {
     // round-based scoring model).
     const proposition = aggregateTeamScores(verdicts, 'proposition');
     const opposition = aggregateTeamScores(verdicts, 'opposition');
-    resolveWinnerFromVerdicts(
-      verdicts,
-      proposition.total,
-      opposition.total,
-    );
     const winnerTeam = resolveWinnerFromTeamScores(proposition.total, opposition.total);
 
     const aiVotes = verdicts.filter((verdict) => verdict?.source === 'ai' && verdict?.winner);
@@ -274,7 +243,7 @@ export function aggregateFinalScores(session: any, _room?: any) {
       humanJudgeWeight: HUMAN_JUDGE_WEIGHT,
       aiJudgeWeight: AI_JUDGE_WEIGHT,
       method: 'criteria_based_legacy',
-      winnerMethod: 'score_delta_with_judge_vote',
+      winnerMethod: 'score_comparison_only',
       scoredRounds: [],
       verdictCount: verdicts.length,
       aggregatedAt: new Date(),

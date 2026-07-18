@@ -6,11 +6,10 @@ export type WorkflowPhase =
   | 'speech'
   | 'cross_exam'
   | 'judge_feedback'
-  | 'final_judging'
   | 'completed';
 
 export interface DebateWorkflowStep {
-  speaker: SpeakerTurn | 'HOST' | 'BOTH_TEAMS_PREP' | 'CE_ROUND_1' | 'CE_ROUND_2' | 'CE_ROUND_3' | 'CE_ROUND_4' | 'JUDGES_FB_1' | 'JUDGES_FB_2' | 'JUDGES_FB_3' | 'JUDGES' | 'COMPLETED';
+  speaker: SpeakerTurn | 'HOST' | 'BOTH_TEAMS_PREP' | 'CE_ROUND_1' | 'CE_ROUND_2' | 'CE_ROUND_3' | 'CE_ROUND_4' | 'JUDGES_FB_1' | 'JUDGES_FB_2' | 'JUDGES_FB_3' | 'JUDGES' | 'COMPLETE_REVIEW' | 'COMPLETED';
   phase: WorkflowPhase;
   label: string;
   detail: string;

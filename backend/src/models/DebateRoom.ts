@@ -129,7 +129,6 @@ const debateRoomSchema = new Schema<IDebateRoom>(
         'judge_feedback',
         'prep_1',
         'closing',
-        'final_judging',
         'completed',
       ],
       default: 'motion',

@@ -177,12 +177,10 @@ export function RoundJudgeForm({
  * Returns 0 when no scoring phase is active.
  *
  *   - judge_feedback phase → round from speaker (JUDGES_FB_1 → 1, FB_2 → 2)
- *   - final_judging phase  → round 3
  *   - any other phase      → 0
  */
 export function detectCurrentRound(phase?: string | null, speaker?: string | null): 0 | 1 | 2 | 3 {
   if (!phase) return 0;
-  if (phase === 'final_judging') return 3;
   if (phase !== 'judge_feedback' || !speaker) return 0;
   const match = /JUDGES_FB_(\d)/i.exec(speaker);
   if (!match) return 0;
