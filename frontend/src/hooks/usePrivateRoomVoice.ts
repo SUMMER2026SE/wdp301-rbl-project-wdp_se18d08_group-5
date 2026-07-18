@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { getSocket } from './useSocket';
 import type { PrivateRoomTeam } from './usePrivateRoomSocket';
+import { loadWebRtcConfiguration, WEBRTC_CONFIGURATION } from '@/config/webrtc';
+import { attachLocalTrack } from '@/utils/webrtcNegotiation';
 
 interface UsePrivateRoomVoiceOptions {
   roomId: string;
@@ -14,10 +16,6 @@ interface RemotePeer {
   userId: string;
   stream: MediaStream | null;
 }
-
-const peerConnectionConfig: RTCConfiguration = {
-  iceServers: [],
-};
 
 function getMicrophoneErrorMessage(error: unknown) {
   if (!window.isSecureContext) {
@@ -45,6 +43,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
   const [audioLevel, setAudioLevel] = useState(0);
 
   const streamRef = useRef<MediaStream | null>(null);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(WEBRTC_CONFIGURATION);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -52,16 +51,11 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
   const joinedVoiceRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
-  const attachLocalTracks = useCallback((pc: RTCPeerConnection) => {
+  const attachLocalTracks = useCallback(async (pc: RTCPeerConnection) => {
     if (!streamRef.current) return;
-    streamRef.current.getAudioTracks().forEach((track) => {
-      const existing = pc.getSenders().find((s) => s.track?.kind === 'audio');
-      if (existing) {
-        existing.replaceTrack(track).catch(() => undefined);
-      } else {
-        pc.addTrack(track, streamRef.current!);
-      }
-    });
+    const [track] = streamRef.current.getAudioTracks();
+    if (!track) return;
+    await attachLocalTrack(pc, track, streamRef.current);
   }, []);
 
   const ensurePeerConnection = useCallback(
@@ -69,7 +63,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       const existing = peerConnectionsRef.current.get(peerSocketId);
       if (existing) return existing;
 
-      const pc = new RTCPeerConnection(peerConnectionConfig);
+      const pc = new RTCPeerConnection(rtcConfigurationRef.current);
 
       pc.onicecandidate = (event) => {
         if (!event.candidate) return;
@@ -107,11 +101,10 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
         }
       };
 
-      attachLocalTracks(pc);
       peerConnectionsRef.current.set(peerSocketId, pc);
       return pc;
     },
-    [attachLocalTracks, roomId, team],
+    [roomId, team],
   );
 
   const sendOffer = useCallback(
@@ -120,6 +113,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       if (!socket) return;
       const pc = ensurePeerConnection(peerSocketId);
       if (pc.signalingState !== 'stable') return;
+      await attachLocalTracks(pc);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       socket.emit('voice:offer', {
@@ -129,7 +123,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
         offer: pc.localDescription,
       });
     },
-    [ensurePeerConnection, roomId, team],
+    [attachLocalTracks, ensurePeerConnection, roomId, team],
   );
 
   const closePeer = useCallback((peerSocketId: string) => {
@@ -190,19 +184,19 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
         animationRef.current = requestAnimationFrame(tick);
       }
 
-      peerConnectionsRef.current.forEach(attachLocalTracks);
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
       setMicActive(true);
     } catch (error) {
       toast.error(getMicrophoneErrorMessage(error));
       stopMic();
     }
-  }, [attachLocalTracks, sendOffer, stopMic]);
+  }, [sendOffer, stopMic]);
 
   useEffect(() => {
     if (!enabled || !roomId || !team) return undefined;
     const socket = getSocket();
     if (!socket) return undefined;
+    let cancelled = false;
 
     const joinVoice = () => {
       socket.emit('voice:join', { roomId, team }, (response?: { peers: Array<{ socketId: string; userId: string }> }) => {
@@ -259,6 +253,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+        await attachLocalTracks(pc);
         await flushPendingCandidates(payload.fromSocketId, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -310,18 +305,23 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       }
     };
 
-    socket.on('connect', joinVoice);
-    socket.on('voice:user-joined', handleUserJoined);
-    socket.on('voice:user-left', handleUserLeft);
-    socket.on('voice:offer', handleOffer);
-    socket.on('voice:answer', handleAnswer);
-    socket.on('voice:ice-candidate', handleIce);
+    void loadWebRtcConfiguration().then((configuration) => {
+      if (cancelled) return;
+      rtcConfigurationRef.current = configuration;
+      socket.on('connect', joinVoice);
+      socket.on('voice:user-joined', handleUserJoined);
+      socket.on('voice:user-left', handleUserLeft);
+      socket.on('voice:offer', handleOffer);
+      socket.on('voice:answer', handleAnswer);
+      socket.on('voice:ice-candidate', handleIce);
 
-    if (socket.connected) {
-      joinVoice();
-    }
+      if (socket.connected) {
+        joinVoice();
+      }
+    });
 
     return () => {
+      cancelled = true;
       socket.off('connect', joinVoice);
       socket.off('voice:user-joined', handleUserJoined);
       socket.off('voice:user-left', handleUserLeft);
@@ -337,7 +337,7 @@ export function usePrivateRoomVoice({ roomId, team, enabled }: UsePrivateRoomVoi
       peerConnectionsRef.current.clear();
       setPeers([]);
     };
-  }, [closePeer, enabled, ensurePeerConnection, roomId, sendOffer, team]);
+  }, [attachLocalTracks, closePeer, enabled, ensurePeerConnection, roomId, sendOffer, team]);
 
   useEffect(() => {
     return () => {

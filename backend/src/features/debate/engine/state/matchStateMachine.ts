@@ -41,16 +41,16 @@
  */
 
 import { setup, assign } from 'xstate';
-import { DEBATE_DURATIONS } from '../config/duration.config';
-import type { DebateModeConfig, Role } from '../config/types';
+import { DEBATE_DURATIONS } from '../config/duration.config.js';
+import type { DebateModeConfig, Role } from '../config/types.js';
 import {
   createInitialContext,
   type MatchContext,
   type MatchEvent,
   type PhaseLifecycleStatus,
-} from './matchStates';
-import { generateFlowFromMode } from './flowGenerator';
-import { getTransitionAnnouncement } from '../config/transitionAnnouncements';
+} from './matchStates.js';
+import { generateFlowFromMode } from './flowGenerator.js';
+import { getTransitionAnnouncement } from '../config/transitionAnnouncements.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -723,8 +723,8 @@ export const matchMachine = setup({
   },
 });
 
-export type { MatchContext, MatchEvent, PhaseLifecycleStatus } from './matchStates';
-export { createInitialContext } from './matchStates';
+export type { MatchContext, MatchEvent, PhaseLifecycleStatus } from './matchStates.js';
+export { createInitialContext } from './matchStates.js';
 
 // ── Public API ─────────────────────────────────────────────────────
 

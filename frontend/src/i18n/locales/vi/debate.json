@@ -16,6 +16,7 @@
     "sessionStarting": "Phiên tranh luận đang bắt đầu...",
     "hostClickedStart": "Host vừa bấm Bắt đầu",
     "syncBanner": "Đang đồng bộ trạng thái tranh luận...",
+    "syncFailed": "Không thể đồng bộ trạng thái trực tiếp.",
     "phaseTransition": "CHUYỂN GIAI ĐOẠN",
     "muteMicAndLockChat": "Tắt mic và khóa chat",
     "startsIn": "{{label}} bắt đầu sau",

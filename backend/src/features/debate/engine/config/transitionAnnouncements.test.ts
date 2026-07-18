@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest';
 import {
   getTransitionAnnouncement,
   speakerForRound,
-} from './transitionAnnouncements';
-import type { DebateModeId, Phase } from './types';
+} from './transitionAnnouncements.js';
+import type { DebateModeId, Phase } from './types.js';
 
 describe('getTransitionAnnouncement — rule §13-15 mọi mode', () => {
   // per rule_noHost_JudgeAI.md §13 + Consolidated §5 — cuối Round 3

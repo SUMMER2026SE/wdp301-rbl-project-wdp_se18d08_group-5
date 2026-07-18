@@ -4,7 +4,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/AppE
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { aggregateFinalScores } from '../../utils/scoring.js';
 import { hasControlPanel } from '../../utils/roomPermissions.js';
-import { DEBATE_DURATIONS } from './engine/config/duration.config';
+import { DEBATE_DURATIONS } from './engine/config/duration.config.js';
 import {
   getFlowAdapter,
   checkStartMatchParticipantsAdapter,
