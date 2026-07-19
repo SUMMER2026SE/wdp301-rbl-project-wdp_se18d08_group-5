@@ -746,23 +746,14 @@ describe('AI Judge — JUDGE_FEEDBACK_3 auto-completes to COMPLETED', () => {
 });
 
 describe('host_human_* — JUDGE_FEEDBACK_3 routes to AWAITING_HOST_END', () => {
-  // Lưu ý: hiện tại logic host_human_* AWAITING_HOST_END được xử lý trong
-  // debate.service.ts (qua triggerTransition setTimeout). State machine chỉ
-  // giữ logic auto-advance. Service-level test sẽ cover trong integration tests.
-<<<<<<< HEAD
-  // Ở đây ta verify rằng flow step của host_human_3v3 KHÔNG có FINAL_JUDGING hay COMPLETE_REVIEW.
-  it('host_human_3v3 flow có 14 steps và step cuối là COMPLETED (không có COMPLETE_REVIEW)', async () => {
-    const { generateFlowFromMode } = await import('./flowGenerator');
-=======
-  // Ở đây ta verify rằng flow step của host_human_3v3 KHÔNG có FINAL_JUDGING.
-  it('host_human_3v3 flow có 15 steps và step cuối là COMPLETED', async () => {
+  // debate.service.ts handles AWAITING_HOST_END for host_human_* modes through
+  // its transition timeout. The state machine only retains auto-advance logic.
+  it('creates a 14-step host_human_3v3 flow ending in COMPLETED', async () => {
     const { generateFlowFromMode } = await import('./flowGenerator.js');
->>>>>>> 209fc1a (fix deploy)
     const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.host_human_3v3);
-    expect(flow).toHaveLength(14); // MOTION + PREP + 3 rounds × (PRO+OPP+CE+FB) + COMPLETED = 1+1+12+1 = 15? Wait: Motion(1)+Prep(1)+R1(4)+R2(4)+R3(4)+COMPLETED(1) = 15? No: MOTION(1)+PREP(1)+R1(4 steps: PRO_S1,OPP_S1,CE_1,FB_1)+R2(4 steps: OPP_S2,PRO_S2,CE_2,FB_2)+R3(3 steps: PRO_S3,OPP_S3,FB_3)+COMPLETED(1) = 1+1+4+4+3+1 = 14
+    expect(flow).toHaveLength(14);
     expect(flow[flow.length - 1]?.speaker).toBe('COMPLETED');
     expect(flow[flow.length - 1]?.phase).toBe('completed');
-    // Đảm bảo không có FINAL_JUDGING hay COMPLETE_REVIEW
     expect(flow.some((s) => s.speaker === 'FINAL_JUDGING')).toBe(false);
     expect(flow.some((s) => s.speaker === 'COMPLETE_REVIEW')).toBe(false);
   });

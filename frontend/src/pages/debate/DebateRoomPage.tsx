@@ -1467,11 +1467,7 @@ export default function DebateRoomPage() {
                   roomStatus={room.status}
                   roomId={roomId}
                   participants={room.participants}
-<<<<<<< HEAD
                   startDisabled={startPhaseMutation.isPending || turnStatus !== 'waiting_to_start'}
-=======
-                  startDisabled={startPhaseMutation.isPending || isJudge3 || turnStatus !== 'waiting_to_start'}
->>>>>>> 209fc1a (fix deploy)
                   skipDisabled={turnStatus !== 'active' && currentPhase !== 'judge_feedback'}
                   controlsPending={controlMutation.isPending}
                   cameraPending={toggleCameraMutation.isPending}
