@@ -7,13 +7,13 @@
  * - docs/rule_noHost_JudgeAI.md §9 + §13
  */
 import { describe, it, expect } from 'vitest';
-import { DEBATE_DURATIONS } from './duration.config';
+import { DEBATE_DURATIONS } from './duration.config.js';
 import {
   DEBATE_MODE_CONFIGS,
   getAllModeIds,
   getModeConfig,
-} from './modeConfigs';
-import type { DebateModeId } from './types';
+} from './modeConfigs.js';
+import type { DebateModeId } from './types.js';
 
 describe('DEBATE_MODE_CONFIGS — 8 modes theo Consolidated §0', () => {
   it('chứa đúng 8 modeId', () => {

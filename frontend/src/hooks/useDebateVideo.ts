@@ -3,6 +3,17 @@ import toast from 'react-hot-toast';
 import { getSocket } from './useSocket';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
+import { loadWebRtcConfiguration, WEBRTC_CONFIGURATION } from '@/config/webrtc';
+import {
+  acceptRemoteAnswer,
+  acceptRemoteOffer,
+  attachLocalTrack,
+  createLocalOffer,
+  findSenderForKind,
+  getPeerNegotiationState,
+  isPolitePeer,
+  type PeerNegotiationState,
+} from '@/utils/webrtcNegotiation';
 
 interface RemotePeer {
   socketId: string;
@@ -14,10 +25,6 @@ interface UseDebateVideoOptions {
   roomId: string;
   enabled: boolean;
 }
-
-const peerConnectionConfig: RTCConfiguration = {
-  iceServers: [],
-};
 
 const MAIN_VIDEO_CHANNEL = 'video';
 
@@ -63,7 +70,9 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
   const [peers, setPeers] = useState<RemotePeer[]>([]);
 
   const streamRef = useRef<MediaStream | null>(null);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(WEBRTC_CONFIGURATION);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const negotiationStatesRef = useRef<Map<string, PeerNegotiationState>>(new Map());
   const joinedRef = useRef(false);
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localCameraActiveRef = useRef(false);
@@ -76,30 +85,22 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
   }, []);
 
   const detachLocalVideoTrack = useCallback((pc: RTCPeerConnection) => {
-    const videoSender = pc.getSenders().find((sender) => sender.track?.kind === 'video');
-    if (!videoSender) return;
-    if (videoSender.track) {
-      videoSender.replaceTrack(null).catch(() => undefined);
-    }
+    findSenderForKind(pc, 'video')?.replaceTrack(null).catch(() => undefined);
   }, []);
 
-  const attachLocalVideoTrack = useCallback((pc: RTCPeerConnection) => {
+  const attachLocalVideoTrack = useCallback(async (pc: RTCPeerConnection) => {
     if (!streamRef.current) return;
-    streamRef.current.getVideoTracks().forEach((track) => {
-      const existing = pc.getSenders().find((s) => s.track?.kind === 'video');
-      if (existing) {
-        existing.replaceTrack(track).catch(() => undefined);
-      } else {
-        pc.addTrack(track, streamRef.current!);
-      }
-    });
+    const [track] = streamRef.current.getVideoTracks();
+    if (!track) return;
+    await attachLocalTrack(pc, track, streamRef.current);
   }, []);
 
   const ensurePeerConnection = useCallback(
     (peerSocketId: string) => {
       const existing = peerConnectionsRef.current.get(peerSocketId);
       if (existing) return existing;
-      const pc = new RTCPeerConnection(peerConnectionConfig);
+      const pc = new RTCPeerConnection(rtcConfigurationRef.current);
+      getPeerNegotiationState(negotiationStatesRef.current, peerSocketId);
       pc.onicecandidate = (event) => {
         if (!event.candidate) return;
         getSocket()?.emit('voice:ice-candidate', {
@@ -127,7 +128,6 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
               handleRemoteTrackEnded();
             } else {
               videoTrack.addEventListener('ended', handleRemoteTrackEnded, { once: true });
-              videoTrack.addEventListener('mute', handleRemoteTrackEnded, { once: true });
             }
           }
           setPeers((prev) => {
@@ -148,11 +148,10 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
           setPeers((prev) => prev.filter((p) => p.socketId !== peerSocketId));
         }
       };
-      attachLocalVideoTrack(pc);
       peerConnectionsRef.current.set(peerSocketId, pc);
       return pc;
     },
-    [attachLocalVideoTrack, roomId],
+    [roomId],
   );
 
   const sendOffer = useCallback(
@@ -161,22 +160,28 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       if (!socket) return;
       const pc = ensurePeerConnection(peerSocketId);
       if (pc.signalingState !== 'stable') return;
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      await attachLocalVideoTrack(pc);
+      const negotiationState = getPeerNegotiationState(
+        negotiationStatesRef.current,
+        peerSocketId,
+      );
+      const offer = await createLocalOffer(pc, negotiationState);
+      if (!offer) return;
       socket.emit('voice:offer', {
         roomId,
         team: MAIN_VIDEO_CHANNEL,
         targetSocketId: peerSocketId,
-        offer: pc.localDescription,
+        offer,
       });
     },
-    [ensurePeerConnection, roomId],
+    [attachLocalVideoTrack, ensurePeerConnection, roomId],
   );
 
   const closePeer = useCallback((peerSocketId: string) => {
     const pc = peerConnectionsRef.current.get(peerSocketId);
     pc?.close();
     peerConnectionsRef.current.delete(peerSocketId);
+    negotiationStatesRef.current.delete(peerSocketId);
     pendingCandidatesRef.current.delete(peerSocketId);
     setPeers((prev) => prev.filter((p) => p.socketId !== peerSocketId));
   }, []);
@@ -206,7 +211,6 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
         audio: false,
       });
       streamRef.current = stream;
-      peerConnectionsRef.current.forEach(attachLocalVideoTrack);
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
       localCameraActiveRef.current = true;
       setLocalCameraActive(true);
@@ -215,7 +219,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     } catch (error) {
       toast.error(getCameraErrorMessage(error));
     }
-  }, [attachLocalVideoTrack, isCameraMutedByHost, roomId, sendOffer, setCameraActive, userId]);
+  }, [isCameraMutedByHost, roomId, sendOffer, setCameraActive, userId]);
 
   const hostToggleCamera = useCallback(
     (targetUserId: string, active: boolean) => {
@@ -238,6 +242,7 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
     if (!enabled || !roomId) return undefined;
     const socket = getSocket();
     if (!socket) return undefined;
+    let cancelled = false;
 
     const joinVideo = () => {
       socket.emit(
@@ -328,7 +333,18 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       if (payload.roomId !== roomId || payload.team !== MAIN_VIDEO_CHANNEL) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+        const negotiationState = getPeerNegotiationState(
+          negotiationStatesRef.current,
+          payload.fromSocketId,
+        );
+        const accepted = await acceptRemoteOffer(
+          pc,
+          negotiationState,
+          payload.offer,
+          isPolitePeer(socket.id, payload.fromSocketId),
+        );
+        if (!accepted) return;
+        await attachLocalVideoTrack(pc);
         await flushPending(payload.fromSocketId, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -352,7 +368,12 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       if (payload.roomId !== roomId || payload.team !== MAIN_VIDEO_CHANNEL) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+        const negotiationState = getPeerNegotiationState(
+          negotiationStatesRef.current,
+          payload.fromSocketId,
+        );
+        const accepted = await acceptRemoteAnswer(pc, negotiationState, payload.answer);
+        if (!accepted) return;
         await flushPending(payload.fromSocketId, pc);
       } catch (err) {
         console.error('Main room video answer error:', err);
@@ -368,6 +389,11 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       if (payload.roomId !== roomId || payload.team !== MAIN_VIDEO_CHANNEL) return;
       try {
         const pc = ensurePeerConnection(payload.fromSocketId);
+        const negotiationState = getPeerNegotiationState(
+          negotiationStatesRef.current,
+          payload.fromSocketId,
+        );
+        if (negotiationState.ignoreOffer) return;
         if (!pc.remoteDescription) {
           const list = pendingCandidatesRef.current.get(payload.fromSocketId) || [];
           list.push(payload.candidate);
@@ -380,20 +406,25 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       }
     };
 
-    socket.on('connect', joinVideo);
-    socket.on('voice:user-joined', handleUserJoined);
-    socket.on('voice:user-left', handleUserLeft);
-    socket.on('voice:offer', handleOffer);
-    socket.on('voice:answer', handleAnswer);
-    socket.on('voice:ice-candidate', handleIce);
-    socket.on('video:state', handleVideoState);
-    socket.on('video:host-toggle', handleHostToggle);
+    void loadWebRtcConfiguration().then((configuration) => {
+      if (cancelled) return;
+      rtcConfigurationRef.current = configuration;
+      socket.on('connect', joinVideo);
+      socket.on('voice:user-joined', handleUserJoined);
+      socket.on('voice:user-left', handleUserLeft);
+      socket.on('voice:offer', handleOffer);
+      socket.on('voice:answer', handleAnswer);
+      socket.on('voice:ice-candidate', handleIce);
+      socket.on('video:state', handleVideoState);
+      socket.on('video:host-toggle', handleHostToggle);
 
-    if (socket.connected) {
-      joinVideo();
-    }
+      if (socket.connected) {
+        joinVideo();
+      }
+    });
 
     return () => {
+      cancelled = true;
       socket.off('connect', joinVideo);
       socket.off('voice:user-joined', handleUserJoined);
       socket.off('voice:user-left', handleUserLeft);
@@ -409,10 +440,12 @@ export function useDebateVideo({ roomId, enabled }: UseDebateVideoOptions) {
       }
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
+      negotiationStatesRef.current.clear();
       setPeers([]);
     };
   }, [
     closePeer,
+    attachLocalVideoTrack,
     detachLocalVideoTrack,
     enabled,
     ensurePeerConnection,

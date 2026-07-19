@@ -5,6 +5,17 @@ import toast from 'react-hot-toast';
 import { useDebateStore } from '@stores/debateStore';
 import { useAuthStore } from '@stores/authStore';
 import { getSocket } from '@hooks/useSocket';
+import { loadWebRtcConfiguration, WEBRTC_CONFIGURATION } from '@/config/webrtc';
+import {
+  acceptRemoteAnswer,
+  acceptRemoteOffer,
+  attachLocalTrack,
+  createLocalOffer,
+  findSenderForKind,
+  getPeerNegotiationState,
+  isPolitePeer,
+  type PeerNegotiationState,
+} from '@/utils/webrtcNegotiation';
 
 interface MicToggleProps {
   roomId: string;
@@ -46,10 +57,6 @@ type VoiceIcePayload = {
 type VoiceUserPayload = {
   socketId: string;
   userId: string;
-};
-
-const peerConnectionConfig: RTCConfiguration = {
-  iceServers: [],
 };
 
 function getMicrophoneErrorMessage(error: unknown) {
@@ -116,8 +123,10 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
   const translationSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const translationMuteGainRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(WEBRTC_CONFIGURATION);
   const animationRef = useRef<number | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const negotiationStatesRef = useRef<Map<string, PeerNegotiationState>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const joinedVoiceRef = useRef(false);
@@ -166,20 +175,14 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     remoteAudioRefs.current.delete(peerSocketId);
   }, []);
 
-  const addLocalTracks = useCallback((pc: RTCPeerConnection, stream: MediaStream) => {
-    pc.getSenders()
-      .filter((sender) => sender.track?.kind === 'audio')
-      .forEach((sender) => pc.removeTrack(sender));
-
-    stream.getAudioTracks().forEach((track) => {
-      pc.addTrack(track, stream);
-    });
+  const addLocalTracks = useCallback(async (pc: RTCPeerConnection, stream: MediaStream) => {
+    const [track] = stream.getAudioTracks();
+    if (!track) return;
+    await attachLocalTrack(pc, track, stream);
   }, []);
 
   const removeLocalTracks = useCallback((pc: RTCPeerConnection) => {
-    pc.getSenders()
-      .filter((sender) => sender.track?.kind === 'audio')
-      .forEach((sender) => pc.removeTrack(sender));
+    findSenderForKind(pc, 'audio')?.replaceTrack(null).catch(() => undefined);
   }, []);
 
   const ensurePeerConnection = useCallback(
@@ -187,7 +190,8 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
       const existing = peerConnectionsRef.current.get(peerSocketId);
       if (existing) return existing;
 
-      const pc = new RTCPeerConnection(peerConnectionConfig);
+      const pc = new RTCPeerConnection(rtcConfigurationRef.current);
+      getPeerNegotiationState(negotiationStatesRef.current, peerSocketId);
 
       pc.onicecandidate = (event) => {
         if (!event.candidate) return;
@@ -213,14 +217,10 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
         removeRemoteAudio(peerSocketId);
       };
 
-      if (streamRef.current) {
-        addLocalTracks(pc, streamRef.current);
-      }
-
       peerConnectionsRef.current.set(peerSocketId, pc);
       return pc;
     },
-    [addLocalTracks, attachRemoteStream, removeRemoteAudio, roomId],
+    [attachRemoteStream, removeRemoteAudio, roomId],
   );
 
   const flushPendingCandidates = useCallback(async (peerSocketId: string, pc: RTCPeerConnection) => {
@@ -239,17 +239,24 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
 
       const pc = ensurePeerConnection(peerSocketId);
       if (pc.signalingState !== 'stable') return;
+      if (streamRef.current) {
+        await addLocalTracks(pc, streamRef.current);
+      }
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const negotiationState = getPeerNegotiationState(
+        negotiationStatesRef.current,
+        peerSocketId,
+      );
+      const offer = await createLocalOffer(pc, negotiationState);
+      if (!offer) return;
 
       socket.emit('voice:offer', {
         roomId,
         targetSocketId: peerSocketId,
-        offer: pc.localDescription,
+        offer,
       });
     },
-    [ensurePeerConnection, roomId],
+    [addLocalTracks, ensurePeerConnection, roomId],
   );
 
   const closePeerConnection = useCallback(
@@ -257,6 +264,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
       const pc = peerConnectionsRef.current.get(peerSocketId);
       pc?.close();
       peerConnectionsRef.current.delete(peerSocketId);
+      negotiationStatesRef.current.delete(peerSocketId);
       pendingCandidatesRef.current.delete(peerSocketId);
       removeRemoteAudio(peerSocketId);
     },
@@ -445,7 +453,6 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
       startAudioMeter(stream);
       startTranslationAudio(stream);
 
-      peerConnectionsRef.current.forEach((pc) => addLocalTracks(pc, stream));
       await Promise.all(Array.from(peerConnectionsRef.current.keys()).map(sendOffer));
 
       setMicActive(true);
@@ -457,7 +464,6 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
       stopLocalStream();
     }
   }, [
-    addLocalTracks,
     disabled,
     micActive,
     sendOffer,
@@ -473,9 +479,6 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     stopTranslationAudio();
     stopLocalStream();
     peerConnectionsRef.current.forEach(removeLocalTracks);
-    Array.from(peerConnectionsRef.current.keys()).forEach((peerSocketId) => {
-      sendOffer(peerSocketId).catch(() => undefined);
-    });
 
     setMicActive(false);
     setIsSpeaking(false);
@@ -484,7 +487,6 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
   }, [
     removeLocalTracks,
     roomId,
-    sendOffer,
     setIsSpeaking,
     setMicActive,
     stopTranslationAudio,
@@ -502,6 +504,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
     let retryTimer: number | null = null;
     let activeSocket = getSocket();
     let cleanupSocket = () => undefined;
+    let cancelled = false;
 
     const setupVoiceSocket = () => {
       activeSocket = getSocket();
@@ -543,7 +546,20 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
 
         try {
           const pc = ensurePeerConnection(payload.fromSocketId);
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+          const negotiationState = getPeerNegotiationState(
+            negotiationStatesRef.current,
+            payload.fromSocketId,
+          );
+          const accepted = await acceptRemoteOffer(
+            pc,
+            negotiationState,
+            payload.offer,
+            isPolitePeer(activeSocket?.id, payload.fromSocketId),
+          );
+          if (!accepted) return;
+          if (streamRef.current) {
+            await addLocalTracks(pc, streamRef.current);
+          }
           await flushPendingCandidates(payload.fromSocketId, pc);
 
           const answer = await pc.createAnswer();
@@ -564,7 +580,12 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
 
         try {
           const pc = ensurePeerConnection(payload.fromSocketId);
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          const negotiationState = getPeerNegotiationState(
+            negotiationStatesRef.current,
+            payload.fromSocketId,
+          );
+          const accepted = await acceptRemoteAnswer(pc, negotiationState, payload.answer);
+          if (!accepted) return;
           await flushPendingCandidates(payload.fromSocketId, pc);
         } catch (error) {
           console.error('Failed to handle voice answer:', error);
@@ -576,6 +597,11 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
 
         try {
           const pc = ensurePeerConnection(payload.fromSocketId);
+          const negotiationState = getPeerNegotiationState(
+            negotiationStatesRef.current,
+            payload.fromSocketId,
+          );
+          if (negotiationState.ignoreOffer) return;
 
           if (!pc.remoteDescription) {
             const candidates = pendingCandidatesRef.current.get(payload.fromSocketId) || [];
@@ -616,15 +642,21 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
       };
     };
 
-    setupVoiceSocket();
+    void loadWebRtcConfiguration().then((configuration) => {
+      if (cancelled) return;
+      rtcConfigurationRef.current = configuration;
+      setupVoiceSocket();
+    });
 
     return () => {
+      cancelled = true;
       if (retryTimer) {
         window.clearTimeout(retryTimer);
       }
 
       cleanupSocket();
       closeAllPeerConnections();
+      negotiationStatesRef.current.clear();
       stopTranslationAudio();
       stopLocalStream();
       setMicActive(false);
@@ -633,6 +665,7 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
   }, [
     closeAllPeerConnections,
     closePeerConnection,
+    addLocalTracks,
     ensurePeerConnection,
     flushPendingCandidates,
     roomId,

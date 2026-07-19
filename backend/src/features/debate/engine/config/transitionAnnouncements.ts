@@ -22,7 +22,7 @@
  * - docs/Debate_Rule_Consolidated.md §5
  */
 
-import type { DebateModeId, Phase } from './types';
+import type { DebateModeId, Phase } from './types.js';
 
 /**
  * Speaker key hiểu được trong engine.

@@ -20,11 +20,14 @@ export function getSocket(): Socket | null {
  * (token rotation on login/logout in the same tab).
  */
 function ensureSocket(accessToken: string): Socket {
-  // If we already have a socket for the same token, reuse it.
-  if (socket && socketToken === accessToken && socket.connected) {
+  // Reuse the same-token socket even while it is still connecting or
+  // reconnecting. Several components consume this singleton on first render;
+  // requiring `connected` here made each consumer tear down the in-flight
+  // connection and create a new one.
+  if (socket && socketToken === accessToken) {
     return socket;
   }
-  // If token changed or socket is stale, tear down the old socket.
+  // Only replace the singleton when the authenticated user/token changes.
   if (socket) {
     try {
       socket.removeAllListeners();
@@ -80,6 +83,7 @@ export function useSocket() {
   const disconnect = useCallback(() => {
     socket?.disconnect();
     socket = null;
+    socketToken = null;
     setActiveSocket(null);
   }, []);
 

@@ -16,6 +16,7 @@
     "sessionStarting": "Debate session is starting...",
     "hostClickedStart": "The host just clicked Start",
     "syncBanner": "Syncing live debate state…",
+    "syncFailed": "Unable to sync live debate state.",
     "phaseTransition": "PHASE TRANSITION",
     "muteMicAndLockChat": "Mute mic and lock chat",
     "startsIn": "{{label}} starts in",

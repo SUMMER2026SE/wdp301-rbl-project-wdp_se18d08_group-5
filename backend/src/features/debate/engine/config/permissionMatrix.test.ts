@@ -14,12 +14,12 @@ import {
   debugPermissionMatrix,
   deriveRole,
   getPermissions,
-} from './permissionMatrix';
+} from './permissionMatrix.js';
 import type {
   DebateModeId,
   ParticipantDescriptor,
   Role,
-} from './types';
+} from './types.js';
 
 const ALL_MODES: DebateModeId[] = [
   'host_ai_1v1',
