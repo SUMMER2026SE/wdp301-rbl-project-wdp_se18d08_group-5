@@ -1,0 +1,82 @@
+graph LR
+    subgraph SYSTEM["AI Debate Platform"]
+        UC_REGISTER["Register Account"]
+        UC_LOGIN["Login"]
+        UC_GOOGLE["Login with Google"]
+        UC_RESET["Reset Password"]
+        UC_PUBLIC_PROFILE["View Public Profiles"]
+        UC_PUBLIC_MATCHES["Browse Public Matches"]
+        UC_LEADERBOARD["View Leaderboard"]
+        UC_PLATFORM_INFO["View Platform Information"]
+
+        UC_ACCOUNT["Update Profile"]
+        UC_CHANGE_PASS["Change Password"]
+        UC_VIEW_OWN["View Own Profile"]
+        UC_RANKED["Join Ranked Queue"]
+        UC_CUSTOM_ROOM["Create Custom Room"]
+        UC_JOIN_ROOM["Join Room"]
+        UC_REJOIN["Rejoin Room"]
+        UC_LEAVE_ROOM["Leave Room"]
+        UC_DEBATE["Participate in Debate"]
+        UC_LIVE["Watch Live Match"]
+        UC_RESULTS["View Results"]
+        UC_HISTORY["View Debate History"]
+        UC_CREATE_TOPIC["Create Topic"]
+        UC_VIEW_TOPIC["View Topic"]
+        UC_STANCE["Set Stance (Agree/Disagree)"]
+        UC_CREATE_POST["Create Post"]
+        UC_LIKE_POST["Like / Unlike Post"]
+        UC_COMMENT_POST["Comment Post"]
+        UC_NOTIFICATION["Receive Notification"]
+        UC_REPORT["Create Report"]
+        UC_LOGOUT["Logout"]
+
+        UC_OVERVIEW["View Admin Overview"]
+        UC_USERS["Manage Users"]
+        UC_ROLE["Update User Role"]
+        UC_BAN["Ban / Unban User"]
+        UC_ROOMS["Manage Rooms & Status"]
+        UC_KICK_MUTE["Kick / Mute Participant"]
+        UC_REPORTS["Review Reports"]
+        UC_RESOLVE["Resolve / Dismiss Report"]
+    end
+
+    Guest --> UC_REGISTER
+    Guest --> UC_LOGIN
+    Guest --> UC_GOOGLE
+    Guest --> UC_RESET
+    Guest --> UC_PUBLIC_PROFILE
+    Guest --> UC_PUBLIC_MATCHES
+    Guest --> UC_LEADERBOARD
+    Guest --> UC_PLATFORM_INFO
+
+    User --> UC_ACCOUNT
+    User --> UC_CHANGE_PASS
+    User --> UC_VIEW_OWN
+    User --> UC_RANKED
+    User --> UC_CUSTOM_ROOM
+    User --> UC_JOIN_ROOM
+    User --> UC_REJOIN
+    User --> UC_LEAVE_ROOM
+    User --> UC_DEBATE
+    User --> UC_LIVE
+    User --> UC_RESULTS
+    User --> UC_HISTORY
+    User --> UC_CREATE_TOPIC
+    User --> UC_VIEW_TOPIC
+    User --> UC_STANCE
+    User --> UC_CREATE_POST
+    User --> UC_LIKE_POST
+    User --> UC_COMMENT_POST
+    User --> UC_NOTIFICATION
+    User --> UC_REPORT
+    User --> UC_LOGOUT
+
+    Admin --> UC_OVERVIEW
+    Admin --> UC_USERS
+    Admin --> UC_ROLE
+    Admin --> UC_BAN
+    Admin --> UC_ROOMS
+    Admin --> UC_KICK_MUTE
+    Admin --> UC_REPORTS
+    Admin --> UC_RESOLVE
