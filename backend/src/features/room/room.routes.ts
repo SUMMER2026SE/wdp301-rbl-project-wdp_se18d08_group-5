@@ -21,6 +21,7 @@ import { getIO } from '../../socket/index.js';
 import { aiService } from '../ai/ai.service.js';
 import { applyDebateResult } from '../ranking/ranking.service.js';
 import { startDebate, triggerTransition, endPhaseByHost, endPhaseBySpeaker } from '../debate/debate.service.js';
+import { getTranscriptForTurn } from '../debate/transcript.service.js';
 import { timerService } from '../../socket/timer.service.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/AppError.js';
 import { hasControlPanel } from '../../utils/roomPermissions.js';
@@ -533,12 +534,21 @@ async function judgeTurnWithAI(
   turnHistoryIndex: number,
   transcript: string,
 ) {
-  if (room.judgeType !== 'ai' || !transcript.trim()) return null;
+  if (room.judgeType !== 'ai') return null;
 
   const turn = session.turnHistory[turnHistoryIndex];
   if (!turn) return null;
 
-  const aiResult = await aiService.judgeTurn(room._id.toString(), turn.speaker, transcript, {
+  const persistedSession = await DebateSession.findById(session._id).select('speechTranscripts');
+  const canonicalTranscript = getTranscriptForTurn(
+    persistedSession || session,
+    turn.speaker,
+    turn.crossExamination ? 'cross_exam' : 'speech',
+    { activeSpeakerOnly: !turn.crossExamination },
+  ) || transcript.trim();
+  if (!canonicalTranscript) return null;
+
+  const aiResult = await aiService.judgeTurn(room._id.toString(), turn.speaker, canonicalTranscript, {
     motion: room.motion,
     format: room.format,
     phase: turn.crossExamination ? 'cross_exam' : 'speech',

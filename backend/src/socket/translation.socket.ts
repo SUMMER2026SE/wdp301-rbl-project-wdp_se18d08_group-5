@@ -1,6 +1,10 @@
 import { Server, Socket } from 'socket.io';
 import { ENV } from '../config/env.js';
 import { DebateRoom } from '../models/DebateRoom.js';
+import {
+  mergeTranscriptText,
+  persistSourceCaption,
+} from '../features/debate/transcript.service.js';
 
 type TranslationLanguage = 'en' | 'vi';
 
@@ -50,11 +54,18 @@ type TranslationSession = {
   senderName: string;
   connections: LiveConnection[];
   hasReceivedAudio: boolean;
+  pendingSourceCaption?: {
+    text: string;
+    language: string;
+  };
+  persistenceTimer?: ReturnType<typeof setTimeout>;
+  persistenceChain: Promise<void>;
 };
 
 const sessionsBySocketId = new Map<string, TranslationSession>();
 const MAX_AUDIO_CHUNK_CHARS = 32_000;
 const MAX_QUEUED_CHUNKS = 16;
+const TRANSCRIPT_PERSIST_DEBOUNCE_MS = 750;
 
 function getSocketUserId(socket: Socket) {
   return (socket as unknown as { userId: string }).userId;
@@ -97,10 +108,53 @@ function emitCaption(
   });
 }
 
+function flushPendingSourceCaption(session: TranslationSession) {
+  if (session.persistenceTimer) {
+    clearTimeout(session.persistenceTimer);
+    session.persistenceTimer = undefined;
+  }
+
+  const pending = session.pendingSourceCaption;
+  session.pendingSourceCaption = undefined;
+  if (!pending?.text.trim()) return;
+
+  session.persistenceChain = session.persistenceChain
+    .then(async () => {
+      await persistSourceCaption({
+        roomId: session.roomId,
+        userId: session.userId,
+        text: pending.text,
+        language: pending.language,
+        source: 'gemini-live',
+      });
+    })
+    .catch((error) => {
+      console.error(`Could not persist live transcript for room ${session.roomId}:`, error);
+    });
+}
+
+function queueSourceCaptionPersistence(
+  session: TranslationSession,
+  text: string,
+  language: string,
+) {
+  session.pendingSourceCaption = {
+    text: mergeTranscriptText(session.pendingSourceCaption?.text, text),
+    language: language || session.pendingSourceCaption?.language || 'und',
+  };
+
+  if (session.persistenceTimer) clearTimeout(session.persistenceTimer);
+  session.persistenceTimer = setTimeout(
+    () => flushPendingSourceCaption(session),
+    TRANSCRIPT_PERSIST_DEBOUNCE_MS,
+  );
+}
+
 function stopTranslation(socketId: string) {
   const session = sessionsBySocketId.get(socketId);
   if (!session) return;
 
+  flushPendingSourceCaption(session);
   session.connections.forEach((connection) => {
     connection.pendingAudio.length = 0;
     try {
@@ -208,6 +262,7 @@ function createLiveConnection(
       const input = content?.inputTranscription;
       if (input?.text && connection.isPrimary) {
         emitCaption(io, session, 'source', input.languageCode || 'und', input.text);
+        queueSourceCaptionPersistence(session, input.text, input.languageCode || 'und');
         ownerSocket.emit('translation:status', { roomId: session.roomId, state: 'captioning' });
       }
 
@@ -267,8 +322,16 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         senderName: participant.username,
         connections: [],
         hasReceivedAudio: false,
+        persistenceChain: Promise.resolve(),
       };
       emitCaption(io, session, 'source', payload.sourceLanguage || 'und', sourceText);
+      await persistSourceCaption({
+        roomId,
+        userId,
+        text: sourceText,
+        language: payload.sourceLanguage || 'und',
+        source: 'native-client',
+      });
 
       const translatedText = payload?.translatedText?.trim();
       if (translatedText && translatedText.length <= 1400) {
@@ -315,6 +378,7 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         senderName: participant.username,
         connections: [],
         hasReceivedAudio: false,
+        persistenceChain: Promise.resolve(),
       };
       sessionsBySocketId.set(socket.id, session);
 
