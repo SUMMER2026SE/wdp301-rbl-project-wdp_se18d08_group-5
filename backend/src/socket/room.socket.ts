@@ -47,7 +47,8 @@ export async function buildRoomStatePayload(roomId: string, userId: string) {
   if (!participant) return null;
 
   const [session, messages] = await Promise.all([
-    DebateSession.findOne({ roomId: room._id }),
+    // Live room restore does not need the potentially large archived script.
+    DebateSession.findOne({ roomId: room._id }).select('-speechTranscripts'),
     Message.find({
       roomId: room._id,
       type: { $ne: 'viewer_chat' },

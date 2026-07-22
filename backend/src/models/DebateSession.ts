@@ -1,5 +1,33 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type TranscriptRole = 'host' | 'debater' | 'judge' | 'viewer' | 'owner';
+export type TranscriptTeam = 'proposition' | 'opposition';
+export type TranscriptSource = 'gemini-live' | 'native-client';
+
+export interface ISpeechTranscript {
+  roomId: mongoose.Types.ObjectId;
+  segmentKey: string;
+  round: 0 | 1 | 2 | 3;
+  phase: string;
+  speaker: string;
+  isActiveSpeaker: boolean;
+  userId: mongoose.Types.ObjectId;
+  username: string;
+  role: TranscriptRole;
+  team?: TranscriptTeam;
+  speakerSlot?: 'S1' | 'S2' | 'S3';
+  language: string;
+  originalText: string;
+  translatedText?: string;
+  source: TranscriptSource;
+  judgeType: 'human' | 'ai';
+  hostType: 'human' | 'ai';
+  format: '1v1' | '3v3';
+  startedAt?: Date;
+  updatedAt: Date;
+  createdAt: Date;
+}
+
 export interface IDebateSession extends Document {
   roomId: mongoose.Types.ObjectId;
   pausesUsed: {
@@ -55,6 +83,7 @@ export interface IDebateSession extends Document {
       summary: string;
     } | null;
   }[];
+  speechTranscripts: ISpeechTranscript[];
   cards: {
     type: string;
     issuedTo: mongoose.Types.ObjectId;
@@ -119,6 +148,47 @@ const debateSessionSchema = new Schema<IDebateSession>(
         },
       },
     ],
+    speechTranscripts: [
+      {
+        roomId: { type: Schema.Types.ObjectId, ref: 'DebateRoom', required: true },
+        segmentKey: { type: String, required: true },
+        round: { type: Number, enum: [0, 1, 2, 3], required: true },
+        phase: { type: String, required: true },
+        speaker: { type: String, required: true },
+        isActiveSpeaker: { type: Boolean, default: false },
+        userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        username: { type: String, required: true },
+        role: {
+          type: String,
+          enum: ['host', 'debater', 'judge', 'viewer', 'owner'],
+          required: true,
+        },
+        team: {
+          type: String,
+          enum: ['proposition', 'opposition'],
+          required: false,
+        },
+        speakerSlot: {
+          type: String,
+          enum: ['S1', 'S2', 'S3'],
+          required: false,
+        },
+        language: { type: String, default: 'und' },
+        originalText: { type: String, required: true, maxlength: 50_000 },
+        translatedText: { type: String, required: false, maxlength: 50_000 },
+        source: {
+          type: String,
+          enum: ['gemini-live', 'native-client'],
+          required: true,
+        },
+        judgeType: { type: String, enum: ['human', 'ai'], required: true },
+        hostType: { type: String, enum: ['human', 'ai'], required: true },
+        format: { type: String, enum: ['1v1', '3v3'], required: true },
+        startedAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: true },
+        createdAt: { type: Date, required: true },
+      },
+    ],
     cards: [
       {
         type: { type: String, enum: ['yellow'] },
@@ -138,5 +208,10 @@ const debateSessionSchema = new Schema<IDebateSession>(
     timestamps: true,
   },
 );
+
+debateSessionSchema.index({ roomId: 1, 'speechTranscripts.userId': 1 });
+debateSessionSchema.index({ roomId: 1, 'speechTranscripts.round': 1 });
+debateSessionSchema.index({ roomId: 1, 'speechTranscripts.speaker': 1 });
+debateSessionSchema.index({ roomId: 1, 'speechTranscripts.phase': 1 });
 
 export const DebateSession = mongoose.model<IDebateSession>('DebateSession', debateSessionSchema);
