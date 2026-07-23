@@ -32,6 +32,894 @@
 | 3.26 | View User List | Admin |
 | 3.27 | Penalize User | Admin |
 
+## 3.1 Register
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Guest
+    participant FE as RegisterPage (FE)
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant Model as User (Model)
+    participant DB as MongoDB
+    participant Mail as EmailService / SMTP
+
+    rect rgb(240,248,255)
+        Note over Guest,Mail: Register a local account
+    end
+
+    Guest->>FE: 1. Enter username, email, password, and confirmation
+    Guest->>FE: 2. Click "Register"
+    FE->>FE: 3. Validate form with Zod
+
+    alt Invalid client-side data
+        FE-->>Guest: 4. Display validation errors
+    else Valid client-side data
+        FE->>Ctrl: 5. POST /api/v1/auth/register
+        Note over Ctrl: authLimiter + validate(registerSchema)
+
+        alt Invalid request body
+            Ctrl-->>FE: 6. 400 Validation error
+            FE-->>Guest: 7. Display validation error
+        else Valid request body
+            Ctrl->>Svc: 8. register(data)
+            Svc->>Model: 9. findOne(email or username)
+            Model->>DB: 10. Query existing account
+            DB-->>Model: 11. Existing user or null
+            Model-->>Svc: 12. Existing user or null
+
+            alt Email or username already exists
+                Svc-->>Ctrl: 13. ConflictError
+                Ctrl-->>FE: 14. 409 Conflict
+                FE-->>Guest: 15. Display duplicate account error
+            else Account is available
+                Svc->>Svc: 16. Generate and hash verification token
+                Svc->>Model: 17. create(user data and token)
+                Model->>Model: 18. Hash password in pre-save hook
+                Model->>DB: 19. Insert user
+                DB-->>Model: 20. User created
+                Model-->>Svc: 21. Created user
+                Svc->>Mail: 22. sendVerificationEmail(email, rawToken)
+                Mail-->>Svc: 23. Email accepted by SMTP
+                Svc->>Svc: 24. Generate access/refresh tokens and sanitize user
+                Svc-->>Ctrl: 25. user and token pair
+                Ctrl-->>FE: 26. 201 Created
+                FE-->>Guest: 27. Display registration success
+            end
+        end
+    end
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Guest {
+    +register()
+}
+
+class RegisterPage {
+    +validateForm(data)
+    +onSubmit(data)
+    +displayResult()
+}
+
+class AuthController {
+    +register(req, res)
+}
+
+class AuthService {
+    +register(input)
+    -sanitizeUser(user)
+}
+
+class EmailService {
+    +sendVerificationEmail(email, token)
+}
+
+class User {
+    +ObjectId _id
+    +String username
+    +String email
+    +String password
+    +String authProvider
+    +Boolean isEmailVerified
+    +String emailVerificationToken
+    +Date emailVerificationExpires
+    +save()
+}
+
+class MongoDB
+
+Guest --> RegisterPage : enters registration data
+RegisterPage --> AuthController : POST /auth/register
+AuthController --> AuthService : register()
+AuthService --> User : findOne() / create()
+AuthService --> EmailService : sends verification link
+User --> MongoDB : query / insert
+MongoDB --> User : user data
+AuthService --> AuthController : user and tokens
+AuthController --> RegisterPage : HTTP response
+RegisterPage --> Guest : result
+```
+
+## 3.2 Login
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Guest
+    participant FE as LoginPage (FE)
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant Model as User (Model)
+    participant DB as MongoDB
+    participant Store as AuthStore (Zustand)
+
+    rect rgb(240,248,255)
+        Note over Guest,Store: Login with email and password
+    end
+
+    Guest->>FE: 1. Enter email and password
+    Guest->>FE: 2. Click "Login"
+    FE->>FE: 3. Validate form with Zod
+
+    alt Invalid client-side data
+        FE-->>Guest: 4. Display validation errors
+    else Valid client-side data
+        FE->>Ctrl: 5. POST /api/v1/auth/login
+        Note over Ctrl: authLimiter + validate(loginSchema)
+
+        alt Invalid request body
+            Ctrl-->>FE: 6. 400 Validation error
+            FE-->>Guest: 7. Display validation error
+        else Valid request body
+            Ctrl->>Svc: 8. login(email, password)
+            Svc->>Model: 9. findOne(email).select(password)
+            Model->>DB: 10. Query local account
+            DB-->>Model: 11. User or null
+            Model-->>Svc: 12. User or null
+
+            alt User missing or not a local account
+                Svc-->>Ctrl: 13. UnauthorizedError
+                Ctrl-->>FE: 14. 401 Invalid email or password
+                FE-->>Guest: 15. Display login error
+            else Local account exists
+                Svc->>Model: 16. comparePassword(password)
+                Model-->>Svc: 17. Match result
+
+                alt Password does not match
+                    Svc-->>Ctrl: 18. UnauthorizedError
+                    Ctrl-->>FE: 19. 401 Invalid email or password
+                    FE-->>Guest: 20. Display login error
+                else Account is banned
+                    Svc->>Svc: 21. assertNotBanned(user)
+                    Svc-->>Ctrl: 22. ForbiddenError
+                    Ctrl-->>FE: 23. 403 Account is banned
+                    FE-->>Guest: 24. Display blocked-account error
+                else Credentials are valid
+                    Svc->>Svc: 25. Generate JWT pair and sanitize user
+                    Svc-->>Ctrl: 26. user, accessToken, refreshToken
+                    Ctrl-->>FE: 27. 200 OK
+                    FE->>Store: 28. login(user, tokens)
+                    Store-->>FE: 29. Persist authenticated state
+                    FE-->>Guest: 30. Redirect to requested page or home
+                end
+            end
+        end
+    end
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Guest {
+    +login()
+}
+
+class LoginPage {
+    +validateForm(data)
+    +onSubmit(data)
+    +displayError()
+}
+
+class AuthStore {
+    +User user
+    +String accessToken
+    +String refreshToken
+    +Boolean isAuthenticated
+    +login(user, accessToken, refreshToken)
+    +clearAuth()
+}
+
+class AuthController {
+    +login(req, res)
+}
+
+class AuthService {
+    +login(input)
+    -sanitizeUser(user)
+}
+
+class User {
+    +ObjectId _id
+    +String email
+    +String password
+    +String role
+    +String authProvider
+    +Boolean isBanned
+    +Date bannedUntil
+    +comparePassword(candidatePassword)
+}
+
+class JwtUtility {
+    +generateTokenPair(payload)
+}
+
+class MongoDB
+
+Guest --> LoginPage : enters credentials
+LoginPage --> AuthController : POST /auth/login
+AuthController --> AuthService : login()
+AuthService --> User : findOne() / comparePassword()
+User --> MongoDB : query
+MongoDB --> User : user data
+AuthService --> JwtUtility : creates token pair
+AuthService --> AuthController : user and tokens
+AuthController --> LoginPage : HTTP response
+LoginPage --> AuthStore : persists session
+LoginPage --> Guest : result
+```
+
+## 3.3 Login by Google
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Guest
+    participant GoogleUI as Google Identity Services
+    participant FE as LoginPage (FE)
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant GoogleAPI as Google OAuth2Client
+    participant Model as User (Model)
+    participant DB as MongoDB
+    participant Store as AuthStore (Zustand)
+
+    rect rgb(240,248,255)
+        Note over Guest,Store: Login with Google
+    end
+
+    Guest->>GoogleUI: 1. Click "Sign in with Google"
+    GoogleUI-->>FE: 2. Return Google ID credential
+    FE->>Ctrl: 3. POST /api/v1/auth/google with idToken
+    Note over Ctrl: authLimiter + validate(googleLoginSchema)
+    Ctrl->>Svc: 4. googleLogin(idToken)
+
+    alt Google OAuth is not configured
+        Svc-->>Ctrl: 5. BadRequestError
+        Ctrl-->>FE: 6. 400 Bad Request
+        FE-->>Guest: 7. Display Google login error
+    else Google OAuth is configured
+        Svc->>GoogleAPI: 8. verifyIdToken(idToken, audience)
+
+        alt Invalid token or missing identity claims
+            GoogleAPI-->>Svc: 9. Verification failure
+            Svc-->>Ctrl: 10. 401 Invalid Google token
+            Ctrl-->>FE: 11. 401 Unauthorized
+            FE-->>Guest: 12. Display Google login error
+        else Valid Google payload
+            GoogleAPI-->>Svc: 13. email, subject, name, picture
+            Svc->>Model: 14. findOne(googleId or email)
+            Model->>DB: 15. Query linked account
+            DB-->>Model: 16. Existing user or null
+            Model-->>Svc: 17. Existing user or null
+
+            alt New Google user
+                Svc->>Svc: 18. createUniqueUsername(baseUsername)
+                Svc->>Model: 19. create(verified Google profile)
+                Model->>DB: 20. Insert user
+                DB-->>Model: 21. User created
+                Model-->>Svc: 22. Created user
+            else Existing user
+                Svc->>Model: 23. Link googleId and update verified profile
+                Model->>DB: 24. Save user
+                DB-->>Model: 25. User updated
+                Model-->>Svc: 26. Updated user
+            end
+
+            alt Account is banned
+                Svc->>Svc: 27. assertNotBanned(user)
+                Svc-->>Ctrl: 28. ForbiddenError
+                Ctrl-->>FE: 29. 403 Account is banned
+                FE-->>Guest: 30. Display blocked-account error
+            else Account is active
+                Svc->>Svc: 31. Generate JWT pair and sanitize user
+                Svc-->>Ctrl: 32. user, accessToken, refreshToken
+                Ctrl-->>FE: 33. 200 OK
+                FE->>Store: 34. login(user, tokens)
+                Store-->>FE: 35. Persist authenticated state
+                FE-->>Guest: 36. Redirect to requested page or home
+            end
+        end
+    end
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Guest {
+    +loginWithGoogle()
+}
+
+class LoginPage {
+    +initializeGoogleButton()
+    +handleGoogleCredential(credential)
+}
+
+class GoogleIdentityServices {
+    +initialize(config)
+    +renderButton(element, options)
+}
+
+class AuthStore {
+    +login(user, accessToken, refreshToken)
+}
+
+class AuthController {
+    +googleLogin(req, res)
+}
+
+class AuthService {
+    +googleLogin(input)
+    -createUniqueUsername(baseUsername)
+    -sanitizeUser(user)
+}
+
+class OAuth2Client {
+    +verifyIdToken(options)
+}
+
+class User {
+    +ObjectId _id
+    +String email
+    +String username
+    +String authProvider
+    +String googleId
+    +Boolean isEmailVerified
+    +Boolean isBanned
+    +save()
+}
+
+class MongoDB
+
+Guest --> GoogleIdentityServices : authenticates
+GoogleIdentityServices --> LoginPage : ID credential
+LoginPage --> AuthController : POST /auth/google
+AuthController --> AuthService : googleLogin()
+AuthService --> OAuth2Client : verifies token
+AuthService --> User : findOne() / create() / save()
+User --> MongoDB : query / insert / update
+MongoDB --> User : user data
+AuthService --> AuthController : user and tokens
+AuthController --> LoginPage : HTTP response
+LoginPage --> AuthStore : persists session
+LoginPage --> Guest : result
+```
+
+## 3.4 Reset Password
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Guest
+    participant ForgotFE as ForgotPasswordPage (FE)
+    participant ResetFE as ResetPasswordPage (FE)
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant Model as User (Model)
+    participant DB as MongoDB
+    participant Mail as EmailService / SMTP
+
+    rect rgb(240,248,255)
+        Note over Guest,Mail: Request and use a password-reset link
+    end
+
+    Guest->>ForgotFE: 1. Enter email and submit
+    ForgotFE->>ForgotFE: 2. Validate email with Zod
+    ForgotFE->>Ctrl: 3. POST /api/v1/auth/forgot-password
+    Ctrl->>Svc: 4. forgotPassword(email)
+    Svc->>Model: 5. findOne(email).select(reset fields)
+    Model->>DB: 6. Query user
+    DB-->>Model: 7. User or null
+    Model-->>Svc: 8. User or null
+
+    alt Existing local account
+        Svc->>Svc: 9. Generate and hash reset token with 1-hour expiry
+        Svc->>Model: 10. save(reset token and expiry)
+        Model->>DB: 11. Update user
+        DB-->>Model: 12. User updated
+        Model-->>Svc: 13. Saved
+        Svc->>Mail: 14. sendPasswordResetEmail(email, rawToken)
+        Mail-->>Svc: 15. Reset link sent
+    else Unknown email or Google-only account
+        Note over Svc: Do not disclose whether the account exists
+    end
+
+    Svc-->>Ctrl: 16. Complete without account details
+    Ctrl-->>ForgotFE: 17. 200 Generic success message
+    ForgotFE-->>Guest: 18. Display reset-link notice
+
+    opt Guest receives a reset email
+        Mail-->>Guest: 19. Email containing /reset-password?token=...
+        Guest->>ResetFE: 20. Open link and enter new password
+        ResetFE->>ResetFE: 21. Read token and validate matching passwords
+
+        alt Missing token or invalid form
+            ResetFE-->>Guest: 22. Display validation error
+        else Token and form are present
+            ResetFE->>Ctrl: 23. POST /api/v1/auth/reset-password
+            Ctrl->>Svc: 24. resetPassword(token, password)
+            Svc->>Model: 25. findOne(hashed token and unexpired date)
+            Model->>DB: 26. Query reset token
+            DB-->>Model: 27. User or null
+            Model-->>Svc: 28. User or null
+
+            alt Token is invalid or expired
+                Svc-->>Ctrl: 29. BadRequestError
+                Ctrl-->>ResetFE: 30. 400 Invalid or expired token
+                ResetFE-->>Guest: 31. Display reset error
+            else Token is valid
+                Svc->>Model: 32. Set password and clear reset fields
+                Model->>Model: 33. Hash password in pre-save hook
+                Model->>DB: 34. Save user
+                DB-->>Model: 35. User updated
+                Model-->>Svc: 36. Saved
+                Svc-->>Ctrl: 37. Password reset completed
+                Ctrl-->>ResetFE: 38. 200 Password reset successful
+                ResetFE-->>Guest: 39. Display success and login link
+            end
+        end
+    end
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Guest {
+    +requestPasswordReset()
+    +resetPassword()
+}
+
+class ForgotPasswordPage {
+    +onSubmit(email)
+    +displayGenericResult()
+}
+
+class ResetPasswordPage {
+    +readToken()
+    +validatePasswords()
+    +onSubmit(data)
+}
+
+class AuthController {
+    +forgotPassword(req, res)
+    +resetPassword(req, res)
+}
+
+class AuthService {
+    +forgotPassword(input)
+    +resetPassword(input)
+}
+
+class EmailService {
+    +sendPasswordResetEmail(email, token)
+}
+
+class TokenUtility {
+    +generateRawToken()
+    +hashToken(token)
+}
+
+class User {
+    +ObjectId _id
+    +String email
+    +String password
+    +String authProvider
+    +String passwordResetToken
+    +Date passwordResetExpires
+    +save()
+}
+
+class MongoDB
+
+Guest --> ForgotPasswordPage : submits email
+ForgotPasswordPage --> AuthController : POST /auth/forgot-password
+Guest --> ResetPasswordPage : submits token and password
+ResetPasswordPage --> AuthController : POST /auth/reset-password
+AuthController --> AuthService : delegates reset operations
+AuthService --> TokenUtility : generates / hashes token
+AuthService --> EmailService : sends reset link
+AuthService --> User : findOne() / save()
+User --> MongoDB : query / update
+MongoDB --> User : user data
+AuthController --> ForgotPasswordPage : generic response
+AuthController --> ResetPasswordPage : reset result
+```
+
+## 3.5 Change Password
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Account as User / Admin
+    participant FE as ChangePasswordPage (FE)
+    participant AuthMW as authenticate Middleware
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant Model as User (Model)
+    participant DB as MongoDB
+
+    rect rgb(240,248,255)
+        Note over Account,DB: Change the current account password
+    end
+
+    Account->>FE: 1. Enter current password, new password, confirmation
+    Account->>FE: 2. Click "Change password"
+    FE->>FE: 3. Validate form with Zod
+
+    alt Invalid client-side data
+        FE-->>Account: 4. Display validation errors
+    else Valid client-side data
+        FE->>AuthMW: 5. POST /api/v1/auth/change-password with Bearer token
+        AuthMW->>AuthMW: 6. Verify access token
+        AuthMW->>Model: 7. findById(token.userId)
+        Model->>DB: 8. Query role and ban status
+        DB-->>Model: 9. User or null
+        Model-->>AuthMW: 10. Authentication data
+
+        alt Missing, invalid, or expired access token
+            AuthMW-->>FE: 11. 401 Unauthorized
+            FE-->>Account: 12. Redirect to login or display error
+        else Account is banned
+            AuthMW-->>FE: 13. 403 Account is banned
+            FE-->>Account: 14. Clear session and redirect to login
+        else Authenticated account
+            AuthMW->>Ctrl: 15. Forward validated request with userId
+            Ctrl->>Svc: 16. changePassword(userId, data)
+            Svc->>Model: 17. findById(userId).select(password)
+            Model->>DB: 18. Query account
+            DB-->>Model: 19. User or null
+            Model-->>Svc: 20. User or null
+
+            alt User not found
+                Svc-->>Ctrl: 21. 400 User not found
+                Ctrl-->>FE: 22. 400 Bad Request
+                FE-->>Account: 23. Display error
+            else Google-only account
+                Svc-->>Ctrl: 24. 400 Password login is not enabled
+                Ctrl-->>FE: 25. 400 Bad Request
+                FE-->>Account: 26. Display account-provider error
+            else Local account
+                Svc->>Model: 27. comparePassword(currentPassword)
+                Model-->>Svc: 28. Match result
+
+                alt Current password is incorrect
+                    Svc-->>Ctrl: 29. UnauthorizedError
+                    Ctrl-->>FE: 30. 401 Current password is incorrect
+                    FE-->>Account: 31. Display password error
+                else Current password is correct
+                    Svc->>Model: 32. Set new password and save()
+                    Model->>Model: 33. Hash password in pre-save hook
+                    Model->>DB: 34. Update password
+                    DB-->>Model: 35. User updated
+                    Model-->>Svc: 36. Saved
+                    Svc-->>Ctrl: 37. Password changed
+                    Ctrl-->>FE: 38. 200 OK
+                    FE-->>Account: 39. Reset form and display success
+                end
+            end
+        end
+    end
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Account {
+    +String role
+    +changePassword()
+}
+
+class ChangePasswordPage {
+    +validateForm(data)
+    +onSubmit(data)
+    +resetForm()
+}
+
+class AuthenticateMiddleware {
+    +authenticate(req, res, next)
+}
+
+class AuthController {
+    +changePassword(req, res)
+}
+
+class AuthService {
+    +changePassword(userId, input)
+}
+
+class JwtUtility {
+    +verifyAccessToken(token)
+}
+
+class User {
+    +ObjectId _id
+    +String password
+    +String authProvider
+    +String role
+    +Boolean isBanned
+    +Date bannedUntil
+    +comparePassword(candidatePassword)
+    +save()
+}
+
+class MongoDB
+
+Account --> ChangePasswordPage : submits passwords
+ChangePasswordPage --> AuthenticateMiddleware : Bearer token and request
+AuthenticateMiddleware --> JwtUtility : verifies access token
+AuthenticateMiddleware --> User : checks account status
+AuthenticateMiddleware --> AuthController : authenticated request
+AuthController --> AuthService : changePassword()
+AuthService --> User : findById() / comparePassword() / save()
+User --> MongoDB : query / update
+MongoDB --> User : user data
+AuthController --> ChangePasswordPage : HTTP response
+ChangePasswordPage --> Account : result
+```
+
+## 3.6 Logout
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Account as User / Admin
+    participant FE as AppNavbar (FE)
+    participant Api as authService (FE)
+    participant AuthMW as authenticate Middleware
+    participant Model as User (Model)
+    participant DB as MongoDB
+    participant Ctrl as AuthController
+    participant Store as AuthStore (Zustand)
+
+    rect rgb(240,248,255)
+        Note over Account,Store: Logout from a stateless JWT session
+    end
+
+    Account->>FE: 1. Click "Logout"
+    FE->>Api: 2. logout()
+    Api->>AuthMW: 3. POST /api/v1/auth/logout with Bearer token
+    AuthMW->>AuthMW: 4. Verify access token
+    AuthMW->>Model: 5. findById(token.userId)
+    Model->>DB: 6. Query role and ban status
+    DB-->>Model: 7. User or null
+    Model-->>AuthMW: 8. Authentication data
+
+    alt Token and account are valid
+        AuthMW->>Ctrl: 9. Forward authenticated request
+        Note over Ctrl: No server-side token revocation is performed
+        Ctrl-->>Api: 10. 200 Logged out
+        Api-->>FE: 11. Request completed
+    else Authentication fails
+        AuthMW-->>Api: 12. 401 or 403
+        Api-->>FE: 13. Reject request
+    end
+
+    Note over FE,Store: finally block always clears local authentication
+    FE->>Store: 14. logout()
+    Store->>Store: 15. Clear user and both JWTs from persisted state
+    Store-->>FE: 16. Unauthenticated state
+    FE-->>Account: 17. Navigate to home page
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Account {
+    +logout()
+}
+
+class AppNavbar {
+    +handleLogout()
+}
+
+class AuthApiService {
+    +logout()
+}
+
+class AuthStore {
+    +User user
+    +String accessToken
+    +String refreshToken
+    +Boolean isAuthenticated
+    +logout()
+    +clearAuth()
+}
+
+class AuthenticateMiddleware {
+    +authenticate(req, res, next)
+}
+
+class AuthController {
+    +logout(req, res)
+}
+
+class JwtUtility {
+    +verifyAccessToken(token)
+}
+
+class User {
+    +ObjectId _id
+    +String role
+    +Boolean isBanned
+    +Date bannedUntil
+}
+
+class MongoDB
+
+Account --> AppNavbar : clicks logout
+AppNavbar --> AuthApiService : logout()
+AuthApiService --> AuthenticateMiddleware : POST /auth/logout
+AuthenticateMiddleware --> JwtUtility : verifies token
+AuthenticateMiddleware --> User : checks account
+User --> MongoDB : query
+MongoDB --> User : authentication data
+AuthenticateMiddleware --> AuthController : authenticated request
+AuthController --> AuthApiService : success response
+AppNavbar --> AuthStore : clears persisted session
+AppNavbar --> Account : redirects home
+```
+
+## 3.7 View Public Profile
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor Guest
+    participant FE as ProfilePage (FE)
+    participant Api as userService (FE)
+    participant Route as UserRoutes
+    participant Model as User (Model)
+    participant DB as MongoDB
+
+    rect rgb(240,248,255)
+        Note over Guest,DB: View a public user profile
+    end
+
+    Guest->>FE: 1. Open /profile/{userId}
+    FE->>Api: 2. getProfile(userId)
+    Api->>Route: 3. GET /api/v1/users/{userId}
+    Route->>Model: 4. findById(userId)
+    Model->>DB: 5. Query user
+    DB-->>Model: 6. User or null
+    Model-->>Route: 7. User or null
+
+    alt User not found
+        Route-->>Api: 8. 404 User not found
+        Api-->>FE: 9. Reject request
+        FE-->>Guest: 10. Display profile-not-found error
+    else User exists
+        Note over Model,Route: Fields marked select:false are omitted by Mongoose
+        Route-->>Api: 11. 200 Public user data
+        Api-->>FE: 12. User profile, stats, and ranking
+        FE->>FE: 13. Calculate presentation metrics
+        FE-->>Guest: 14. Display public profile
+    end
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+direction LR
+
+class Guest {
+    +viewPublicProfile(userId)
+}
+
+class ProfilePage {
+    +loadProfile(userId)
+    +getDisplayName(user)
+    +getWinRate(user)
+    +getAverageScore(user)
+    +renderProfile()
+}
+
+class UserApiService {
+    +getProfile(userId)
+}
+
+class UserRoutes {
+    +getPublicProfile(req, res)
+}
+
+class User {
+    +ObjectId _id
+    +String username
+    +String email
+    +String role
+    +String authProvider
+    +Boolean isEmailVerified
+    +Profile profile
+    +Stats stats
+    +Ranking ranking
+    +Date createdAt
+}
+
+class Profile {
+    +String displayName
+    +String avatar
+    +String bio
+    +String school
+    +String club
+}
+
+class Stats {
+    +Number totalDebates
+    +Number wins
+    +Number losses
+    +Number draws
+    +Number avgScore
+}
+
+class Ranking {
+    +Number elo
+    +String tier
+    +Number seasonPoints
+}
+
+class MongoDB
+
+Guest --> ProfilePage : opens profile URL
+ProfilePage --> UserApiService : getProfile()
+UserApiService --> UserRoutes : GET /users/{id}
+UserRoutes --> User : findById()
+User --> MongoDB : query
+MongoDB --> User : user data
+User *-- Profile
+User *-- Stats
+User *-- Ranking
+UserRoutes --> UserApiService : HTTP response
+UserApiService --> ProfilePage : profile data
+ProfilePage --> Guest : rendered public profile
+```
+
 ### Notes
 
 - `Login by Google` is listed separately because it extends `Login` in the Guest use case diagram.
