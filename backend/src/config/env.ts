@@ -13,7 +13,7 @@ export const ENV = {
     .split(',')
     .map((key) => key.trim())
     .filter(Boolean),
-  GEMINI_AGENT_MODEL: process.env.GEMINI_AGENT_MODEL || process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+  GEMINI_AGENT_MODEL: process.env.GEMINI_AGENT_MODEL || 'gemini-3.5-flash-lite',
   GEMINI_LIVE_MODEL: process.env.GEMINI_LIVE_MODEL || 'gemini-3.5-live-translate-preview',
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
   SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',

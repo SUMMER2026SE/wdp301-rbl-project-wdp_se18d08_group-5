@@ -244,6 +244,70 @@ export interface AIAnalysis {
   comments?: string;
 }
 
+export interface AIDebateRoundSideAnalysis {
+  speaker: string;
+  userId: string;
+  username: string;
+  speechScore: number;
+  crossExamScore: number;
+  transcriptConfidence: number;
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  fallacies: string[];
+}
+
+export interface AIDebateFinalAnalysis {
+  status: 'processing' | 'completed' | 'failed';
+  judgeMode: 'ai' | 'human';
+  affectsOfficialResult: boolean;
+  model: string;
+  sourceFingerprint: string;
+  generatedAt?: string;
+  error?: string;
+  transcriptStats?: {
+    participantCount: number;
+    segmentCount: number;
+    totalCharacters: number;
+    truncated: boolean;
+  };
+  transcriptQuality?: {
+    overallConfidence: number;
+    issues: string[];
+    notes: string;
+  };
+  summary?: string;
+  keyClashes?: string[];
+  teams?: Record<Team, {
+    score: number;
+    keyArguments: string[];
+    strengths: string[];
+    weaknesses: string[];
+  }>;
+  rounds?: Array<{
+    round: 1 | 2 | 3;
+    proposition: AIDebateRoundSideAnalysis;
+    opposition: AIDebateRoundSideAnalysis;
+  }>;
+  participants?: Array<{
+    userId: string;
+    username: string;
+    team: Team;
+    transcriptConfidence: number;
+    summary: string;
+    strengths: string[];
+    improvements: string[];
+  }>;
+  judgeSynthesis?: {
+    summary: string;
+    agreements: string[];
+    disagreements: string[];
+  };
+  recommendedWinner?: Team | 'draw';
+  officialWinner?: Team | 'draw' | null;
+  winnerReason?: string;
+}
+
 export interface TurnHistory {
   speaker: SpeakerTurn;
   startTime: string;
@@ -282,6 +346,7 @@ export interface FinalScores {
   aiVerdict: Team | 'draw' | null;
   judgeVerdicts?: JudgeVerdict[];
   drawRequests?: DrawRequest[];
+    resultSource?: 'judging' | 'surrender' | 'agreed_draw' | 'forfeit';
   aggregatePolicy?: {
     humanJudgeWeight: number;
     aiJudgeWeight: number;
@@ -354,6 +419,7 @@ export interface DebateSession {
   }[];
   finalScores: FinalScores | null;
   aiSummary: string | null;
+  aiDebateAnalysis?: AIDebateFinalAnalysis | null;
   pauseType?: 'host' | 'proposition' | 'opposition' | null;
   pausedAt?: string | null;
   pausesUsed?: {

@@ -10,6 +10,7 @@ import {
   checkStartMatchParticipantsAdapter,
   canPerformAdapter,
 } from './engine/adapter.js';
+import { generateFinalDebateAnalysis } from './final-analysis.service.js';
 
 // Re-export duration constants cho code cũ đang reference trực tiếp (backward-compat)
 const TRANSITION_MUTE_SECONDS = DEBATE_DURATIONS.TRANSITION_MUTE_SECONDS;
@@ -662,11 +663,37 @@ export async function triggerTransition(
         if (isNoHost) {
           // Auto-end the debate for no-host rooms
           (session.currentTurn as any).status = 'completed';
+          (session.currentTurn as any).phase = 'completed';
           (session.currentTurn as any).phaseStatus = 'completed';
           updatedRoom.status = 'completed';
+          updatedRoom.currentPhase = 'completed';
           updatedRoom.endedAt = new Date();
+          const aggregate = aggregateFinalScores(session, updatedRoom);
+          session.finalScores = {
+            ...(session.finalScores || {}),
+            ...aggregate,
+            resultSource: 'judging',
+          } as any;
+          session.markModified('finalScores');
           await Promise.all([session.save(), updatedRoom.save()]);
-          io?.to(roomId).emit('debate:ended', { roomId, isAuto: true });
+
+          if (updatedRoom.judgeType === 'ai') {
+            try {
+              await generateFinalDebateAnalysis(roomId);
+            } catch (error) {
+              console.error('AI final debate analysis failed during auto-complete:', error);
+            }
+          }
+
+          const completedSession = await DebateSession.findOne({ roomId: updatedRoom._id });
+          io?.to(roomId).emit('debate:ended', {
+            roomId,
+            isAuto: true,
+            result: {
+              winner: (completedSession?.finalScores as any)?.winner || null,
+              finalScores: completedSession?.finalScores || null,
+            },
+          });
           io?.emit('debate:ended', { roomId, isAuto: true });
           io?.emit('room:update', { action: 'completed', roomId });
           await applyDebateResult(roomId);
@@ -1106,7 +1133,13 @@ export async function finishCe(roomId: string, userId: string, transcript = '') 
   return endPhaseByHost(roomId, userId, transcript);
 }
 
-async function completeDebateWithWinner(room: any, session: any, winner: 'proposition' | 'opposition' | 'draw', summary: string) {
+async function completeDebateWithWinner(
+  room: any,
+  session: any,
+  winner: 'proposition' | 'opposition' | 'draw',
+  summary: string,
+  resultSource: 'surrender' | 'agreed_draw' | 'forfeit',
+) {
   session.finalScores = {
     ...(session.finalScores || {}),
     teamProposition: { total: winner === 'proposition' ? 100 : winner === 'draw' ? 50 : 0, breakdown: {} },
@@ -1115,6 +1148,7 @@ async function completeDebateWithWinner(room: any, session: any, winner: 'propos
     winnerTeam: winner,
     aiVerdict: (session.finalScores as any)?.aiVerdict || null,
     judgeVerdicts: (session.finalScores as any)?.judgeVerdicts || [],
+    resultSource,
   };
   session.aiSummary = summary;
   (session.currentTurn as any).status = 'completed';
@@ -1208,6 +1242,7 @@ async function endDebateInternal(
     ...aggregate,
     aiVerdict: (session.finalScores as any)?.aiVerdict || null,
     judgeVerdicts: verdicts,
+    resultSource: 'judging',
   };
   session.markModified('finalScores');
   session.aiSummary = summary || session.aiSummary;
@@ -1218,13 +1253,29 @@ async function endDebateInternal(
   room.endedAt = new Date();
   await Promise.all([session.save(), room.save()]);
 
+  let completedSession = session;
+  if (room.judgeType === 'ai') {
+    try {
+      await generateFinalDebateAnalysis(roomId);
+      completedSession = await DebateSession.findOne({ roomId: room._id }) || session;
+    } catch (error) {
+      console.error('AI final debate analysis failed while ending debate:', error);
+    }
+  }
+
   // Broadcast debate ended BEFORE applying ranking (so frontend can redirect)
-  io?.to(roomId).emit('debate:ended', { roomId, result: { winner: aggregate.winner, finalScores: aggregate } });
+  io?.to(roomId).emit('debate:ended', {
+    roomId,
+    result: {
+      winner: (completedSession.finalScores as any)?.winner || aggregate.winner,
+      finalScores: completedSession.finalScores || aggregate,
+    },
+  });
   io?.emit('debate:ended', { roomId });
   io?.emit('room:update', { action: 'completed', roomId });
 
   const ranking = await applyDebateResult(roomId);
-  return { room, session, ranking };
+  return { room, session: completedSession, ranking };
 }
 
 function getDebaterOrThrow(room: any, userId: string) {
@@ -1251,7 +1302,13 @@ export async function surrenderDebate(roomId: string, userId: string): Promise<a
   const winner = participant.team === 'proposition' ? 'opposition' : 'proposition';
   const session = await DebateSession.findOne({ roomId: room._id });
   if (!session) throw new NotFoundError('Session not found');
-  return completeDebateWithWinner(room, session, winner, `${participant.username} surrendered. ${winner} wins.`);
+  return completeDebateWithWinner(
+    room,
+    session,
+    winner,
+    `${participant.username} surrendered. ${winner} wins.`,
+    'surrender',
+  );
 }
 
 export async function requestDraw(roomId: string, userId: string): Promise<any> {
@@ -1272,7 +1329,13 @@ export async function requestDraw(roomId: string, userId: string): Promise<any> 
     oppositeRequest.acceptedBy = participant.userId;
     oppositeRequest.acceptedAt = new Date();
     session.finalScores = finalScores;
-    return completeDebateWithWinner(room, session, 'draw', 'Both teams agreed to a draw.');
+    return completeDebateWithWinner(
+      room,
+      session,
+      'draw',
+      'Both teams agreed to a draw.',
+      'agreed_draw',
+    );
   }
   const existingRequest = drawRequests.find((r: any) => r.status === 'pending' && r.team === participant.team);
   if (!existingRequest) {

@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export type TranscriptRole = 'host' | 'debater' | 'judge' | 'viewer' | 'owner';
 export type TranscriptTeam = 'proposition' | 'opposition';
 export type TranscriptSource = 'gemini-live' | 'native-client';
+export type DebateAnalysisStatus = 'processing' | 'completed' | 'failed';
+export type DebateAnalysisWinner = 'proposition' | 'opposition' | 'draw';
 
 export interface ISpeechTranscript {
   roomId: mongoose.Types.ObjectId;
@@ -26,6 +28,87 @@ export interface ISpeechTranscript {
   startedAt?: Date;
   updatedAt: Date;
   createdAt: Date;
+}
+
+export interface IAIDebateAnalysis {
+  status: DebateAnalysisStatus;
+  judgeMode: 'ai' | 'human';
+  affectsOfficialResult: boolean;
+  model: string;
+  sourceFingerprint: string;
+  generatedAt?: Date;
+  error?: string;
+  transcriptStats?: {
+    participantCount: number;
+    segmentCount: number;
+    totalCharacters: number;
+    truncated: boolean;
+  };
+  transcriptQuality?: {
+    overallConfidence: number;
+    issues: string[];
+    notes: string;
+  };
+  summary?: string;
+  keyClashes?: string[];
+  teams?: {
+    proposition: {
+      score: number;
+      keyArguments: string[];
+      strengths: string[];
+      weaknesses: string[];
+    };
+    opposition: {
+      score: number;
+      keyArguments: string[];
+      strengths: string[];
+      weaknesses: string[];
+    };
+  };
+  rounds?: Array<{
+    round: 1 | 2 | 3;
+    proposition: {
+      speaker: string;
+      userId: string;
+      username: string;
+      speechScore: number;
+      crossExamScore: number;
+      transcriptConfidence: number;
+      summary: string;
+      strengths: string[];
+      improvements: string[];
+      fallacies: string[];
+    };
+    opposition: {
+      speaker: string;
+      userId: string;
+      username: string;
+      speechScore: number;
+      crossExamScore: number;
+      transcriptConfidence: number;
+      summary: string;
+      strengths: string[];
+      improvements: string[];
+      fallacies: string[];
+    };
+  }>;
+  participants?: Array<{
+    userId: string;
+    username: string;
+    team: TranscriptTeam;
+    transcriptConfidence: number;
+    summary: string;
+    strengths: string[];
+    improvements: string[];
+  }>;
+  judgeSynthesis?: {
+    summary: string;
+    agreements: string[];
+    disagreements: string[];
+  };
+  recommendedWinner?: DebateAnalysisWinner;
+  officialWinner?: DebateAnalysisWinner | null;
+  winnerReason?: string;
 }
 
 export interface IDebateSession extends Document {
@@ -97,15 +180,20 @@ export interface IDebateSession extends Document {
     winner: string | null;
     aiVerdict: string | null;
     judgeVerdicts: Array<{
-      judgeId: mongoose.Types.ObjectId;
+      judgeId: mongoose.Types.ObjectId | null;
+      judgeName?: string;
       winner?: string;
       speaker?: string;
       score?: any;
       notes: string;
+      source?: 'ai' | 'human';
+      round?: number;
       submittedAt: Date;
     }>;
+    resultSource?: 'judging' | 'surrender' | 'agreed_draw' | 'forfeit';
   } | null;
   aiSummary: string | null;
+  aiDebateAnalysis: IAIDebateAnalysis | null;
   createdAt: Date;
 }
 
@@ -203,6 +291,7 @@ const debateSessionSchema = new Schema<IDebateSession>(
       default: null,
     },
     aiSummary: { type: String, default: null },
+    aiDebateAnalysis: { type: Schema.Types.Mixed, default: null },
   },
   {
     timestamps: true,

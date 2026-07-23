@@ -223,6 +223,7 @@ async function handleForfeit(roomId: string, forfeitingTeam: 'proposition' | 'op
       session,
       winner as 'proposition' | 'opposition' | 'draw',
       `Forfeit: ${forfeitingTeam} team disconnected. ${winnerLabel} wins by forfeit.`,
+      'forfeit',
     );
 
     // completeDebateWithWinner now applies ELO internally

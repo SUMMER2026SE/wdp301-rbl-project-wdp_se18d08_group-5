@@ -1,5 +1,5 @@
 import api from './api';
-import type { ApiResponse, DebateSession } from '@/types';
+import type { AIDebateFinalAnalysis, ApiResponse, DebateSession } from '@/types';
 
 export interface DebateControlResult {
   room?: unknown;
@@ -79,5 +79,13 @@ export const debateService = {
 
   getReplay(roomId: string) {
     return api.get<ApiResponse<{ room: unknown; session: DebateSession }>>(`/debate/${roomId}/replay`);
+  },
+
+  generateFinalAnalysis(roomId: string) {
+    return api.post<ApiResponse<{
+      analysis: AIDebateFinalAnalysis;
+      aiSummary: string | null;
+      finalScores: DebateSession['finalScores'];
+    }>>(`/debate/${roomId}/final-analysis`);
   },
 };

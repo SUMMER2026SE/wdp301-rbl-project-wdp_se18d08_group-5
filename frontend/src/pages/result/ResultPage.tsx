@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { debateService } from '@services/debateService';
 import { useSocket } from '@hooks/useSocket';
 import { clearDebateRoomFromStorage } from '@components/common/ReturnToDebateBanner';
+import type { AIDebateFinalAnalysis, Team } from '@/types';
 
 // Import CSS
 import '../../styles/result.css';
@@ -35,6 +36,25 @@ export default function ResultPage() {
     refetchInterval: 3000,
   });
 
+  const replayRoom = resultQuery.data?.room as { status?: string } | undefined;
+  const replayAnalysis = resultQuery.data?.session.aiDebateAnalysis;
+  const finalAnalysisQuery = useQuery({
+    queryKey: ['final-analysis', sessionId],
+    queryFn: async () => (await debateService.generateFinalAnalysis(sessionId)).data.data,
+    enabled: Boolean(
+      sessionId
+      && replayRoom?.status === 'completed'
+      && replayAnalysis?.status !== 'completed',
+    ),
+    retry: 1,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+  useEffect(() => {
+    if (!finalAnalysisQuery.data) return;
+    void queryClient.invalidateQueries({ queryKey: ['result', sessionId] });
+  }, [finalAnalysisQuery.data, queryClient, sessionId]);
+
   useEffect(() => {
     if (!socket) return;
     const handleUpdate = () => queryClient.invalidateQueries({ queryKey: ['result', sessionId] });
@@ -42,11 +62,13 @@ export default function ResultPage() {
     socket.on('score:aggregate-updated', handleUpdate);
     socket.on('score:winner-determined', handleUpdate);
     socket.on('debate:ended', handleUpdate);
+    socket.on('debate:final-analysis-ready', handleUpdate);
     return () => {
       socket.off('score:updated', handleUpdate);
       socket.off('score:aggregate-updated', handleUpdate);
       socket.off('score:winner-determined', handleUpdate);
-      socket.off('score:debate:ended', handleUpdate);
+      socket.off('debate:ended', handleUpdate);
+      socket.off('debate:final-analysis-ready', handleUpdate);
     };
   }, [sessionId, queryClient, socket]);
 
@@ -76,12 +98,14 @@ export default function ResultPage() {
   const room = resultQuery.data.room as any;
   const participants = room?.participants || [];
   const verdicts = session.finalScores?.judgeVerdicts || [];
+  const finalAnalysis = finalAnalysisQuery.data?.analysis || session.aiDebateAnalysis || null;
 
   // Detect round-based scoring
   const isRoundBased = verdicts.some((v: any) => v.round !== undefined);
 
   // Get unique judges
-  const judgeIds = Array.from(new Set(verdicts.map((v: any) => v.judgeId?.toString()).filter(Boolean)));
+  const verdictJudgeKey = (verdict: any) => verdict.judgeId?.toString() || (verdict.source === 'ai' ? 'ai' : null);
+  const judgeIds = Array.from(new Set(verdicts.map(verdictJudgeKey).filter(Boolean)));
 
   // Per-round per-team averages (round-based only)
   const roundTeamScores = ROUNDS.map(({ num, propSpeaker, oppSpeaker }) => {
@@ -275,8 +299,8 @@ export default function ResultPage() {
                         ) : (
                           <div className="d-flex flex-column gap-3">
                             {judgeIds.map((jId) => {
-                              const propV = propVerdicts.find((v: any) => v.judgeId?.toString() === jId);
-                              const oppV = oppVerdicts.find((v: any) => v.judgeId?.toString() === jId);
+                              const propV = propVerdicts.find((v: any) => verdictJudgeKey(v) === jId);
+                              const oppV = oppVerdicts.find((v: any) => verdictJudgeKey(v) === jId);
                               const judgeName = propV?.judgeName || oppV?.judgeName || 'Judge';
                               const hasProp = Boolean(propV);
                               const hasOpp = Boolean(oppV);
@@ -367,7 +391,191 @@ export default function ResultPage() {
             </Card>
           </Col>
         </Row>
+        <FinalAnalysisPanel
+          analysis={finalAnalysis}
+          isLoading={finalAnalysisQuery.isLoading || finalAnalysis?.status === 'processing'}
+          error={finalAnalysisQuery.isError ? finalAnalysisQuery.error : null}
+          onRetry={() => void finalAnalysisQuery.refetch()}
+        />
       </Container>
     </div>
+  );
+}
+
+function AnalysisList({ items }: { items?: string[] }) {
+  if (!items?.length) return <span className="text-muted small">No notable items.</span>;
+  return (
+    <ul className="result-analysis-list">
+      {items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+    </ul>
+  );
+}
+
+function TeamAnalysis({
+  team,
+  analysis,
+}: {
+  team: Team;
+  analysis: NonNullable<AIDebateFinalAnalysis['teams']>[Team];
+}) {
+  const { t } = useTranslation('result');
+  return (
+    <section className={`result-analysis-team team-${team}`}>
+      <header>
+        <strong>{team === 'proposition' ? t('proposition') : t('opposition')}</strong>
+        <span>{analysis.score}/100</span>
+      </header>
+      <h6>{t('aiKeyArguments')}</h6>
+      <AnalysisList items={analysis.keyArguments} />
+      <div className="result-analysis-team-columns">
+        <div><h6>{t('aiStrengths')}</h6><AnalysisList items={analysis.strengths} /></div>
+        <div><h6>{t('aiWeaknesses')}</h6><AnalysisList items={analysis.weaknesses} /></div>
+      </div>
+    </section>
+  );
+}
+
+function FinalAnalysisPanel({
+  analysis,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  analysis: AIDebateFinalAnalysis | null;
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation('result');
+
+  return (
+    <Card className="result-premium-card result-ai-analysis mt-4">
+      <Card.Body className="p-4">
+        <div className="result-analysis-header">
+          <div>
+            <span>{t('aiDetailedAnalysis')}</span>
+            <h2>{t('aiDebateReview')}</h2>
+          </div>
+          {analysis?.judgeMode && (
+            <Badge bg={analysis.affectsOfficialResult ? 'info' : 'secondary'}>
+              {analysis.affectsOfficialResult ? t('officialAiJudge') : t('advisoryAiAnalysis')}
+            </Badge>
+          )}
+        </div>
+
+        {isLoading && !analysis?.summary && (
+          <div className="result-analysis-loading">
+            <Spinner animation="border" variant="info" size="sm" />
+            <span>{t('aiAnalysisProcessing')}</span>
+          </div>
+        )}
+
+        {Boolean(error) && analysis?.status !== 'completed' && (
+          <Alert variant="warning" className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span>{t('aiAnalysisFailed')}</span>
+            <Button size="sm" variant="outline-warning" onClick={onRetry}>{t('retryAnalysis')}</Button>
+          </Alert>
+        )}
+
+        {analysis?.status === 'completed' && (
+          <>
+            {!analysis.affectsOfficialResult && (
+              <Alert variant="info" className="result-analysis-policy">
+                {t('humanJudgePolicy')}
+              </Alert>
+            )}
+
+            <div className="result-analysis-summary">
+              <p>{analysis.summary}</p>
+              {analysis.winnerReason && <small>{analysis.winnerReason}</small>}
+            </div>
+
+            {analysis.transcriptQuality && (
+              <section className="result-transcript-quality">
+                <div>
+                  <strong>{t('transcriptConfidence')}</strong>
+                  <span>{Math.round(analysis.transcriptQuality.overallConfidence * 100)}%</span>
+                </div>
+                <ProgressBar now={analysis.transcriptQuality.overallConfidence * 100} />
+                {analysis.transcriptQuality.notes && <p>{analysis.transcriptQuality.notes}</p>}
+                <AnalysisList items={analysis.transcriptQuality.issues} />
+              </section>
+            )}
+
+            {analysis.keyClashes && analysis.keyClashes.length > 0 && (
+              <section className="result-analysis-clashes">
+                <h3>{t('keyClashes')}</h3>
+                <AnalysisList items={analysis.keyClashes} />
+              </section>
+            )}
+
+            {analysis.teams && (
+              <div className="result-analysis-teams">
+                <TeamAnalysis team="proposition" analysis={analysis.teams.proposition} />
+                <TeamAnalysis team="opposition" analysis={analysis.teams.opposition} />
+              </div>
+            )}
+
+            {analysis.rounds && analysis.rounds.length > 0 && (
+              <section className="result-analysis-rounds">
+                <h3>{t('roundAnalysis')}</h3>
+                {analysis.rounds.map((round) => (
+                  <article key={round.round}>
+                    <header><strong>{t('round', { num: round.round })}</strong></header>
+                    {(['proposition', 'opposition'] as const).map((team) => {
+                      const side = round[team];
+                      return (
+                        <div className={`round-analysis-side team-${team}`} key={team}>
+                          <div>
+                            <strong>{side.username}</strong>
+                            <small>{side.speaker}</small>
+                          </div>
+                          <p>{side.summary}</p>
+                          <span>{t('speech')} {side.speechScore}/20</span>
+                          <span>{t('ce')} {side.crossExamScore}/20</span>
+                          <span>{Math.round(side.transcriptConfidence * 100)}% {t('confidence')}</span>
+                        </div>
+                      );
+                    })}
+                  </article>
+                ))}
+              </section>
+            )}
+
+            {analysis.participants && analysis.participants.length > 0 && (
+              <section className="result-participant-insights">
+                <h3>{t('participantInsights')}</h3>
+                <div>
+                  {analysis.participants.map((participant) => (
+                    <article className={`team-${participant.team}`} key={participant.userId}>
+                      <header>
+                        <strong>{participant.username}</strong>
+                        <span>{Math.round(participant.transcriptConfidence * 100)}%</span>
+                      </header>
+                      <p>{participant.summary}</p>
+                      <h6>{t('aiStrengths')}</h6>
+                      <AnalysisList items={participant.strengths} />
+                      <h6>{t('improvements')}</h6>
+                      <AnalysisList items={participant.improvements} />
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {analysis.judgeSynthesis?.summary && (
+              <section className="result-judge-synthesis">
+                <h3>{t('judgeSynthesis')}</h3>
+                <p>{analysis.judgeSynthesis.summary}</p>
+                <div>
+                  <div><h6>{t('agreements')}</h6><AnalysisList items={analysis.judgeSynthesis.agreements} /></div>
+                  <div><h6>{t('disagreements')}</h6><AnalysisList items={analysis.judgeSynthesis.disagreements} /></div>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </Card.Body>
+    </Card>
   );
 }
