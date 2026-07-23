@@ -99,8 +99,19 @@ function encodePcm16ToBase64(input: Float32Array, inputSampleRate: number) {
   const output = new Int16Array(outputLength);
 
   for (let index = 0; index < outputLength; index += 1) {
-    const sourceIndex = Math.min(Math.floor(index * ratio), input.length - 1);
-    const sample = Math.max(-1, Math.min(1, input[sourceIndex] || 0));
+    const sourceStart = Math.min(Math.floor(index * ratio), input.length - 1);
+    const sourceEnd = Math.min(
+      Math.max(sourceStart + 1, Math.floor((index + 1) * ratio)),
+      input.length,
+    );
+    let sum = 0;
+    for (let sourceIndex = sourceStart; sourceIndex < sourceEnd; sourceIndex += 1) {
+      sum += input[sourceIndex] || 0;
+    }
+    // Averaging the source window acts as a small anti-aliasing filter. The
+    // previous nearest-sample conversion discarded most 48 kHz microphone
+    // data and noticeably reduced recognition accuracy after downsampling.
+    const sample = Math.max(-1, Math.min(1, sum / Math.max(1, sourceEnd - sourceStart)));
     output[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
   }
 
@@ -445,6 +456,8 @@ export function MicToggle({ roomId, disabled = false }: MicToggleProps) {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 16_000,
         },
         video: false,
       });

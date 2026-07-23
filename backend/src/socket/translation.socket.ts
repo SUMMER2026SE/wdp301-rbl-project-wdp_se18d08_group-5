@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { ENV } from '../config/env.js';
 import { DebateRoom } from '../models/DebateRoom.js';
+import { DebateSession } from '../models/DebateSession.js';
 import {
   mergeTranscriptText,
   persistSourceCaption,
@@ -52,6 +53,9 @@ type TranslationSession = {
   roomId: string;
   userId: string;
   senderName: string;
+  motion: string;
+  currentSpeaker: string;
+  currentPhase: string;
   connections: LiveConnection[];
   hasReceivedAudio: boolean;
   pendingSourceCaption?: {
@@ -66,6 +70,20 @@ const sessionsBySocketId = new Map<string, TranslationSession>();
 const MAX_AUDIO_CHUNK_CHARS = 32_000;
 const MAX_QUEUED_CHUNKS = 16;
 const TRANSCRIPT_PERSIST_DEBOUNCE_MS = 750;
+
+function buildTranscriptionInstruction(session: TranslationSession) {
+  const motion = session.motion.slice(0, 600) || 'No motion provided';
+  return `Accurately transcribe a live academic debate in Vietnamese or English.
+Debate motion: ${motion}
+Current phase: ${session.currentPhase || 'unknown'}
+Current speaker code: ${session.currentSpeaker || 'unknown'}
+Participant: ${session.senderName}
+
+Preserve argument meaning, negation, numbers, proper nouns, English terms used inside Vietnamese,
+and debate terminology. Use surrounding sentence context to resolve homophones. Do not invent words,
+translate the input transcript, summarize, or add commentary. Ignore background voices when the main
+speaker is clearer. Output transcription in the language actually spoken.`;
+}
 
 function getSocketUserId(socket: Socket) {
   return (socket as unknown as { userId: string }).userId;
@@ -222,6 +240,9 @@ function createLiveConnection(
     liveSocket.send(JSON.stringify({
       setup: {
         model: `models/${ENV.GEMINI_LIVE_MODEL}`,
+        system_instruction: {
+          parts: [{ text: buildTranscriptionInstruction(session) }],
+        },
         generation_config: {
           response_modalities: ['AUDIO'],
           translation_config: {
@@ -320,6 +341,9 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         roomId,
         userId,
         senderName: participant.username,
+        motion: '',
+        currentSpeaker: 'UNKNOWN',
+        currentPhase: 'unknown',
         connections: [],
         hasReceivedAudio: false,
         persistenceChain: Promise.resolve(),
@@ -364,7 +388,10 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
     }
 
     try {
-      const room = await DebateRoom.findById(roomId).select('participants');
+      const [room, debateSession] = await Promise.all([
+        DebateRoom.findById(roomId).select('participants motion'),
+        DebateSession.findOne({ roomId }).select('currentTurn'),
+      ]);
       const participant = room?.participants.find((entry) => entry.userId.toString() === userId);
       if (!participant) {
         ack?.({ success: false, message: 'You are not a participant in this debate room' });
@@ -376,6 +403,9 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         roomId,
         userId,
         senderName: participant.username,
+        motion: room?.motion || '',
+        currentSpeaker: debateSession?.currentTurn?.speaker || 'UNKNOWN',
+        currentPhase: debateSession?.currentTurn?.phase || 'unknown',
         connections: [],
         hasReceivedAudio: false,
         persistenceChain: Promise.resolve(),

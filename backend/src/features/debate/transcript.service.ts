@@ -10,6 +10,7 @@ import {
 } from '../../models/DebateSession.js';
 
 const MAX_TRANSCRIPT_LENGTH = 50_000;
+export const MAX_FINAL_ANALYSIS_CHARACTERS = 650_000;
 
 type TranscriptParticipant = {
   userId: mongoose.Types.ObjectId;
@@ -38,6 +39,41 @@ export type StructuredTranscript = {
   transcript: string;
 };
 
+export type FinalAnalysisTranscriptSegment = {
+  segmentKey: string;
+  round: 0 | 1 | 2 | 3;
+  phase: string;
+  speaker: string;
+  userId: string;
+  username: string;
+  team?: TranscriptTeam;
+  speakerSlot?: 'S1' | 'S2' | 'S3';
+  language: string;
+  text: string;
+  source: TranscriptSource | 'turn-history';
+};
+
+export type FinalAnalysisTranscriptBundle = {
+  participants: Array<{
+    userId: string;
+    username: string;
+    team: TranscriptTeam;
+    speakerSlot?: 'S1' | 'S2' | 'S3';
+  }>;
+  expectedRounds: Array<{
+    round: 1 | 2 | 3;
+    proposition: { speaker: string; userId: string; username: string };
+    opposition: { speaker: string; userId: string; username: string };
+  }>;
+  segments: FinalAnalysisTranscriptSegment[];
+  stats: {
+    participantCount: number;
+    segmentCount: number;
+    totalCharacters: number;
+    truncated: boolean;
+  };
+};
+
 export function mergeTranscriptText(existing: string | undefined, incoming: string): string {
   const current = existing?.trim() || '';
   const next = incoming.trim();
@@ -58,7 +94,7 @@ export function mergeTranscriptText(existing: string | undefined, incoming: stri
 
 export function detectTranscriptRound(turn?: CurrentTurnLike): 0 | 1 | 2 | 3 {
   const value = `${turn?.speaker || ''} ${turn?.phase || ''}`;
-  const match = value.match(/(?:S|ROUND_|FB_)([123])\b/i);
+  const match = value.match(/(?:S|ROUND_|FB_|CROSS_EXAM_)([123])\b/i);
   if (!match) return 0;
   return Number(match[1]) as 1 | 2 | 3;
 }
@@ -163,6 +199,144 @@ export function buildStructuredRoundTranscripts(
   }
 
   return Array.from(grouped.values());
+}
+
+function effectiveParticipantRole(participant: IDebateRoom['participants'][number]) {
+  return participant.roomRole === 'owner'
+    ? participant.primaryRole || 'owner'
+    : participant.roomRole;
+}
+
+function expectedRoundParticipant(
+  room: Pick<IDebateRoom, 'format' | 'participants'>,
+  team: TranscriptTeam,
+  round: 1 | 2 | 3,
+) {
+  const debaters = room.participants.filter((participant) =>
+    effectiveParticipantRole(participant) === 'debater' && participant.team === team,
+  );
+  if (room.format === '1v1') return debaters[0];
+  return debaters.find((participant) => participant.speakerSlot === `S${round}`) || debaters[round - 1];
+}
+
+function appendWithinLimit(
+  segments: FinalAnalysisTranscriptSegment[],
+  segment: FinalAnalysisTranscriptSegment,
+  state: { used: number; total: number; truncated: boolean },
+  maxCharacters: number,
+) {
+  const text = segment.text.trim();
+  if (!text) return;
+  state.total += text.length;
+  const remaining = Math.max(0, maxCharacters - state.used);
+  if (remaining === 0) {
+    state.truncated = true;
+    return;
+  }
+  const accepted = text.slice(0, remaining);
+  if (accepted.length < text.length) state.truncated = true;
+  segments.push({ ...segment, text: accepted });
+  state.used += accepted.length;
+}
+
+export function buildFinalAnalysisTranscriptBundle(
+  room: Pick<IDebateRoom, 'format' | 'participants'>,
+  session: Pick<IDebateSession, 'speechTranscripts' | 'turnHistory'>,
+  maxCharacters = MAX_FINAL_ANALYSIS_CHARACTERS,
+): FinalAnalysisTranscriptBundle {
+  const participants = room.participants
+    .filter((participant) =>
+      effectiveParticipantRole(participant) === 'debater'
+      && (participant.team === 'proposition' || participant.team === 'opposition'),
+    )
+    .map((participant) => ({
+      userId: participant.userId.toString(),
+      username: participant.username,
+      team: participant.team as TranscriptTeam,
+      speakerSlot: participant.speakerSlot === 'S1' || participant.speakerSlot === 'S2' || participant.speakerSlot === 'S3'
+        ? participant.speakerSlot as 'S1' | 'S2' | 'S3'
+        : undefined,
+    }));
+
+  const expectedRounds = ([1, 2, 3] as const).map((round) => {
+    const proposition = expectedRoundParticipant(room, 'proposition', round);
+    const opposition = expectedRoundParticipant(room, 'opposition', round);
+    return {
+      round,
+      proposition: {
+        speaker: `PRO_S${round}`,
+        userId: proposition?.userId.toString() || '',
+        username: proposition?.username || `Proposition S${round}`,
+      },
+      opposition: {
+        speaker: `OPP_S${round}`,
+        userId: opposition?.userId.toString() || '',
+        username: opposition?.username || `Opposition S${round}`,
+      },
+    };
+  });
+
+  const segments: FinalAnalysisTranscriptSegment[] = [];
+  const state = { used: 0, total: 0, truncated: false };
+  const sortedTranscripts = [...(session.speechTranscripts || [])].sort(
+    (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+  );
+
+  for (const entry of sortedTranscripts) {
+    if (entry.role !== 'debater') continue;
+    if (entry.phase === 'speech' && !entry.isActiveSpeaker) continue;
+    if (entry.phase !== 'speech' && entry.phase !== 'cross_exam') continue;
+    appendWithinLimit(segments, {
+      segmentKey: entry.segmentKey,
+      round: entry.round,
+      phase: entry.phase,
+      speaker: entry.speaker,
+      userId: entry.userId.toString(),
+      username: entry.username,
+      team: entry.team,
+      speakerSlot: entry.speakerSlot,
+      language: entry.language,
+      text: entry.originalText,
+      source: entry.source,
+    }, state, maxCharacters);
+  }
+
+  for (const [index, turn] of (session.turnHistory || []).entries()) {
+    const text = turn.transcript?.trim();
+    if (!text) continue;
+    const phase = turn.crossExamination ? 'cross_exam' : 'speech';
+    const alreadyCaptured = segments.some((segment) =>
+      segment.speaker === turn.speaker && segment.phase === phase,
+    );
+    if (alreadyCaptured) continue;
+    const round = detectTranscriptRound({ speaker: turn.speaker, phase });
+    const expected = expectedRounds.find((item) => item.round === round);
+    const side = turn.speaker.startsWith('PRO_') ? expected?.proposition : expected?.opposition;
+    appendWithinLimit(segments, {
+      segmentKey: `turn-history:${index}:${turn.speaker}`,
+      round,
+      phase,
+      speaker: turn.speaker,
+      userId: side?.userId || '',
+      username: side?.username || turn.speaker,
+      team: turn.speaker.startsWith('PRO_') ? 'proposition' : turn.speaker.startsWith('OPP_') ? 'opposition' : undefined,
+      language: 'und',
+      text,
+      source: 'turn-history',
+    }, state, maxCharacters);
+  }
+
+  return {
+    participants,
+    expectedRounds,
+    segments,
+    stats: {
+      participantCount: participants.length,
+      segmentCount: segments.length,
+      totalCharacters: state.total,
+      truncated: state.truncated,
+    },
+  };
 }
 
 export function shouldUseTranscriptForAI(judgeType: string): boolean {

@@ -8,6 +8,16 @@ type AIMessage = {
   content: string;
 };
 
+export type FinalDebateAIRequest = {
+  roomId: string;
+  motion: string;
+  format: '1v1' | '3v3';
+  judgeMode: 'ai' | 'human';
+  officialWinner: 'proposition' | 'opposition' | 'draw' | null;
+  transcriptBundle: unknown;
+  judgeVerdicts: unknown[];
+};
+
 export class AIService {
   private geminiAgentKeyIndex = 0;
 
@@ -88,6 +98,83 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
     }
   }
 
+  async analyzeFinalDebate(input: FinalDebateAIRequest): Promise<Record<string, unknown> | null> {
+    const resultPolicy = input.judgeMode === 'ai'
+      ? `You are the OFFICIAL AI judge. Score all six round-side entries, calculate both team totals,
+and recommend proposition, opposition, or draw. The winner must follow the total score. Existing
+AI turn verdicts are supporting context, not a substitute for reviewing the complete transcript.`
+      : `Human judges are authoritative. Do NOT replace, recalculate, or challenge the official winner
+(${input.officialWinner || 'pending'}). Use judge verdicts as evidence, explain where the transcript
+supports their feedback, and provide advisory observations only.`;
+
+    const systemPrompt = `You are a senior bilingual Vietnamese-English debate adjudicator analyzing a completed debate.
+${resultPolicy}
+
+The speech-to-text transcript is noisy. Correct only obvious recognition errors when the motion,
+sentence context, speaker side, or repeated phrasing makes the intended wording clear. Never invent
+claims, evidence, examples, or concessions that are absent. Lower transcriptConfidence when meaning
+is uncertain, fragmented, duplicated, or missing. Evaluate the intended argument only when supported
+by the captured words.
+
+Scoring policy for every round and side:
+- speechScore: integer 0-20.
+- crossExamScore: integer 0-20 for rounds 1 and 2; exactly 0 for round 3.
+- Each team total is the sum of its three speech scores and first two cross-exam scores (0-100).
+- Base scores on argument relevance, reasoning, rebuttal, evidence use, responsiveness, strategy,
+  and communication. Do not reward transcript length by itself.
+
+Return valid JSON only with this exact top-level shape:
+{
+  "summary": "Vietnamese final summary",
+  "keyClashes": ["..."],
+  "transcriptQuality": {
+    "overallConfidence": 0.0,
+    "issues": ["..."],
+    "notes": "Vietnamese note about ASR quality and conservative corrections"
+  },
+  "teams": {
+    "proposition": { "score": 0, "keyArguments": ["..."], "strengths": ["..."], "weaknesses": ["..."] },
+    "opposition": { "score": 0, "keyArguments": ["..."], "strengths": ["..."], "weaknesses": ["..."] }
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "proposition": {
+        "speaker": "PRO_S1", "userId": "", "username": "", "speechScore": 0,
+        "crossExamScore": 0, "transcriptConfidence": 0.0, "summary": "",
+        "strengths": ["..."], "improvements": ["..."], "fallacies": ["..."]
+      },
+      "opposition": {
+        "speaker": "OPP_S1", "userId": "", "username": "", "speechScore": 0,
+        "crossExamScore": 0, "transcriptConfidence": 0.0, "summary": "",
+        "strengths": ["..."], "improvements": ["..."], "fallacies": ["..."]
+      }
+    }
+  ],
+  "participants": [
+    {
+      "userId": "", "username": "", "team": "proposition", "transcriptConfidence": 0.0,
+      "summary": "", "strengths": ["..."], "improvements": ["..."]
+    }
+  ],
+  "judgeSynthesis": { "summary": "", "agreements": ["..."], "disagreements": ["..."] },
+  "recommendedWinner": "proposition",
+  "winnerReason": "Vietnamese explanation"
+}
+
+Include exactly rounds 1, 2, and 3. Preserve the provided userId, username, speaker, and team values.
+For human-judge mode, recommendedWinner must equal the supplied officialWinner when it is available.`;
+
+    return this.generateJSON<Record<string, unknown> | null>(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: JSON.stringify(input) },
+      ],
+      0.15,
+      null,
+    );
+  }
+
   /**
    * Summarize entire debate.
    */
@@ -153,7 +240,9 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
   }
 
   private async generateAIContent(messages: AIMessage[], temperature: number, jsonMode: boolean) {
-    if (ENV.GEMINI_AGENT_API_KEYS.length || ENV.GEMINI_API_KEY) {
+    // Agent workloads use their own key pool. GEMINI_API_KEY is reserved for
+    // Gemini Live translation/STT so scoring cannot consume its quota.
+    if (ENV.GEMINI_AGENT_API_KEYS.length) {
       try {
         return await this.generateGeminiContent(messages, temperature, jsonMode);
       } catch (error) {
@@ -197,9 +286,7 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
 
     // AI Judge uses its own ordered key pool. When a key has exhausted its
     // quota, subsequent requests begin with the next key in the list.
-    const apiKeys = ENV.GEMINI_AGENT_API_KEYS.length
-      ? ENV.GEMINI_AGENT_API_KEYS
-      : [ENV.GEMINI_API_KEY];
+    const apiKeys = ENV.GEMINI_AGENT_API_KEYS;
     let lastQuotaError: Error | null = null;
     const startingKeyIndex = this.geminiAgentKeyIndex;
 
@@ -223,7 +310,9 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
             },
           ],
           generationConfig: {
-            temperature,
+            // Gemini 3.5+ deprecates sampling parameters and may reject them.
+            ...(/^gemini-3\.[5-9]/.test(ENV.GEMINI_AGENT_MODEL) ? {} : { temperature }),
+            maxOutputTokens: 8192,
             responseMimeType: jsonMode ? 'application/json' : 'text/plain',
           },
         }),

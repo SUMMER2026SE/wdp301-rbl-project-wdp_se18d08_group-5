@@ -22,6 +22,7 @@ import {
 import { aggregateFinalScores } from '../../utils/scoring.js';
 import { hasControlPanel } from '../../utils/roomPermissions.js';
 import type { AuthRequest } from '../../types/index.js';
+import { generateFinalDebateAnalysis } from './final-analysis.service.js';
 
 const router = Router();
 
@@ -701,6 +702,35 @@ router.get(
   }),
 );
 
+// POST /api/v1/debate/:roomId/final-analysis — Build the completed debate report
+router.post(
+  '/:roomId/final-analysis',
+  authenticate,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await DebateRoom.findById(req.params.roomId).select('participants status');
+    if (!room) throw new NotFoundError('Room not found');
+    if (room.status !== 'completed') {
+      throw new BadRequestError('Final analysis is only available after the debate is completed');
+    }
+
+    const isParticipant = room.participants.some(
+      (participant) => participant.userId.toString() === req.user!.userId,
+    );
+    if (!isParticipant && req.user!.role !== 'admin') {
+      throw new ForbiddenError('Only debate participants or admins can generate this analysis');
+    }
+
+    const analysis = await generateFinalDebateAnalysis(req.params.roomId);
+    const session = await DebateSession.findOne({ roomId: req.params.roomId })
+      .select('aiDebateAnalysis aiSummary finalScores');
+    sendSuccess(res, {
+      analysis,
+      aiSummary: session?.aiSummary || null,
+      finalScores: session?.finalScores || null,
+    }, 'Final debate analysis ready');
+  }),
+);
+
 // GET /api/v1/debate/:roomId/replay — Get replay data (UC-66)
 router.get(
   '/:roomId/replay',
@@ -708,7 +738,8 @@ router.get(
     const session = await DebateSession.findOne({ roomId: req.params.roomId });
     if (!session) throw new NotFoundError('Session not found');
 
-    const room = await DebateRoom.findById(req.params.roomId).select('title motion format participants');
+    const room = await DebateRoom.findById(req.params.roomId)
+      .select('title motion format participants status judgeType hostType');
 
     sendSuccess(res, { room, session });
   }),
