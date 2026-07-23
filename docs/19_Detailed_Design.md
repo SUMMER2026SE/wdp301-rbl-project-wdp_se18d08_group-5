@@ -2,35 +2,35 @@
 
 ## 3. Detailed Design
 
-| Section | Detailed Design | Actor(s) |
-|---:|---|---|
-| 3.1 | Register | Guest |
-| 3.2 | Login | Guest |
-| 3.3 | Login by Google | Guest |
-| 3.4 | Reset Password | Guest |
-| 3.5 | Change Password | User, Admin |
-| 3.6 | Logout | User, Admin |
-| 3.7 | View Public Profile | Guest |
-| 3.8 | View Own Profile | User, Admin |
-| 3.9 | Update Profile | User, Admin |
-| 3.10 | View Platform Information | Guest, User, Admin |
-| 3.11 | View Public Matches | Guest, User, Admin |
-| 3.12 | View Leaderboard | Guest, User, Admin |
-| 3.13 | Create Custom Room | User |
-| 3.14 | Join Room | User |
-| 3.15 | Rejoin Room | User |
-| 3.16 | Leave Room | User, Admin |
-| 3.17 | Join Ranked Queue | User |
-| 3.18 | Watch Live Match | User, Admin |
-| 3.19 | View Results | User, Admin |
-| 3.20 | View Debate History | User |
-| 3.21 | Receive Notification | User, Admin |
-| 3.22 | View Topic | User |
-| 3.23 | Create Topic | User |
-| 3.24 | Create Post | User |
-| 3.25 | Comment Post | User |
-| 3.26 | View User List | Admin |
-| 3.27 | Penalize User | Admin |
+| Section | Detailed Design | Feature | Actor(s) |
+|---:|---|---|---|
+| 3.1 | Register | Authentication | Guest |
+| 3.2 | Login | Authentication | Guest |
+| 3.3 | Login by Google | Authentication | Guest |
+| 3.4 | Reset Password | Authentication | Guest |
+| 3.5 | Change Password | Authentication | User, Admin |
+| 3.6 | Logout | Authentication | User, Admin |
+| 3.7 | View Public Profile | Profile | Guest |
+| 3.8 | View Own Profile | Profile | User, Admin |
+| 3.9 | Update Profile | Profile | User, Admin |
+| 3.10 | View Platform Information | Platform Information | Guest, User, Admin |
+| 3.11 | View Public Matches | Match Discovery | Guest, User, Admin |
+| 3.12 | View Leaderboard | Ranking | Guest, User, Admin |
+| 3.13 | Create Custom Room | Room Management | User |
+| 3.14 | Join Room | Room Management | User |
+| 3.15 | Rejoin Room | Room Management | User |
+| 3.16 | Leave Room | Room Management | User, Admin |
+| 3.17 | Join Ranked Queue | Matchmaking | User |
+| 3.18 | Watch Live Match | Match Discovery | User, Admin |
+| 3.19 | View Results | Debate Results | User, Admin |
+| 3.20 | View Debate History | Debate History | User |
+| 3.21 | Receive Notification | Notification | User, Admin |
+| 3.22 | View Topic | Community | User |
+| 3.23 | Create Topic | Community | User |
+| 3.24 | Create Post | Community | User |
+| 3.25 | Comment Post | Community | User |
+| 3.26 | View User List | Administration | Admin |
+| 3.27 | Penalize User | Administration | Admin |
 
 ## 3.1 Register
 
