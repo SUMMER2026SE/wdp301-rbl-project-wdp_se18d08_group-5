@@ -4,6 +4,7 @@ import { DebateRoom, type IDebateRoom } from '../../models/DebateRoom.js';
 import { DebateSession } from '../../models/DebateSession.js';
 import { User } from '../../models/User.js';
 import { getIO } from '../../socket/index.js';
+import { getRandomSeededDebateTopic } from '../../utils/debateTopics.js';
 
 const REQUIRED_PLAYERS_BY_FORMAT: Record<string, number> = {
   '1v1': 2,
@@ -47,6 +48,10 @@ function buildRankParticipants(users: Array<{ _id: Types.ObjectId; username: str
       muted: false,
     };
   });
+}
+
+export function selectRandomRankMotion() {
+  return getRandomSeededDebateTopic();
 }
 
 function emitMatchFound(userIds: Types.ObjectId[], roomId: Types.ObjectId) {
@@ -99,10 +104,12 @@ export async function tryCreateRankMatch(entry: IMatchQueue): Promise<MatchResul
   const orderedUsers = userIds
     .map((userId) => usersById.get(userId.toString()))
     .filter((user): user is NonNullable<typeof user> => Boolean(user));
+  const motion = await selectRandomRankMotion();
 
   const room = await DebateRoom.create({
     roomType: 'rank',
     title: `Rank ${entry.format} Match`,
+    motion,
     format: entry.format,
     hostType: 'ai',
     judgeType: 'ai',

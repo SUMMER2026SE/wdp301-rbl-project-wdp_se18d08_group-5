@@ -727,7 +727,7 @@ export default function DebateRoomPage() {
 
   // Every authenticated room participant can join the main voice channel.
   // Host mute, debate pause, and phase transitions still take precedence.
-  const canUseMicrophone = Boolean(currentParticipant);
+  const canUseMicrophone = Boolean(currentParticipant && effectiveRole !== 'viewer');
   const canUseCamera = Boolean(
     (myRole && ['host', 'owner', 'debater', 'judge'].includes(myRole))
       || isMyTurnToSpeak
