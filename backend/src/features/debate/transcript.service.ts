@@ -349,17 +349,25 @@ async function updateExistingSegment(
   existingText: string,
   incomingText: string,
   language: string,
+  existingIsToxic: boolean,
+  incomingIsToxic: boolean,
+  moderationReason?: string,
 ) {
   const mergedText = mergeTranscriptText(existingText, incomingText);
+  const isToxic = existingIsToxic || incomingIsToxic;
+  const fields: Record<string, unknown> = {
+    'speechTranscripts.$.originalText': mergedText,
+    'speechTranscripts.$.language': language || 'und',
+    'speechTranscripts.$.isToxic': isToxic,
+    'speechTranscripts.$.updatedAt': new Date(),
+  };
+  if (moderationReason) {
+    fields['speechTranscripts.$.moderationReason'] = moderationReason.slice(0, 500);
+  }
+
   await DebateSession.updateOne(
     { _id: sessionId, 'speechTranscripts.segmentKey': segmentKey },
-    {
-      $set: {
-        'speechTranscripts.$.originalText': mergedText,
-        'speechTranscripts.$.language': language || 'und',
-        'speechTranscripts.$.updatedAt': new Date(),
-      },
-    },
+    { $set: fields },
   );
   return mergedText;
 }
@@ -370,6 +378,8 @@ export async function persistSourceCaption(input: {
   text: string;
   language?: string;
   source: TranscriptSource;
+  isToxic?: boolean;
+  moderationReason?: string;
 }): Promise<ISpeechTranscript | null> {
   const originalText = input.text.trim();
   if (!originalText) return null;
@@ -399,11 +409,16 @@ export async function persistSourceCaption(input: {
       existing.originalText,
       originalText,
       input.language || 'und',
+      Boolean(existing.isToxic),
+      Boolean(input.isToxic),
+      input.moderationReason,
     );
     return {
       ...existing,
       originalText: mergedText,
       language: input.language || 'und',
+      isToxic: Boolean(existing.isToxic || input.isToxic),
+      moderationReason: input.moderationReason || existing.moderationReason,
       updatedAt: new Date(),
     };
   }
@@ -423,6 +438,8 @@ export async function persistSourceCaption(input: {
     speakerSlot: participant.speakerSlot,
     language: input.language || 'und',
     originalText: originalText.slice(0, MAX_TRANSCRIPT_LENGTH),
+    isToxic: Boolean(input.isToxic),
+    moderationReason: input.moderationReason?.slice(0, 500),
     source: input.source,
     judgeType: room.judgeType as 'human' | 'ai',
     hostType: room.hostType as 'human' | 'ai',
@@ -447,7 +464,12 @@ export async function persistSourceCaption(input: {
         concurrent.originalText,
         originalText,
         input.language || 'und',
+        Boolean(concurrent.isToxic),
+        Boolean(input.isToxic),
+        input.moderationReason,
       );
+      transcript.isToxic = Boolean(concurrent.isToxic || input.isToxic);
+      transcript.moderationReason = input.moderationReason || concurrent.moderationReason;
     }
   }
 
