@@ -79,7 +79,8 @@ function buildModeConfig(params: {
     rounds: {
       prep: true,
       speechCount: 3,
-      crossExamRounds: is1v1 ? 1 : 2,
+      // Both 1v1 and 3v3 run CE after rounds 1 and 2.
+      crossExamRounds: 2,
     },
     consensusRule,
     requiredParticipants: {

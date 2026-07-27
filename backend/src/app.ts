@@ -26,13 +26,17 @@ import webrtcRoutes from './features/webrtc/webrtc.routes.js';
 const app = express();
 
 // --- Global Middleware ---
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
-app.use(cors({
-  origin: ENV.CLIENT_URL,
-  credentials: true,
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+app.use(
+  cors({
+    origin: ENV.CLIENT_URL,
+    credentials: true,
+  }),
+);
 app.use(morgan(ENV.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -43,6 +47,27 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 // --- Health Check ---
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/health/translation', (_req, res) => {
+  const configured = Boolean(ENV.GEMINI_API_KEY && ENV.GEMINI_LIVE_MODEL);
+  res.status(configured ? 200 : 503).json({
+    status: configured ? 'configured' : 'unavailable',
+    model: ENV.GEMINI_LIVE_MODEL,
+  });
+});
+
+app.get('/health/ai-judge', (_req, res) => {
+  const configured = Boolean(
+    ENV.GEMINI_AGENT_API_KEYS.length > 0 &&
+    ENV.GEMINI_AGENT_MODEL,
+  );
+  res.status(configured ? 200 : 503).json({
+    status: configured ? 'configured' : 'unavailable',
+    model: ENV.GEMINI_AGENT_MODEL,
+    configuredKeyCount: ENV.GEMINI_AGENT_API_KEYS.length,
+    timeoutMs: ENV.GEMINI_AGENT_TIMEOUT_MS,
+  });
 });
 
 // --- API Routes ---

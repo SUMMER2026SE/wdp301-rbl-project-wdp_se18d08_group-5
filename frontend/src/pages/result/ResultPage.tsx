@@ -133,7 +133,10 @@ export default function ResultPage() {
       ? 'proposition'
       : session.finalScores?.winner === 'opposition'
         ? 'opposition'
-        : 'draw';
+        : session.finalScores?.winner === 'draw'
+          ? 'draw'
+          : null;
+  const isAIJudgeResultPending = room?.judgeType === 'ai' && winner === null;
 
   const proDebaters = participants.filter((p: any) => p.roomRole === 'debater' && p.team === 'proposition');
   const oppDebaters = participants.filter((p: any) => p.roomRole === 'debater' && p.team === 'opposition');
@@ -156,7 +159,7 @@ export default function ResultPage() {
           <div className="text-end">
             <span className="text-muted d-block small mb-1" style={{ fontFamily: 'Orbitron', fontSize: '9px' }}>{t('winner')}</span>
             <Badge
-              bg={winner === 'proposition' ? 'info' : winner === 'opposition' ? 'danger' : 'warning'}
+              bg={winner === 'proposition' ? 'info' : winner === 'opposition' ? 'danger' : winner === 'draw' ? 'warning' : 'secondary'}
               className="fs-6 px-3 py-2 text-uppercase"
               style={{
                 fontFamily: 'Orbitron',
@@ -165,14 +168,29 @@ export default function ResultPage() {
                   ? '0 0 10px rgba(0, 245, 255, 0.4)'
                   : winner === 'opposition'
                     ? '0 0 10px rgba(255, 0, 110, 0.4)'
-                    : '0 0 10px rgba(255, 214, 10, 0.4)',
+                    : winner === 'draw'
+                      ? '0 0 10px rgba(255, 214, 10, 0.4)'
+                      : '0 0 10px rgba(108, 117, 125, 0.4)',
                 color: winner === 'draw' ? '#000' : '#fff',
               }}
             >
-            {winner === 'proposition' ? t('propositionWins') : winner === 'opposition' ? t('oppositionWins') : t('drawMatch')}
+            {winner === 'proposition'
+              ? t('propositionWins')
+              : winner === 'opposition'
+                ? t('oppositionWins')
+                : winner === 'draw'
+                  ? t('drawMatch')
+                  : t('resultPending')}
             </Badge>
           </div>
         </div>
+
+        {isAIJudgeResultPending && (
+          <Alert variant="warning" className="d-flex align-items-center gap-2 mb-4">
+            <Spinner animation="border" size="sm" />
+            <span>{t('aiJudgeResultPending')}</span>
+          </Alert>
+        )}
 
         <Row className="g-4">
           {/* Left Column */}

@@ -185,6 +185,12 @@ describe('DEBATE_MODE_CONFIGS — 8 modes theo Consolidated §0', () => {
     }
   });
 
+  it('mọi mode đều có CE ở Round 1 và Round 2', () => {
+    for (const mode of Object.values(DEBATE_MODE_CONFIGS)) {
+      expect(mode.rounds.crossExamRounds).toBe(2);
+    }
+  });
+
   // per Consolidated §0 + §7 Open Point #4
   it('aiTieBreak = SPLIT_TOTAL cho AI judge modes (Open Point #4 chốt)', () => {
     const aiModes: DebateModeId[] = [

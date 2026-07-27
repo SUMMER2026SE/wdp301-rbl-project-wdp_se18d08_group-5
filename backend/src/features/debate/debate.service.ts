@@ -11,12 +11,29 @@ import {
   canPerformAdapter,
 } from './engine/adapter.js';
 import { generateFinalDebateAnalysis } from './final-analysis.service.js';
+import { getTranscriptForTurn } from './transcript.service.js';
 
 // Re-export duration constants cho code cũ đang reference trực tiếp (backward-compat)
 const TRANSITION_MUTE_SECONDS = DEBATE_DURATIONS.TRANSITION_MUTE_SECONDS;
 const AUTO_TRANSITION_COUNTDOWN = DEBATE_DURATIONS.AUTO_TRANSITION_COUNTDOWN_SECONDS;
 const HOST_END_COUNTDOWN_SECONDS = DEBATE_DURATIONS.HOST_END_COUNTDOWN_SECONDS;
 const noHostAiStartConsensus = new Map<string, Set<string>>();
+
+function markAIJudgeResultPending(session: any) {
+  const existing = session.finalScores || {};
+  session.finalScores = {
+    ...existing,
+    teamProposition: existing.teamProposition || { total: 0, breakdown: {} },
+    teamOpposition: existing.teamOpposition || { total: 0, breakdown: {} },
+    winner: null,
+    winnerTeam: null,
+    aiVerdict: 'pending',
+    judgeVerdicts: Array.isArray(existing.judgeVerdicts) ? existing.judgeVerdicts : [],
+    resultSource: 'judging',
+  };
+  session.markModified('finalScores');
+  return session.finalScores;
+}
 
 type DebateStep = {
   speaker: string;
@@ -507,7 +524,7 @@ function computeTransitionAnnouncement(
 
 export async function triggerTransition(
   roomId: string,
-  _transcript = '',
+  transcript = '',
   _options?: { isJudgeFeedback?: boolean },
 ) {
   const { getIO } = await import('../../socket/index.js');
@@ -668,20 +685,32 @@ export async function triggerTransition(
           updatedRoom.status = 'completed';
           updatedRoom.currentPhase = 'completed';
           updatedRoom.endedAt = new Date();
-          const aggregate = aggregateFinalScores(session, updatedRoom);
-          session.finalScores = {
-            ...(session.finalScores || {}),
-            ...aggregate,
-            resultSource: 'judging',
-          } as any;
-          session.markModified('finalScores');
+          if (updatedRoom.judgeType === 'ai') {
+            markAIJudgeResultPending(session);
+          } else {
+            const aggregate = aggregateFinalScores(session, updatedRoom);
+            session.finalScores = {
+              ...(session.finalScores || {}),
+              ...aggregate,
+              resultSource: 'judging',
+            } as any;
+            session.markModified('finalScores');
+          }
           await Promise.all([session.save(), updatedRoom.save()]);
 
+          let aiJudgeSucceeded = true;
           if (updatedRoom.judgeType === 'ai') {
             try {
               await generateFinalDebateAnalysis(roomId);
             } catch (error) {
+              aiJudgeSucceeded = false;
               console.error('AI final debate analysis failed during auto-complete:', error);
+              io?.to(roomId).emit('debate:ai-judge-error', {
+                roomId,
+                stage: 'final_analysis',
+                retryable: true,
+                message: 'AI Judge could not finalize the result. The result is pending and ranking was not changed.',
+              });
             }
           }
 
@@ -689,6 +718,7 @@ export async function triggerTransition(
           io?.to(roomId).emit('debate:ended', {
             roomId,
             isAuto: true,
+            resultPending: updatedRoom.judgeType === 'ai' && !aiJudgeSucceeded,
             result: {
               winner: (completedSession?.finalScores as any)?.winner || null,
               finalScores: completedSession?.finalScores || null,
@@ -696,7 +726,9 @@ export async function triggerTransition(
           });
           io?.emit('debate:ended', { roomId, isAuto: true });
           io?.emit('room:update', { action: 'completed', roomId });
-          await applyDebateResult(roomId);
+          if (updatedRoom.judgeType !== 'ai' || aiJudgeSucceeded) {
+            await applyDebateResult(roomId);
+          }
         } else {
           // Human host: stay idle, waiting for host to click End
           (session.currentTurn as any).status = 'waiting_to_start';
@@ -722,7 +754,7 @@ export async function triggerTransition(
         // Judge S1, depending on mode) explicitly ends the phase via Skip.
         // Per the rule docs the judge may submit scores during this phase,
         // but ending it is always gated on Skip, not on the Start button.
-        snapshotCurrentTurn(session, '');
+        snapshotCurrentTurn(session, transcript);
         applyStep(session, nextStep);
         session.currentTurn.phaseStatus = 'active';
         session.currentTurn.status = 'active';
@@ -746,33 +778,28 @@ export async function triggerTransition(
           // debate auto-transitions with no user action required.
           // Per the rule: "AI Judge submits score → Judge Feedback ends
           // immediately → Transition Phase starts immediately."
-          const humanJudgeCount = updatedRoom.participants.filter((p: any) => {
-            const r = p.roomRole === 'owner' ? p.primaryRole : p.roomRole;
-            return r === 'judge';
-          }).length;
-
-          if (humanJudgeCount === 0 || nextStep.speaker === 'JUDGES_FB_3') {
-            // JUDGES_FB_3: AI already generated feedback for R3 speeches in the
-            // previous OPP_S3→PRO_S3 transition. Auto-advance to COMPLETED
-            // (không còn FINAL_JUDGING phase riêng) sau 3s.
-            console.log(`[triggerTransition] Auto-advancing from ${nextStep.speaker} (AI judge, no human judges or R3 FB)`);
-            setTimeout(async () => {
-              triggerTransition(roomId).catch(console.error);
-            }, 3000);
-            return;
-          }
-
-          // AI judge: generate feedback, auto-advance after a short delay so
-          // participants can read the feedback before transition.
+          // Generate feedback for every round, including JUDGES_FB_3. AI Judge
+          // rooms normally have no human judge participants; that is expected
+          // and must not suppress the provider call.
           (async () => {
             const feedbackShown = await generateAIFeedback(roomId, nextStep.speaker);
-            if (!feedbackShown) {
-              console.warn('AI feedback not available within timeout, advancing anyway');
+            if (feedbackShown) {
+              io?.to(roomId).emit('debate:ai-feedback-received', {
+                speaker: nextStep.speaker,
+              });
+            } else {
+              console.warn(`AI feedback unavailable for ${nextStep.speaker}; advancing without a fake score`);
+              io?.to(roomId).emit('debate:ai-judge-error', {
+                roomId,
+                stage: 'round_feedback',
+                speaker: nextStep.speaker,
+                retryable: true,
+                message: 'AI Judge feedback is temporarily unavailable.',
+              });
             }
-            io?.to(roomId).emit('debate:ai-feedback-received', {});
             setTimeout(async () => {
               triggerTransition(roomId).catch(console.error);
-            }, 5000);
+            }, feedbackShown ? 5000 : 3000);
           })();
         } else {
           // Human judge: wait for judge scores.
@@ -842,7 +869,7 @@ export async function triggerTransition(
         // moves it to active with the proper timer.
         // Snapshot current turn history with the old phase, then apply the
         // next step as waiting_to_start so the Start endpoint can pick it up.
-        snapshotCurrentTurn(session, '');
+        snapshotCurrentTurn(session, transcript);
         applyStep(session, nextStep);
         updatedRoom.currentPhase = nextStep.phase;
         await session.save();
@@ -879,7 +906,7 @@ export async function triggerTransition(
 
       // Snapshot + advance session to the next step so the DB matches the
       // upcoming active phase once the 10s countdown completes.
-      snapshotCurrentTurn(session, '');
+      snapshotCurrentTurn(session, transcript);
       applyStep(session, nextStep);
       updatedRoom.currentPhase = nextStep.phase;
       await session.save();
@@ -1002,13 +1029,22 @@ async function generateAIFeedback(roomId: string, speaker: string): Promise<bool
 
     const room = await DebateRoom.findById(roomId);
     const io = getIO();
+    let expectedFeedbackCount = 0;
+    let generatedFeedbackCount = 0;
 
     for (const sp of uniqueSpeakers) {
       const speechEntry = history.filter((t: any) => t.speaker === sp).pop();
-      if (!speechEntry?.transcript) continue;
+      const canonicalTranscript = getTranscriptForTurn(
+        session,
+        sp,
+        'speech',
+        { activeSpeakerOnly: true },
+      ) || speechEntry?.transcript?.trim() || '';
+      if (!canonicalTranscript) continue;
+      expectedFeedbackCount += 1;
 
       try {
-        const result = await aiService.judgeTurn(roomId, sp, speechEntry.transcript, {
+        const result = await aiService.judgeTurn(roomId, sp, canonicalTranscript, {
           motion: room?.motion,
           turnHistory: history.slice(-5),
         });
@@ -1017,12 +1053,13 @@ async function generateAIFeedback(roomId: string, speaker: string): Promise<bool
           speaker: sp,
           feedback: result,
         });
+        generatedFeedbackCount += 1;
       } catch (err) {
         console.error(`AI feedback error for speaker ${sp}:`, err);
       }
     }
 
-    return uniqueSpeakers.length > 0;
+    return expectedFeedbackCount > 0 && generatedFeedbackCount === expectedFeedbackCount;
   } catch (err) {
     console.error('AI feedback generation error:', err);
     return false;
@@ -1236,15 +1273,19 @@ async function endDebateInternal(
   // uses, so End Match and auto-complete produce identical results. The
   // legacy `aggregateScores` helper predates per-round scoring and silently
   // ignores the "5 items × 20 points" scale documented in ruleScore.md.
-  const aggregate = aggregateFinalScores(session, room);
-  session.finalScores = {
-    ...(session.finalScores || {}),
-    ...aggregate,
-    aiVerdict: (session.finalScores as any)?.aiVerdict || null,
-    judgeVerdicts: verdicts,
-    resultSource: 'judging',
-  };
-  session.markModified('finalScores');
+  const aggregate = room.judgeType === 'ai'
+    ? markAIJudgeResultPending(session)
+    : aggregateFinalScores(session, room);
+  if (room.judgeType !== 'ai') {
+    session.finalScores = {
+      ...(session.finalScores || {}),
+      ...aggregate,
+      aiVerdict: (session.finalScores as any)?.aiVerdict || null,
+      judgeVerdicts: verdicts,
+      resultSource: 'judging',
+    };
+    session.markModified('finalScores');
+  }
   session.aiSummary = summary || session.aiSummary;
   (session.currentTurn as any).status = 'completed';
   (session.currentTurn as any).phase = 'completed';
@@ -1254,27 +1295,38 @@ async function endDebateInternal(
   await Promise.all([session.save(), room.save()]);
 
   let completedSession = session;
+  let aiJudgeSucceeded = true;
   if (room.judgeType === 'ai') {
     try {
       await generateFinalDebateAnalysis(roomId);
       completedSession = await DebateSession.findOne({ roomId: room._id }) || session;
     } catch (error) {
+      aiJudgeSucceeded = false;
       console.error('AI final debate analysis failed while ending debate:', error);
+      io?.to(roomId).emit('debate:ai-judge-error', {
+        roomId,
+        stage: 'final_analysis',
+        retryable: true,
+        message: 'AI Judge could not finalize the result. The result is pending and ranking was not changed.',
+      });
     }
   }
 
   // Broadcast debate ended BEFORE applying ranking (so frontend can redirect)
   io?.to(roomId).emit('debate:ended', {
     roomId,
+    resultPending: room.judgeType === 'ai' && !aiJudgeSucceeded,
     result: {
-      winner: (completedSession.finalScores as any)?.winner || aggregate.winner,
+      winner: (completedSession.finalScores as any)?.winner || null,
       finalScores: completedSession.finalScores || aggregate,
     },
   });
   io?.emit('debate:ended', { roomId });
   io?.emit('room:update', { action: 'completed', roomId });
 
-  const ranking = await applyDebateResult(roomId);
+  const ranking = room.judgeType !== 'ai' || aiJudgeSucceeded
+    ? await applyDebateResult(roomId)
+    : { applied: false, reason: 'missing_winner' as const };
   return { room, session: completedSession, ranking };
 }
 

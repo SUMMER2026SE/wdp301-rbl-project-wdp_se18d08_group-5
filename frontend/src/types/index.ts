@@ -341,9 +341,9 @@ export interface DrawRequest {
 export interface FinalScores {
   teamProposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
   teamOpposition: { total: number; breakdown: ScoreBreakdown; weight?: number };
-  winner: Team | 'draw';
-  winnerTeam?: Team | 'draw';
-  aiVerdict: Team | 'draw' | null;
+  winner: Team | 'draw' | null;
+  winnerTeam?: Team | 'draw' | null;
+  aiVerdict: Team | 'draw' | 'pending' | null;
   judgeVerdicts?: JudgeVerdict[];
   drawRequests?: DrawRequest[];
     resultSource?: 'judging' | 'surrender' | 'agreed_draw' | 'forfeit';

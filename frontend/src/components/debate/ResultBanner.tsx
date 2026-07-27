@@ -3,6 +3,7 @@ import { Button as RBButton } from 'react-bootstrap';
 const Button = RBButton as any;
 import { useDebateStore } from '@stores/debateStore';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface ResultBannerProps {
   roomId: string;
@@ -18,6 +19,7 @@ interface ResultBannerProps {
 
 export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: ResultBannerProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation('result');
   const [countdown, setCountdown] = useState(10);
   const aiFinalVerdict = useDebateStore((s) => s.aiFinalVerdict);
   const winnerResult = useDebateStore((s) => s.winnerResult);
@@ -29,10 +31,13 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
 
   const verdict = isCompleted
     ? (winnerResult?.winnerTeam
+      ?? winnerResult?.finalScores?.winnerTeam
+      ?? winnerResult?.finalScores?.winner
       ?? aiFinalVerdict?.winnerTeam
       ?? finalScores?.winnerTeam
       ?? finalScores?.winner)
     : null;
+  const isResultPending = isCompleted && !verdict;
 
   // Build scores from winnerResult if available, otherwise from prop
   const propScore = winnerResult?.finalScores?.teamProposition?.total
@@ -45,7 +50,7 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
   // Auto redirect after 10 seconds (per the rule docs).
   // useEffect must always be called, even when we render nothing below.
   useEffect(() => {
-    if (!verdict) return;
+    if (!isCompleted) return;
     const timer = setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) {
@@ -57,9 +62,9 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [verdict, roomId, navigate]);
+  }, [isCompleted, roomId, navigate]);
 
-  if (!verdict) return null;
+  if (!isCompleted) return null;
 
   const getWinnerLabel = () => {
     if (verdict === 'proposition' || verdict === 'pro') return 'PROPOSITION';
@@ -153,7 +158,7 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
                   : 'none',
             }}
           >
-            {propScore.toFixed(1)}
+            {isResultPending ? '—' : propScore.toFixed(1)}
           </div>
         </div>
 
@@ -206,7 +211,7 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
                   : 'none',
             }}
           >
-            {oppScore.toFixed(1)}
+            {isResultPending ? '—' : oppScore.toFixed(1)}
           </div>
         </div>
       </div>
@@ -262,6 +267,31 @@ export function ResultBanner({ roomId, finalScores, aiSummary, onViewResult }: R
             }}
           >
             HOA
+          </div>
+        </div>
+      )}
+
+      {isResultPending && (
+        <div
+          className="rounded-3 px-5 py-3 mb-4 animate-slide-in text-center"
+          style={{
+            background: 'rgba(255, 204, 0, 0.08)',
+            border: '2px solid rgba(255, 204, 0, 0.35)',
+            maxWidth: '560px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 'clamp(1rem, 4vw, 1.6rem)',
+              fontWeight: 900,
+              color: '#ffcc00',
+              letterSpacing: '0.08em',
+            }}
+          >
+            {t('resultPending')}
+          </div>
+          <div className="mt-2 text-white-50">
+            {t('aiJudgeResultPending')}
           </div>
         </div>
       )}

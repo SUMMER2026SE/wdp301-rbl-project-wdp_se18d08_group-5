@@ -3,6 +3,13 @@ import { ENV } from '../../config/env.js';
 
 const openai = ENV.OPENAI_API_KEY ? new OpenAI({ apiKey: ENV.OPENAI_API_KEY }) : null;
 
+export class AIProviderUnavailableError extends Error {
+  constructor(message = 'AI Judge provider is unavailable') {
+    super(message);
+    this.name = 'AIProviderUnavailableError';
+  }
+}
+
 type AIMessage = {
   role: 'system' | 'user';
   content: string;
@@ -17,6 +24,49 @@ export type FinalDebateAIRequest = {
   transcriptBundle: unknown;
   judgeVerdicts: unknown[];
 };
+
+export type AIJudgeTurnResult = {
+  score: {
+    logic: number;
+    rebuttal: number;
+    evidence: number;
+    crossExam: number;
+    strategy: number;
+    communication: number;
+    overall: number;
+  };
+  verdict: 'proposition' | 'opposition' | 'draw';
+  comments: string;
+  strengths: string[];
+  weaknesses: string[];
+  fallacies: Array<{ type: string; description: string }>;
+  summary: string;
+};
+
+function isAIJudgeTurnResult(value: unknown): value is AIJudgeTurnResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const result = value as Record<string, unknown>;
+  const score = result.score as Record<string, unknown> | undefined;
+  const scoreFields = [
+    'logic',
+    'rebuttal',
+    'evidence',
+    'crossExam',
+    'strategy',
+    'communication',
+    'overall',
+  ];
+  return Boolean(
+    score &&
+    scoreFields.every((field) => Number.isFinite(score[field])) &&
+    ['proposition', 'opposition', 'draw'].includes(String(result.verdict)) &&
+    typeof result.comments === 'string' &&
+    typeof result.summary === 'string' &&
+    Array.isArray(result.strengths) &&
+    Array.isArray(result.weaknesses) &&
+    Array.isArray(result.fallacies),
+  );
+}
 
 export class AIService {
   private geminiAgentKeyIndex = 0;
@@ -64,21 +114,24 @@ Return JSON with: { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossE
     }
   }
 
-  async judgeTurn(roomId: string, speaker: string, transcript: string, context: any) {
-    try {
-      const prompt = `You are an AI judge evaluating one debate turn for room ${roomId}. The speaker is ${speaker}. Use the transcript and context to provide a JSON result with { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossExam: 0-15, strategy: 0-10, communication: 0-10, overall: 0-100 }, verdict: 'proposition' | 'opposition' | 'draw', comments: string, strengths: string[], weaknesses: string[], fallacies: { type: string, description: string }[], summary: string }`;
-      return await this.generateJSON(
-        [
-          { role: 'system', content: prompt },
-          { role: 'user', content: `${transcript}\n\nContext:\n${JSON.stringify(context || {})}` },
-        ],
-        0.3,
-        this.getFallbackJudgeTurn(),
-      );
-    } catch (error) {
-      console.error('AI judgeTurn error:', error);
-      return this.getFallbackJudgeTurn();
+  async judgeTurn(
+    roomId: string,
+    speaker: string,
+    transcript: string,
+    context: any,
+  ): Promise<AIJudgeTurnResult> {
+    const prompt = `You are an AI judge evaluating one debate turn for room ${roomId}. The speaker is ${speaker}. Use the transcript and context to provide a JSON result with { score: { logic: 0-30, rebuttal: 0-20, evidence: 0-15, crossExam: 0-15, strategy: 0-10, communication: 0-10, overall: 0-100 }, verdict: 'proposition' | 'opposition' | 'draw', comments: string, strengths: string[], weaknesses: string[], fallacies: { type: string, description: string }[], summary: string }`;
+    const result = await this.generateRequiredJSON<unknown>(
+      [
+        { role: 'system', content: prompt },
+        { role: 'user', content: `${transcript}\n\nContext:\n${JSON.stringify(context || {})}` },
+      ],
+      0.3,
+    );
+    if (!isAIJudgeTurnResult(result)) {
+      throw new AIProviderUnavailableError('AI Judge returned an invalid result shape');
     }
+    return result;
   }
 
   async finalVerdict(roomId: string, sessionData: any) {
@@ -165,13 +218,12 @@ Return valid JSON only with this exact top-level shape:
 Include exactly rounds 1, 2, and 3. Preserve the provided userId, username, speaker, and team values.
 For human-judge mode, recommendedWinner must equal the supplied officialWinner when it is available.`;
 
-    return this.generateJSON<Record<string, unknown> | null>(
+    return this.generateRequiredJSON<Record<string, unknown>>(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(input) },
       ],
       0.15,
-      null,
     );
   }
 
@@ -234,6 +286,23 @@ For human-judge mode, recommendedWinner must equal the supplied officialWinner w
     }
   }
 
+  private async generateRequiredJSON<T>(messages: AIMessage[], temperature: number): Promise<T> {
+    const content = await this.generateAIContent(messages, temperature, true);
+    if (!content) {
+      throw new AIProviderUnavailableError('AI Judge did not return any content');
+    }
+
+    try {
+      const parsed = JSON.parse(content);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Expected a JSON object');
+      }
+      return parsed as T;
+    } catch {
+      throw new AIProviderUnavailableError('AI Judge returned invalid JSON');
+    }
+  }
+
   private async generateText(messages: AIMessage[], temperature: number, fallback: string) {
     const content = await this.generateAIContent(messages, temperature, false);
     return content || fallback;
@@ -287,49 +356,72 @@ For human-judge mode, recommendedWinner must equal the supplied officialWinner w
     // AI Judge uses its own ordered key pool. When a key has exhausted its
     // quota, subsequent requests begin with the next key in the list.
     const apiKeys = ENV.GEMINI_AGENT_API_KEYS;
-    let lastQuotaError: Error | null = null;
+    let lastProviderError: Error | null = null;
     const startingKeyIndex = this.geminiAgentKeyIndex;
 
     for (let attempt = 0; attempt < apiKeys.length; attempt += 1) {
       const keyIndex = (startingKeyIndex + attempt) % apiKeys.length;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${ENV.GEMINI_AGENT_MODEL}:generateContent?key=${apiKeys[keyIndex]}`,
-        {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: systemText
-            ? {
-                parts: [{ text: systemText }],
-              }
-            : undefined,
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: userText }],
+      let response: Response;
+      try {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(ENV.GEMINI_AGENT_MODEL)}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKeys[keyIndex],
             },
-          ],
-          generationConfig: {
-            // Gemini 3.5+ deprecates sampling parameters and may reject them.
-            ...(/^gemini-3\.[5-9]/.test(ENV.GEMINI_AGENT_MODEL) ? {} : { temperature }),
-            maxOutputTokens: 8192,
-            responseMimeType: jsonMode ? 'application/json' : 'text/plain',
+            signal: AbortSignal.timeout(ENV.GEMINI_AGENT_TIMEOUT_MS),
+            body: JSON.stringify({
+              systemInstruction: systemText
+                ? {
+                    parts: [{ text: systemText }],
+                  }
+                : undefined,
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: userText }],
+                },
+              ],
+              generationConfig: {
+                // Gemini 3.5+ deprecates sampling parameters and may reject them.
+                ...(/^gemini-3\.[5-9]/.test(ENV.GEMINI_AGENT_MODEL) ? {} : { temperature }),
+                maxOutputTokens: 8192,
+                responseMimeType: jsonMode ? 'application/json' : 'text/plain',
+              },
+            }),
           },
-        }),
-        },
-      );
+        );
+      } catch (error) {
+        lastProviderError = error instanceof Error
+          ? error
+          : new Error('Gemini AI Judge network request failed');
+        if (attempt < apiKeys.length - 1) {
+          this.geminiAgentKeyIndex = (keyIndex + 1) % apiKeys.length;
+          console.warn(`Gemini AI Judge request failed on key ${keyIndex + 1}/${apiKeys.length}; trying the next key.`);
+          continue;
+        }
+        throw lastProviderError;
+      }
 
       if (!response.ok) {
         const errorBody = await response.text();
-        const isQuotaError = response.status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(errorBody);
+        const isRetryableKeyError =
+          response.status === 401 ||
+          response.status === 403 ||
+          response.status === 408 ||
+          response.status === 429 ||
+          response.status >= 500 ||
+          /RESOURCE_EXHAUSTED|quota/i.test(errorBody);
 
-        if (!isQuotaError) {
-          throw new Error(`Gemini API error ${response.status}: ${errorBody}`);
+        if (!isRetryableKeyError) {
+          throw new Error(`Gemini AI Judge request rejected with status ${response.status}`);
         }
 
-        lastQuotaError = new Error(`Gemini API quota exhausted (${response.status})`);
+        lastProviderError = new Error(`Gemini AI Judge request failed with status ${response.status}`);
         this.geminiAgentKeyIndex = (keyIndex + 1) % apiKeys.length;
-        console.warn(`Gemini AI Judge key ${keyIndex + 1}/${apiKeys.length} exhausted; trying the next key.`);
+        console.warn(`Gemini AI Judge key ${keyIndex + 1}/${apiKeys.length} was rejected (${response.status}); trying the next key.`);
         continue;
       }
 
@@ -341,13 +433,14 @@ For human-judge mode, recommendedWinner must equal the supplied officialWinner w
         }>;
       };
 
+      this.geminiAgentKeyIndex = keyIndex;
       return payload.candidates?.[0]?.content?.parts
         ?.map((part) => part.text || '')
         .join('')
         .trim() || null;
     }
 
-    throw lastQuotaError || new Error('No Gemini AI Judge API key is configured');
+    throw lastProviderError || new Error('No Gemini AI Judge API key is configured');
   }
 
   // --- Fallbacks ---
@@ -364,18 +457,6 @@ For human-judge mode, recommendedWinner must equal the supplied officialWinner w
 
   private getFallbackScore() {
     return { logic: 0, rebuttal: 0, evidence: 0, crossExam: 0, strategy: 0, communication: 0, overall: 0 };
-  }
-
-  private getFallbackJudgeTurn() {
-    return {
-      score: { logic: 0, rebuttal: 0, evidence: 0, crossExam: 0, strategy: 0, communication: 0, overall: 0 },
-      verdict: 'draw',
-      comments: 'AI judge unavailable. Please try again later.',
-      strengths: ['AI judge unavailable'],
-      weaknesses: ['AI judge unavailable'],
-      fallacies: [],
-      summary: 'AI judge is currently unavailable. Please try again later.',
-    };
   }
 
   private getFallbackFinalVerdict() {

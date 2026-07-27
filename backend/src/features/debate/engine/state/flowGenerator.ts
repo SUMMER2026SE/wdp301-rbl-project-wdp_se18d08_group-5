@@ -46,9 +46,7 @@ function judgeFbSpeaker(round: 1 | 2 | 3): string {
 }
 
 /**
- * Sinh flow steps cho 1 mode. Khác biệt:
- * - 1v1: chỉ 1 CE round (mode.rounds.crossExamRounds = 1)
- * - 3v3: 2 CE round (mode.rounds.crossExamRounds = 2)
+ * Sinh flow steps cho 1 mode. Cả 1v1 và 3v3 đều có CE ở Round 1 và Round 2.
  */
 export function generateFlowFromMode(mode: DebateModeConfig): FlowStep[] {
   const steps: FlowStep[] = [];

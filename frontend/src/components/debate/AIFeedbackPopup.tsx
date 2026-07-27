@@ -1,3 +1,4 @@
+import { useCallback, useEffect } from 'react';
 import { useDebateStore } from '@stores/debateStore';
 
 interface AIFeedbackPopupProps {
@@ -11,6 +12,22 @@ interface AIFeedbackPopupProps {
  */
 export function AIFeedbackPopup({ onDismiss }: AIFeedbackPopupProps) {
   const aiFeedback = useDebateStore((s) => s.aiFeedback);
+  const setAIFeedback = useDebateStore((s) => s.setAIFeedback);
+
+  const dismiss = useCallback(() => {
+    setAIFeedback(null);
+    onDismiss?.();
+  }, [onDismiss, setAIFeedback]);
+
+  useEffect(() => {
+    if (!aiFeedback) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismiss();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [aiFeedback, dismiss]);
 
   if (!aiFeedback) return null;
 
@@ -20,16 +37,20 @@ export function AIFeedbackPopup({ onDismiss }: AIFeedbackPopupProps) {
   return (
     <div
       className="position-fixed bottom-0 start-0 w-100 p-3"
-      style={{ zIndex: 9000 }}
+      style={{ zIndex: 9000, pointerEvents: 'none' }}
     >
       <div
         className="rounded-4 mx-auto"
+        role="region"
+        aria-live="polite"
+        aria-label={`AI Judge feedback for ${speaker}`}
         style={{
           maxWidth: '600px',
           background: 'rgba(10, 10, 30, 0.95)',
           border: '1px solid rgba(0, 245, 255, 0.3)',
           backdropFilter: 'blur(10px)',
           fontFamily: 'Rajdhani, sans-serif',
+          pointerEvents: 'auto',
         }}
       >
         <style>{`
@@ -46,7 +67,11 @@ export function AIFeedbackPopup({ onDismiss }: AIFeedbackPopupProps) {
           {/* Header */}
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div className="d-flex align-items-center gap-2">
-              <span style={{ fontSize: '1.2rem' }}>🤖</span>
+              <i
+                className="bi bi-robot"
+                aria-hidden="true"
+                style={{ fontSize: '1.2rem', color: 'rgba(0, 245, 255, 0.8)' }}
+              />
               <span
                 style={{
                   fontSize: '0.8rem',
@@ -59,13 +84,24 @@ export function AIFeedbackPopup({ onDismiss }: AIFeedbackPopupProps) {
                 AI Judge Feedback — {speaker}
               </span>
             </div>
-            {onDismiss && (
-              <button
-                className="btn-close btn-close-white"
-                style={{ opacity: 0.5 }}
-                onClick={onDismiss}
-              />
-            )}
+            <button
+              type="button"
+              className="btn d-inline-flex align-items-center justify-content-center flex-shrink-0 text-white"
+              aria-label="Close AI Judge feedback"
+              title="Close feedback (Esc)"
+              onClick={dismiss}
+              style={{
+                width: '44px',
+                height: '44px',
+                padding: 0,
+                border: '1px solid rgba(255,255,255,0.18)',
+                borderRadius: '12px',
+                background: 'rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+              }}
+            >
+              <i className="bi bi-x-lg" aria-hidden="true" />
+            </button>
           </div>
 
           {/* Score breakdown */}
@@ -154,7 +190,7 @@ export function AIFeedbackPopup({ onDismiss }: AIFeedbackPopupProps) {
                 paddingTop: '0.5rem',
               }}
             >
-              <span style={{ marginRight: '0.3rem' }}>👍</span>
+              <i className="bi bi-hand-thumbs-up-fill me-1" aria-hidden="true" />
               {feedback.strengths.slice(0, 2).join(' • ')}
             </div>
           )}
@@ -168,7 +204,7 @@ export function AIFeedbackPopup({ onDismiss }: AIFeedbackPopupProps) {
                 marginTop: '0.25rem',
               }}
             >
-              <span style={{ marginRight: '0.3rem' }}>👎</span>
+              <i className="bi bi-hand-thumbs-down-fill me-1" aria-hidden="true" />
               {feedback.weaknesses.slice(0, 2).join(' • ')}
             </div>
           )}
