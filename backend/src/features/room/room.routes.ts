@@ -548,13 +548,26 @@ async function judgeTurnWithAI(
   ) || transcript.trim();
   if (!canonicalTranscript) return null;
 
-  const aiResult = await aiService.judgeTurn(room._id.toString(), turn.speaker, canonicalTranscript, {
-    motion: room.motion,
-    format: room.format,
-    phase: turn.crossExamination ? 'cross_exam' : 'speech',
-    participants: room.participants,
-    currentPhase: room.currentPhase,
-  });
+  let aiResult;
+  try {
+    aiResult = await aiService.judgeTurn(room._id.toString(), turn.speaker, canonicalTranscript, {
+      motion: room.motion,
+      format: room.format,
+      phase: turn.crossExamination ? 'cross_exam' : 'speech',
+      participants: room.participants,
+      currentPhase: room.currentPhase,
+    });
+  } catch (error) {
+    console.error(`AI Judge could not score turn ${turn.speaker}:`, error);
+    getIO().to(room._id.toString()).emit('debate:ai-judge-error', {
+      roomId: room._id.toString(),
+      stage: 'turn_scoring',
+      speaker: turn.speaker,
+      retryable: true,
+      message: 'AI Judge could not score this turn. The debate will continue without a fake score.',
+    });
+    return null;
+  }
   const normalized = normalizeAIJudgeResult(aiResult);
 
   turn.aiAnalysis = {

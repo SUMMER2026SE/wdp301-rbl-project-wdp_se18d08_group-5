@@ -707,7 +707,7 @@ router.post(
   '/:roomId/final-analysis',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const room = await DebateRoom.findById(req.params.roomId).select('participants status');
+    const room = await DebateRoom.findById(req.params.roomId).select('participants status judgeType');
     if (!room) throw new NotFoundError('Room not found');
     if (room.status !== 'completed') {
       throw new BadRequestError('Final analysis is only available after the debate is completed');
@@ -721,12 +721,16 @@ router.post(
     }
 
     const analysis = await generateFinalDebateAnalysis(req.params.roomId);
+    const ranking = room.judgeType === 'ai'
+      ? await applyDebateResult(req.params.roomId)
+      : null;
     const session = await DebateSession.findOne({ roomId: req.params.roomId })
       .select('aiDebateAnalysis aiSummary finalScores');
     sendSuccess(res, {
       analysis,
       aiSummary: session?.aiSummary || null,
       finalScores: session?.finalScores || null,
+      ranking,
     }, 'Final debate analysis ready');
   }),
 );

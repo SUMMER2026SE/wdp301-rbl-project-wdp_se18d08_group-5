@@ -1,7 +1,7 @@
 /**
  * Test cho flowGenerator.
- * Theo rule files §13-15, cấu trúc flow cố định với biến thể duy nhất là
- * mode.rounds.crossExamRounds (1 cho 1v1, 2 cho 3v3).
+ * Theo rule files §13-15, cấu trúc flow cố định với CE ở Round 1 và Round 2
+ * cho cả hai format 1v1 và 3v3.
  */
 import { describe, it, expect } from 'vitest';
 import { DEBATE_DURATIONS } from '../config/duration.config.js';
@@ -20,11 +20,18 @@ describe('flowGenerator', () => {
     expect(flow).toHaveLength(14);
   });
 
-  it('noHost_ai_1v1 có 1 CE round (crossExamRounds=1)', () => {
-    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.noHost_ai_1v1);
+  it.each([
+    'host_ai_1v1',
+    'host_human_1v1',
+    'noHost_ai_1v1',
+    'noHost_human_1v1',
+  ] as const)('%s có đủ CE Round 1 và CE Round 2', (modeId) => {
+    const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS[modeId]);
     const ceSteps = flow.filter((s) => s.phase === 'cross_exam');
-    expect(ceSteps).toHaveLength(1);
-    expect(ceSteps[0]?.speaker).toBe('CE_ROUND_1');
+    expect(ceSteps.map((step) => step.speaker)).toEqual([
+      'CE_ROUND_1',
+      'CE_ROUND_2',
+    ]);
   });
 
   it('host_human_3v3 có 2 CE rounds (R1 & R2)', () => {
@@ -45,14 +52,14 @@ describe('flowGenerator', () => {
     expect(finalJudgingPhases).toHaveLength(0);
   });
 
-  it('1v1: 13 steps (motion + prep + R1×3 + R2×3 + R3×3 + completed)', () => {
+  it('1v1: 14 steps với CE ở Round 1 và Round 2', () => {
     const flow = generateFlowFromMode(DEBATE_MODE_CONFIGS.noHost_ai_1v1);
-    // 1v1 chỉ có 1 CE round (R1): PRO_S1 + OPP_S1 + CE_1 + JD_FB_1 = 4
-    // R2 không có CE: PRO_S2 + OPP_S2 + JD_FB_2 = 3
+    // R1: PRO_S1 + OPP_S1 + CE_1 + JD_FB_1 = 4
+    // R2: OPP_S2 + PRO_S2 + CE_2 + JD_FB_2 = 4
     // R3 không có CE: PRO_S3 + OPP_S3 + JD_FB_3 = 3
     // + motion + prep + completed = 2 + 1
-    // = 2 + 4 + 3 + 3 + 1 = 13
-    expect(flow).toHaveLength(13);
+    // = 2 + 4 + 4 + 3 + 1 = 14
+    expect(flow).toHaveLength(14);
   });
 
   it('mỗi step có duration lấy từ DEBATE_DURATIONS, không magic number', () => {

@@ -330,6 +330,12 @@ export function useDebateSocket(roomId: string | undefined) {
       toast('AI feedback is ready!', { icon: '🤖', duration: 3000 });
     });
 
+    onSocketEvent('debate:ai-judge-error', (data: { message?: string }) => {
+      toast.error(data.message || 'AI Judge is temporarily unavailable.', {
+        duration: 5000,
+      });
+    });
+
     // No-host debate ended (auto or manual)
     onSocketEvent('debate:ended', (data: { roomId: string; isAuto?: boolean; verdict?: { winner: string; summary: string } }) => {
       if (data.verdict) {

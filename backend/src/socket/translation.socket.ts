@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
+import WebSocket from 'ws';
 import { ENV } from '../config/env.js';
 import { DebateRoom } from '../models/DebateRoom.js';
-import { DebateSession } from '../models/DebateSession.js';
 import {
   mergeTranscriptText,
   persistSourceCaption,
@@ -11,18 +11,12 @@ import {
   detectLocalToxicContent,
   redactToxicContent,
 } from '../features/moderation/content-moderation.service.js';
-
-type TranslationLanguage = 'en' | 'vi';
-
-type LiveWebSocket = {
-  readyState: number;
-  onopen: ((event: unknown) => void) | null;
-  onmessage: ((event: { data: unknown }) => void | Promise<void>) | null;
-  onerror: ((event: unknown) => void) | null;
-  onclose: ((event: unknown) => void) | null;
-  send: (data: string) => void;
-  close: () => void;
-};
+import {
+  buildLiveTranslationAudio,
+  buildLiveTranslationSetup,
+  buildLiveTranslationUrl,
+  type TranslationLanguage,
+} from './translation.protocol.js';
 
 type TranslationStartPayload = {
   roomId?: string;
@@ -49,7 +43,7 @@ type TranslationAck = (payload: { success: boolean; message?: string }) => void;
 type LiveConnection = {
   targetLanguage: TranslationLanguage;
   isPrimary: boolean;
-  socket: LiveWebSocket;
+  socket: WebSocket;
   ready: boolean;
   pendingAudio: string[];
 };
@@ -58,9 +52,6 @@ type TranslationSession = {
   roomId: string;
   userId: string;
   senderName: string;
-  motion: string;
-  currentSpeaker: string;
-  currentPhase: string;
   connections: LiveConnection[];
   hasReceivedAudio: boolean;
   pendingSourceCaption?: {
@@ -80,34 +71,24 @@ const MAX_AUDIO_CHUNK_CHARS = 32_000;
 const MAX_QUEUED_CHUNKS = 16;
 const TRANSCRIPT_PERSIST_DEBOUNCE_MS = 750;
 
-function buildTranscriptionInstruction(session: TranslationSession) {
-  const motion = session.motion.slice(0, 600) || 'No motion provided';
-  return `Accurately transcribe a live academic debate in Vietnamese or English.
-Debate motion: ${motion}
-Current phase: ${session.currentPhase || 'unknown'}
-Current speaker code: ${session.currentSpeaker || 'unknown'}
-Participant: ${session.senderName}
-
-Preserve argument meaning, negation, numbers, proper nouns, English terms used inside Vietnamese,
-and debate terminology. Use surrounding sentence context to resolve homophones. Do not invent words,
-translate the input transcript, summarize, or add commentary. Ignore background voices when the main
-speaker is clearer. Output transcription in the language actually spoken.`;
-}
-
 function getSocketUserId(socket: Socket) {
   return (socket as unknown as { userId: string }).userId;
 }
 
-function getLiveWebSocketConstructor() {
-  return (globalThis as unknown as {
-    WebSocket?: new (url: string) => LiveWebSocket;
-  }).WebSocket;
+function redactGeminiSecret(value: string) {
+  if (!ENV.GEMINI_API_KEY) return value;
+  return value.split(ENV.GEMINI_API_KEY).join('[redacted]');
 }
 
 async function getTextFromWebSocketData(data: unknown) {
   if (typeof data === 'string') return data;
   if (data instanceof Blob) return data.text();
   if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf8');
+  if (Array.isArray(data)) {
+    return Buffer.concat(
+      data.map((item) => (Buffer.isBuffer(item) ? item : Buffer.from(item))),
+    ).toString('utf8');
+  }
   if (ArrayBuffer.isView(data)) {
     return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf8');
   }
@@ -220,19 +201,9 @@ function stopTranslation(socketId: string) {
 }
 
 function sendAudio(connection: LiveConnection, audioBase64: string) {
-  const payload = JSON.stringify({
-    realtime_input: {
-      media_chunks: [
-        {
-          mime_type: 'audio/pcm;rate=16000',
-          data: audioBase64,
-        },
-      ],
-    },
-  });
+  const payload = JSON.stringify(buildLiveTranslationAudio(audioBase64));
 
-  // OPEN is 1 in the standard WebSocket ready-state enum.
-  if (!connection.ready || connection.socket.readyState !== 1) {
+  if (!connection.ready || connection.socket.readyState !== WebSocket.OPEN) {
     connection.pendingAudio.push(audioBase64);
     if (connection.pendingAudio.length > MAX_QUEUED_CHUNKS) connection.pendingAudio.shift();
     return;
@@ -253,16 +224,9 @@ function createLiveConnection(
   targetLanguage: TranslationLanguage,
   isPrimary: boolean,
 ) {
-  const WebSocketConstructor = getLiveWebSocketConstructor();
-  if (!WebSocketConstructor) {
-    throw new Error('This Node runtime does not provide a WebSocket client');
-  }
-
-  // Live translation configuration is currently exposed on the v1alpha
-  // Bidi endpoint. The API key stays server-side; browsers only stream PCM
-  // through this authenticated Socket.IO relay.
-  const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(ENV.GEMINI_API_KEY)}`;
-  const liveSocket = new WebSocketConstructor(url);
+  // Keep the standard API key on the server. Northflank injects it as a
+  // runtime secret, while browsers only relay PCM through authenticated IO.
+  const liveSocket = new WebSocket(buildLiveTranslationUrl(ENV.GEMINI_API_KEY));
   const connection: LiveConnection = {
     targetLanguage,
     isPrimary,
@@ -271,32 +235,15 @@ function createLiveConnection(
     pendingAudio: [],
   };
 
-  liveSocket.onopen = () => {
-    liveSocket.send(JSON.stringify({
-      setup: {
-        model: `models/${ENV.GEMINI_LIVE_MODEL}`,
-        system_instruction: {
-          parts: [{ text: buildTranscriptionInstruction(session) }],
-        },
-        generation_config: {
-          response_modalities: ['AUDIO'],
-          translation_config: {
-            target_language_code: targetLanguage,
-            // Each browser decides whether to show the original transcript
-            // or translated text. Two target streams give us
-            // Vietnamese → English and English → Vietnamese at once.
-            echo_target_language: false,
-          },
-        },
-        input_audio_transcription: {},
-        output_audio_transcription: {},
-      },
-    }));
-  };
+  liveSocket.on('open', () => {
+    liveSocket.send(
+      JSON.stringify(buildLiveTranslationSetup(ENV.GEMINI_LIVE_MODEL, targetLanguage)),
+    );
+  });
 
-  liveSocket.onmessage = async (event) => {
+  liveSocket.on('message', async (data) => {
     try {
-      const rawText = await getTextFromWebSocketData(event.data);
+      const rawText = await getTextFromWebSocketData(data);
       if (!rawText) return;
       const payload = JSON.parse(rawText) as {
         setupComplete?: unknown;
@@ -355,31 +302,34 @@ function createLiveConnection(
     } catch (error) {
       console.error('Gemini Live response could not be parsed:', error);
     }
-  };
+  });
 
-  liveSocket.onerror = () => {
-    console.error(`Gemini Live connection error for room ${session.roomId}`);
+  liveSocket.on('error', (error) => {
+    const detail = redactGeminiSecret(
+      error instanceof Error ? error.message : 'Unknown WebSocket error',
+    );
+    console.error(`Gemini Live connection error for room ${session.roomId}: ${detail}`);
     ownerSocket.emit('translation:status', {
       roomId: session.roomId,
       state: 'error',
       message: 'Live translation connection failed. Voice chat is still available.',
     });
-  };
+  });
 
-  liveSocket.onclose = (event) => {
+  liveSocket.on('close', (code, closeReason) => {
     // Intentional stop() deletes the session before close fires. Any close
     // while it is still active is useful feedback (invalid model/key, quota,
     // or a Live API protocol rejection) rather than a silent failure.
     if (sessionsBySocketId.get(ownerSocket.id) !== session) return;
-    const detail = event as { code?: number; reason?: string };
-    const reason = detail.reason ? ` (${detail.reason})` : '';
-    console.error(`Gemini Live connection closed for room ${session.roomId}: ${detail.code || 'unknown'}${reason}`);
+    const detail = redactGeminiSecret(closeReason.toString());
+    const reason = detail ? ` (${detail})` : '';
+    console.error(`Gemini Live connection closed for room ${session.roomId}: ${code}${reason}`);
     ownerSocket.emit('translation:status', {
       roomId: session.roomId,
       state: 'error',
       message: `Live translation connection closed${reason}. Voice chat is still available.`,
     });
-  };
+  });
 
   return connection;
 }
@@ -401,9 +351,6 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         roomId,
         userId,
         senderName: participant.username,
-        motion: '',
-        currentSpeaker: 'UNKNOWN',
-        currentPhase: 'unknown',
         connections: [],
         hasReceivedAudio: false,
         persistenceChain: Promise.resolve(),
@@ -461,10 +408,7 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
     }
 
     try {
-      const [room, debateSession] = await Promise.all([
-        DebateRoom.findById(roomId).select('participants motion'),
-        DebateSession.findOne({ roomId }).select('currentTurn'),
-      ]);
+      const room = await DebateRoom.findById(roomId).select('participants');
       const participant = room?.participants.find((entry) => entry.userId.toString() === userId);
       if (!participant) {
         ack?.({ success: false, message: 'You are not a participant in this debate room' });
@@ -476,9 +420,6 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         roomId,
         userId,
         senderName: participant.username,
-        motion: room?.motion || '',
-        currentSpeaker: debateSession?.currentTurn?.speaker || 'UNKNOWN',
-        currentPhase: debateSession?.currentTurn?.phase || 'unknown',
         connections: [],
         hasReceivedAudio: false,
         persistenceChain: Promise.resolve(),

@@ -111,7 +111,7 @@ interface DebateModeConfig {
   rounds: {
     prep: boolean;
     speechCount: 3;
-    crossExamRounds: 1 | 2;     // 1 cho 1v1, 2 cho 3v3
+    crossExamRounds: 2;         // CE ở Round 1 và Round 2 cho mọi format
   };
   consensusRule?: {
     role: 'BOTH_DEBATERS' | 'BOTH_CAPTAINS';  // chỉ noHost_ai_*
@@ -289,10 +289,10 @@ Implementation: Promise chain per-roomId. Count waiter để cleanup lock đúng
 ```
 
 Số steps (đã bỏ FINAL_JUDGING):
-- 1v1 (1 CE round): 13 steps
+- 1v1 (2 CE rounds): 14 steps
 - 3v3 (2 CE rounds): 14 steps
 
-Số CE rounds dựa vào `mode.rounds.crossExamRounds` (1 cho 1v1, 2 cho 3v3).
+Mọi mode đều đặt `mode.rounds.crossExamRounds = 2`.
 
 ---
 

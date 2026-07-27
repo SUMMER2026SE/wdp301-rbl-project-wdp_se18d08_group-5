@@ -1,5 +1,10 @@
 import api from './api';
-import type { AIDebateFinalAnalysis, ApiResponse, DebateSession } from '@/types';
+import type {
+  AIDebateFinalAnalysis,
+  ApiResponse,
+  DebateSession,
+  RankingApplicationResult,
+} from '@/types';
 
 export interface DebateControlResult {
   room?: unknown;
@@ -86,6 +91,7 @@ export const debateService = {
       analysis: AIDebateFinalAnalysis;
       aiSummary: string | null;
       finalScores: DebateSession['finalScores'];
+      ranking: RankingApplicationResult | null;
     }>>(`/debate/${roomId}/final-analysis`);
   },
 };

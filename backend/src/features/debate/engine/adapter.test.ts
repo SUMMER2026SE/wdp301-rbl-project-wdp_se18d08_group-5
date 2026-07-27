@@ -47,16 +47,15 @@ describe('adapter.ts — backward-compat với debate.service.ts cũ', () => {
       expect(flow[1].hostCanEnd).toBe(false);
     });
 
-    it('1v1 — 13 steps với 1 CE round', () => {
+    it('1v1 — 14 steps với CE Round 1 và CE Round 2', () => {
       const flow = getFlowAdapter('1v1', 'human');
-      expect(flow).toHaveLength(13);
-      // 1v1 chỉ có 1 CE round (crossExamRounds=1 cho 1v1)
+      expect(flow).toHaveLength(14);
       const ce1 = flow.find((s) => s.speaker === 'CE_ROUND_1');
       expect(ce1).toBeDefined();
       expect(ce1?.ce?.askingTeam).toBe('proposition');
-      // 1v1 không có CE_ROUND_2
       const ce2 = flow.find((s) => s.speaker === 'CE_ROUND_2');
-      expect(ce2).toBeUndefined();
+      expect(ce2).toBeDefined();
+      expect(ce2?.ce?.askingTeam).toBe('opposition');
     });
 
     it('3v3 cũng có 2 CE rounds (R1 Prop hỏi, R2 Opp hỏi)', () => {

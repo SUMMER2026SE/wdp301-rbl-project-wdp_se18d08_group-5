@@ -185,10 +185,9 @@ export interface DebateModeConfig {
     /** Cố định 3 theo mọi rule */
     speechCount: 3;
     /**
-     * CE chỉ diễn ra ở Round 1 & Round 2 → 1 hoặc 2 round CE tuỳ team size.
-     * (1v1 thường chỉ 1 CE, 3v3 có thể 2 — để open cho rule rõ hơn sau).
+     * CE diễn ra ở Round 1 và Round 2 cho mọi format.
      */
-    crossExamRounds: 1 | 2;
+    crossExamRounds: 2;
   };
   /**
    * Consensus rule cho prep/CE skip và start_match — chỉ noHost_ai_*.

@@ -30,6 +30,8 @@
   "propositionWins": "Proposition Win",
   "oppositionWins": "Opposition Win",
   "drawMatch": "Draw Match",
+  "resultPending": "AI Judge Pending",
+  "aiJudgeResultPending": "Gemini could not finalize the result yet. No draw or ELO change was recorded; retry the analysis below.",
 
   "finalScoreboard": "Final Scoreboard",
   "proposition": "Proposition",

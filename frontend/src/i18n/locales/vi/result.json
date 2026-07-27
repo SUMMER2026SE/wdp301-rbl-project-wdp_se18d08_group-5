@@ -30,6 +30,8 @@
   "propositionWins": "Proposition thắng",
   "oppositionWins": "Opposition thắng",
   "drawMatch": "Hòa",
+  "resultPending": "Đang chờ AI Judge",
+  "aiJudgeResultPending": "Gemini chưa thể chốt kết quả. Hệ thống không ghi nhận hòa hoặc cập nhật ELO; bạn có thể thử lại phần phân tích bên dưới.",
 
   "finalScoreboard": "Bảng điểm cuối cùng",
   "proposition": "Proposition",

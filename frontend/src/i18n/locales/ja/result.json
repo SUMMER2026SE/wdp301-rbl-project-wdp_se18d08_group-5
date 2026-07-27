@@ -30,6 +30,8 @@
   "propositionWins": "Propositionの勝利",
   "oppositionWins": "Oppositionの勝利",
   "drawMatch": "引き分け",
+  "resultPending": "AI Judgeの結果待ち",
+  "aiJudgeResultPending": "Geminiはまだ結果を確定できませんでした。引き分けやELO更新は記録されていません。下の分析を再試行してください。",
 
   "finalScoreboard": "最終スコアボード",
   "proposition": "Proposition",
