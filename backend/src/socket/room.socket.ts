@@ -53,6 +53,7 @@ export async function buildRoomStatePayload(roomId: string, userId: string) {
       roomId: room._id,
       type: { $ne: 'viewer_chat' },
       team: { $exists: false },
+      isToxic: { $ne: true },
     }).sort({ timestamp: -1 }).limit(50),
   ]);
 

@@ -21,6 +21,8 @@ export interface ISpeechTranscript {
   language: string;
   originalText: string;
   translatedText?: string;
+  isToxic: boolean;
+  moderationReason?: string;
   source: TranscriptSource;
   judgeType: 'human' | 'ai';
   hostType: 'human' | 'ai';
@@ -264,6 +266,8 @@ const debateSessionSchema = new Schema<IDebateSession>(
         language: { type: String, default: 'und' },
         originalText: { type: String, required: true, maxlength: 50_000 },
         translatedText: { type: String, required: false, maxlength: 50_000 },
+        isToxic: { type: Boolean, default: false },
+        moderationReason: { type: String, required: false, maxlength: 500 },
         source: {
           type: String,
           enum: ['gemini-live', 'native-client'],

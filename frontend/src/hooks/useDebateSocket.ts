@@ -528,6 +528,25 @@ export function useDebateSocket(roomId: string | undefined) {
         toast.error(data.message);
       },
     );
+    onSocketEvent(
+      'chat:error',
+      (data: { message: string }) => {
+        toast.error(data.message);
+      },
+    );
+    onSocketEvent(
+      'viewer-chat:error',
+      (data: { message: string }) => {
+        toast.error(data.message);
+      },
+    );
+    onSocketEvent(
+      'moderation:content-blocked',
+      (data: { roomId?: string; message: string }) => {
+        if (data.roomId && data.roomId !== roomId) return;
+        toast.error(data.message);
+      },
+    );
 
     // Join the room channel — guard against emitting before the socket is
     // connected. If we're mid-reconnect, queue the join on the next

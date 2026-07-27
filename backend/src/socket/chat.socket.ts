@@ -2,9 +2,45 @@ import { Server, Socket } from 'socket.io';
 import { Message } from '../models/Message.js';
 import { DebateRoom } from '../models/DebateRoom.js';
 import { DebateSession } from '../models/DebateSession.js';
+import {
+  BLOCKED_CONTENT_MESSAGE,
+  moderateTextContent,
+} from '../features/moderation/content-moderation.service.js';
+
+const MAX_CHAT_LENGTH = 1000;
 
 function isPrivilegedRole(role: string): boolean {
   return ['owner', 'host', 'debater', 'judge'].includes(role);
+}
+
+async function blockToxicMessage(input: {
+  socket: Socket;
+  errorEvent: 'chat:error' | 'viewer-chat:error';
+  roomId: string;
+  userId: string;
+  senderName: string;
+  senderRole: string;
+  content: string;
+  type: 'chat' | 'viewer_chat';
+}): Promise<boolean> {
+  const moderation = await moderateTextContent(input.content, { useAI: true });
+  if (!moderation.isToxic) return false;
+
+  await Message.create({
+    roomId: input.roomId,
+    senderId: input.userId,
+    senderName: input.senderName,
+    senderRole: input.senderRole,
+    content: input.content,
+    type: input.type,
+    isToxic: true,
+  });
+
+  input.socket.emit(input.errorEvent, {
+    code: 'TOXIC_CONTENT',
+    message: BLOCKED_CONTENT_MESSAGE,
+  });
+  return true;
 }
 
 export function registerChatHandlers(io: Server, socket: Socket) {
@@ -13,6 +49,11 @@ export function registerChatHandlers(io: Server, socket: Socket) {
   // Send main debate chat message (debater, judge, host only; viewers read-only)
   socket.on('chat:send', async ({ roomId, content }: { roomId: string; content: string }) => {
     if (!content || !content.trim()) return;
+    const trimmedContent = content.trim();
+    if (trimmedContent.length > MAX_CHAT_LENGTH) {
+      socket.emit('chat:error', { message: `Messages cannot exceed ${MAX_CHAT_LENGTH} characters` });
+      return;
+    }
 
     try {
       const room = await DebateRoom.findById(roomId).select('participants');
@@ -46,12 +87,24 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
+      const blocked = await blockToxicMessage({
+        socket,
+        errorEvent: 'chat:error',
+        roomId,
+        userId,
+        senderName: participant.username,
+        senderRole: participant.roomRole,
+        content: trimmedContent,
+        type: 'chat',
+      });
+      if (blocked) return;
+
       const message = await Message.create({
         roomId,
         senderId: userId,
         senderName: participant.username,
         senderRole: participant.roomRole,
-        content: content.trim(),
+        content: trimmedContent,
         type: 'chat',
         isToxic: false,
       });
@@ -76,6 +129,13 @@ export function registerChatHandlers(io: Server, socket: Socket) {
   // Send viewer chat message (viewer + host only)
   socket.on('viewer-chat:send', async ({ roomId, content }: { roomId: string; content: string }) => {
     if (!content || !content.trim()) return;
+    const trimmedContent = content.trim();
+    if (trimmedContent.length > MAX_CHAT_LENGTH) {
+      socket.emit('viewer-chat:error', {
+        message: `Messages cannot exceed ${MAX_CHAT_LENGTH} characters`,
+      });
+      return;
+    }
 
     try {
       const room = await DebateRoom.findById(roomId).select('participants viewerChatEnabled');
@@ -108,12 +168,24 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
+      const blocked = await blockToxicMessage({
+        socket,
+        errorEvent: 'viewer-chat:error',
+        roomId,
+        userId,
+        senderName: participant.username,
+        senderRole: participant.roomRole,
+        content: trimmedContent,
+        type: 'viewer_chat',
+      });
+      if (blocked) return;
+
       const message = await Message.create({
         roomId,
         senderId: userId,
         senderName: participant.username,
         senderRole: participant.roomRole,
-        content: content.trim(),
+        content: trimmedContent,
         type: 'viewer_chat',
         isToxic: false,
       });
@@ -198,7 +270,11 @@ export function registerChatHandlers(io: Server, socket: Socket) {
         return;
       }
 
-      const messages = await Message.find({ roomId, type: 'viewer_chat' })
+      const messages = await Message.find({
+        roomId,
+        type: 'viewer_chat',
+        isToxic: { $ne: true },
+      })
         .sort({ timestamp: 1 })
         .limit(100);
 

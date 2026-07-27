@@ -28,6 +28,7 @@ function transcript(overrides: Partial<ISpeechTranscript>): ISpeechTranscript {
     speakerSlot: 'S1',
     language: 'vi',
     originalText: 'Proposition argument',
+    isToxic: false,
     source: 'gemini-live',
     judgeType: 'ai',
     hostType: 'human',

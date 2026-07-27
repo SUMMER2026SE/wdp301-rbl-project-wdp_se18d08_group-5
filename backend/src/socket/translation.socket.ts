@@ -6,6 +6,11 @@ import {
   mergeTranscriptText,
   persistSourceCaption,
 } from '../features/debate/transcript.service.js';
+import {
+  BLOCKED_CONTENT_MESSAGE,
+  detectLocalToxicContent,
+  redactToxicContent,
+} from '../features/moderation/content-moderation.service.js';
 
 type TranslationLanguage = 'en' | 'vi';
 
@@ -61,7 +66,11 @@ type TranslationSession = {
   pendingSourceCaption?: {
     text: string;
     language: string;
+    isToxic: boolean;
+    moderationReason?: string;
   };
+  lastModerationWarningAt?: number;
+  redactTranslationsUntil?: number;
   persistenceTimer?: ReturnType<typeof setTimeout>;
   persistenceChain: Promise<void>;
 };
@@ -126,6 +135,25 @@ function emitCaption(
   });
 }
 
+function notifySpeechModeration(
+  socket: Socket,
+  session: TranslationSession,
+  isToxic: boolean,
+) {
+  if (!isToxic) return;
+
+  const now = Date.now();
+  session.redactTranslationsUntil = now + 5000;
+  if (session.lastModerationWarningAt && now - session.lastModerationWarningAt < 3000) return;
+  session.lastModerationWarningAt = now;
+  socket.emit('moderation:content-blocked', {
+    roomId: session.roomId,
+    kind: 'speech',
+    code: 'TOXIC_CONTENT',
+    message: BLOCKED_CONTENT_MESSAGE,
+  });
+}
+
 function flushPendingSourceCaption(session: TranslationSession) {
   if (session.persistenceTimer) {
     clearTimeout(session.persistenceTimer);
@@ -144,6 +172,8 @@ function flushPendingSourceCaption(session: TranslationSession) {
         text: pending.text,
         language: pending.language,
         source: 'gemini-live',
+        isToxic: pending.isToxic,
+        moderationReason: pending.moderationReason,
       });
     })
     .catch((error) => {
@@ -156,9 +186,14 @@ function queueSourceCaptionPersistence(
   text: string,
   language: string,
 ) {
+  const mergedText = mergeTranscriptText(session.pendingSourceCaption?.text, text);
+  const moderation = detectLocalToxicContent(mergedText);
   session.pendingSourceCaption = {
-    text: mergeTranscriptText(session.pendingSourceCaption?.text, text),
+    text: mergedText,
     language: language || session.pendingSourceCaption?.language || 'und',
+    isToxic: Boolean(session.pendingSourceCaption?.isToxic || moderation.isToxic),
+    moderationReason:
+      moderation.reason || session.pendingSourceCaption?.moderationReason,
   };
 
   if (session.persistenceTimer) clearTimeout(session.persistenceTimer);
@@ -282,14 +317,39 @@ function createLiveConnection(
       const content = payload.serverContent;
       const input = content?.inputTranscription;
       if (input?.text && connection.isPrimary) {
-        emitCaption(io, session, 'source', input.languageCode || 'und', input.text);
+        const combinedSourceText = mergeTranscriptText(
+          session.pendingSourceCaption?.text,
+          input.text,
+        );
+        const moderation = detectLocalToxicContent(combinedSourceText);
+        emitCaption(
+          io,
+          session,
+          'source',
+          input.languageCode || 'und',
+          redactToxicContent(input.text, moderation),
+        );
+        notifySpeechModeration(ownerSocket, session, moderation.isToxic);
         queueSourceCaptionPersistence(session, input.text, input.languageCode || 'und');
         ownerSocket.emit('translation:status', { roomId: session.roomId, state: 'captioning' });
       }
 
       const output = content?.outputTranscription;
       if (output?.text) {
-        emitCaption(io, session, 'translation', output.languageCode || targetLanguage, output.text);
+        const outputModeration = detectLocalToxicContent(output.text);
+        const shouldRedact =
+          Boolean(session.pendingSourceCaption?.isToxic)
+          || Boolean(session.redactTranslationsUntil && session.redactTranslationsUntil > Date.now())
+          || outputModeration.isToxic;
+        emitCaption(
+          io,
+          session,
+          'translation',
+          output.languageCode || targetLanguage,
+          shouldRedact
+            ? redactToxicContent(output.text, { ...outputModeration, isToxic: true })
+            : output.text,
+        );
         ownerSocket.emit('translation:status', { roomId: session.roomId, state: 'captioning' });
       }
     } catch (error) {
@@ -348,23 +408,36 @@ export function registerTranslationHandlers(io: Server, socket: Socket) {
         hasReceivedAudio: false,
         persistenceChain: Promise.resolve(),
       };
-      emitCaption(io, session, 'source', payload.sourceLanguage || 'und', sourceText);
+      const sourceModeration = detectLocalToxicContent(sourceText);
+      emitCaption(
+        io,
+        session,
+        'source',
+        payload.sourceLanguage || 'und',
+        redactToxicContent(sourceText, sourceModeration),
+      );
+      notifySpeechModeration(socket, session, sourceModeration.isToxic);
       await persistSourceCaption({
         roomId,
         userId,
         text: sourceText,
         language: payload.sourceLanguage || 'und',
         source: 'native-client',
+        isToxic: sourceModeration.isToxic,
+        moderationReason: sourceModeration.reason,
       });
 
       const translatedText = payload?.translatedText?.trim();
       if (translatedText && translatedText.length <= 1400) {
+        const translationModeration = detectLocalToxicContent(translatedText);
         emitCaption(
           io,
           session,
           'translation',
           payload.translatedLanguage || 'und',
-          translatedText,
+          sourceModeration.isToxic || translationModeration.isToxic
+            ? redactToxicContent(translatedText, { ...translationModeration, isToxic: true })
+            : translatedText,
         );
       }
     } catch (error) {
